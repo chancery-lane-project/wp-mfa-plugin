@@ -205,7 +205,7 @@ wp-markdown-for-agents/
 
 ```json
 {
-    "name": "dgwltd/wp-markdown-for-agents",
+    "name": "tclp/wp-markdown-for-agents",
     "description": "Serve Markdown content to AI agents via HTTP content negotiation",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
@@ -221,12 +221,12 @@ wp-markdown-for-agents/
     },
     "autoload": {
         "psr-4": {
-            "Dgwltd\\WpMarkdownForAgents\\": "src/"
+            "Tclp\\WpMarkdownForAgents\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Dgwltd\\WpMarkdownForAgents\\Tests\\": "tests/"
+            "Tclp\\WpMarkdownForAgents\\Tests\\": "tests/"
         }
     },
     "scripts": {
