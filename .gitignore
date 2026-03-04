@@ -55,3 +55,4 @@ src/utils/utopia-compiled.js
 
 # Lighthouse reports (large, local-only)
 lighthouse-reports/
+.worktrees/
