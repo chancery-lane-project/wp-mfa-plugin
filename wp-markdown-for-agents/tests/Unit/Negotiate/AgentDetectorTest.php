@@ -55,4 +55,29 @@ class AgentDetectorTest extends TestCase {
         $detector = $this->make_detector( [ 'ua_agent_strings' => [ 'ChatGPT-User' ] ] );
         $this->assertTrue( $detector->is_known_agent( 'Mozilla/5.0 ChatGPT-User/1.0' ) );
     }
+
+    public function test_get_matched_agent_returns_matched_substring(): void {
+        $result = $this->make_detector()->get_matched_agent( 'GPTBot/1.0' );
+        $this->assertSame( 'GPTBot', $result );
+    }
+
+    public function test_get_matched_agent_returns_null_for_unknown_ua(): void {
+        $result = $this->make_detector()->get_matched_agent( 'Mozilla/5.0 Chrome/120' );
+        $this->assertNull( $result );
+    }
+
+    public function test_get_matched_agent_is_case_insensitive(): void {
+        $result = $this->make_detector()->get_matched_agent( 'gptbot/1.0' );
+        $this->assertSame( 'GPTBot', $result );
+    }
+
+    public function test_get_matched_agent_returns_null_when_disabled(): void {
+        $detector = $this->make_detector( [ 'ua_force_enabled' => false ] );
+        $result   = $detector->get_matched_agent( 'GPTBot/1.0' );
+        $this->assertNull( $result );
+    }
+
+    public function test_get_matched_agent_returns_null_for_empty_ua(): void {
+        $this->assertNull( $this->make_detector()->get_matched_agent( '' ) );
+    }
 }

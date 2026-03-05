@@ -22,6 +22,33 @@ class AgentDetector {
     public function __construct( private readonly array $options ) {}
 
     /**
+     * Return the first matching UA substring, or null if none matches.
+     *
+     * @since  1.1.0
+     * @param  string $ua The HTTP User-Agent header value.
+     * @return string|null The matched substring, or null.
+     */
+    public function get_matched_agent( string $ua ): ?string {
+        if ( empty( $this->options['ua_force_enabled'] ) ) {
+            return null;
+        }
+
+        if ( '' === $ua ) {
+            return null;
+        }
+
+        $substrings = (array) ( $this->options['ua_agent_strings'] ?? [] );
+
+        foreach ( $substrings as $substring ) {
+            if ( '' !== $substring && false !== stripos( $ua, $substring ) ) {
+                return $substring;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Return true if the given UA string contains a known agent substring.
      *
      * @since  1.1.0
@@ -29,22 +56,6 @@ class AgentDetector {
      * @return bool
      */
     public function is_known_agent( string $ua ): bool {
-        if ( empty( $this->options['ua_force_enabled'] ) ) {
-            return false;
-        }
-
-        if ( '' === $ua ) {
-            return false;
-        }
-
-        $substrings = (array) ( $this->options['ua_agent_strings'] ?? [] );
-
-        foreach ( $substrings as $substring ) {
-            if ( '' !== $substring && false !== stripos( $ua, $substring ) ) {
-                return true;
-            }
-        }
-
-        return false;
+        return null !== $this->get_matched_agent( $ua );
     }
 }
