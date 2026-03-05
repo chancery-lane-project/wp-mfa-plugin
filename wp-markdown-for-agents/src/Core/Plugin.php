@@ -16,6 +16,9 @@ use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
+use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
+use Tclp\WpMarkdownForAgents\Stats\StatsPage;
+use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
 /**
  * Main plugin orchestrator.
@@ -104,8 +107,11 @@ class Plugin {
             return;
         }
 
+        global $wpdb;
         $agent_detector = new AgentDetector( $options );
-        $negotiator     = new Negotiator( $options, $this->generator, $agent_detector );
+        $stats_repo     = new StatsRepository( $wpdb );
+        $access_logger  = new AccessLogger( $stats_repo );
+        $negotiator     = new Negotiator( $options, $this->generator, $agent_detector, $access_logger );
         $this->loader->add_action( 'template_redirect', $negotiator, 'maybe_serve_markdown', 1 );
         $this->loader->add_action( 'wp_head', $negotiator, 'output_link_tag', 1 );
     }
@@ -128,6 +134,10 @@ class Plugin {
         $this->loader->add_action( 'admin_post_wp_mfa_generate', $admin, 'handle_generate_action' );
         $this->loader->add_action( 'admin_post_wp_mfa_regenerate_post', $admin, 'handle_regenerate_post_action' );
         $this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
+
+        global $wpdb;
+        $stats_page = new StatsPage( new StatsRepository( $wpdb ) );
+        $this->loader->add_action( 'admin_menu', $stats_page, 'add_page' );
     }
 
     /**
