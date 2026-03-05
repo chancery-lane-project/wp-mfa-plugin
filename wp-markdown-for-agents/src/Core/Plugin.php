@@ -14,6 +14,7 @@ use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
+use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 
 /**
@@ -103,7 +104,8 @@ class Plugin {
             return;
         }
 
-        $negotiator = new Negotiator( $options, $this->generator );
+        $agent_detector = new AgentDetector( $options );
+        $negotiator     = new Negotiator( $options, $this->generator, $agent_detector );
         $this->loader->add_action( 'template_redirect', $negotiator, 'maybe_serve_markdown', 1 );
         $this->loader->add_action( 'wp_head', $negotiator, 'output_link_tag', 1 );
     }
