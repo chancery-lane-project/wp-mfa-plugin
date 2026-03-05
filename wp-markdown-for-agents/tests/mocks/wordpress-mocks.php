@@ -571,12 +571,15 @@ if (!class_exists('wpdb')) {
         public function prepare(string $query, mixed ...$args): string {
             $this->queries[] = ['query' => $query, 'args' => $args];
             $prepared = $query;
+            $offset   = 0;
             foreach ($args as $arg) {
-                $pos = strpos($prepared, '%');
-                if (false !== $pos) {
-                    $end = $pos + 2; // skip %d, %s, etc.
-                    $prepared = substr($prepared, 0, $pos) . (is_string($arg) ? "'" . $arg . "'" : (string) $arg) . substr($prepared, $end);
+                $pos = strpos($prepared, '%', $offset);
+                if (false === $pos) {
+                    break;
                 }
+                $replacement = is_string($arg) ? "'" . $arg . "'" : (string) $arg;
+                $prepared    = substr($prepared, 0, $pos) . $replacement . substr($prepared, $pos + 2);
+                $offset      = $pos + strlen($replacement);
             }
             return $prepared;
         }
@@ -586,12 +589,12 @@ if (!class_exists('wpdb')) {
             return true;
         }
 
-        public function get_results(string $query, string $output = 'OBJECT'): array {
+        public function get_results(string|null $query = null, string $output = 'OBJECT'): array {
             $this->queries[] = ['query' => $query, 'args' => []];
             return $this->mock_get_results;
         }
 
-        public function get_var(string $query): mixed {
+        public function get_var(string|null $query = null): mixed {
             $this->queries[] = ['query' => $query, 'args' => []];
             return $this->mock_get_var;
         }
@@ -606,11 +609,13 @@ if (!class_exists('wpdb')) {
 // Admin menu stubs
 // ---------------------------------------------------------------------------
 
-$GLOBALS['_mock_menu_pages'] = [];
+$GLOBALS['_mock_menu_pages']       = [];
+$GLOBALS['_mock_dbdelta_queries']  = [];
+$GLOBALS['_mock_post_titles']      = [];
 
 if (!function_exists('add_menu_page')) {
     function add_menu_page(string $page_title, string $menu_title, string $capability, string $menu_slug, ?callable $callback = null, string $icon_url = '', ?int $position = null): string {
-        $GLOBALS['_mock_menu_pages'][$menu_slug] = compact('page_title', 'menu_title', 'capability', 'icon_url');
+        $GLOBALS['_mock_menu_pages'][$menu_slug] = compact('page_title', 'menu_title', 'capability', 'icon_url', 'position');
         return 'toplevel_page_' . $menu_slug;
     }
 }
