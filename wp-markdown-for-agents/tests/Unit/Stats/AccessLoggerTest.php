@@ -46,4 +46,11 @@ class AccessLoggerTest extends TestCase {
 
         $this->logger->log_access( 0, 'GPTBot' );
     }
+
+    public function test_log_access_does_nothing_for_negative_post_id(): void {
+        $this->repository->expects( $this->never() )
+            ->method( 'record_access' );
+
+        $this->logger->log_access( -1, 'GPTBot' );
+    }
 }
