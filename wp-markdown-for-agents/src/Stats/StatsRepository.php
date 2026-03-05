@@ -15,7 +15,7 @@ namespace Tclp\WpMarkdownForAgents\Stats;
  */
 class StatsRepository {
 
-    private const TABLE_SUFFIX = 'wp_mfa_access_stats';
+    private const TABLE_SUFFIX = 'mfa_access_stats';
 
     /**
      * @since  1.1.0
@@ -99,8 +99,8 @@ class StatsRepository {
         }
 
         $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
-        $limit     = (int) ( $filters['limit'] ?? 50 );
-        $offset    = (int) ( $filters['offset'] ?? 0 );
+        $limit     = max( 1, (int) ( $filters['limit']  ?? 50 ) );
+        $offset    = max( 0, (int) ( $filters['offset'] ?? 0 ) );
 
         $sql = "SELECT post_id, agent, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT {$limit} OFFSET {$offset}";
 

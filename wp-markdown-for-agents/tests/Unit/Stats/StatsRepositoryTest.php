@@ -18,10 +18,11 @@ class StatsRepositoryTest extends TestCase {
     protected function setUp(): void {
         $this->wpdb = new \wpdb();
         $this->repo = new StatsRepository( $this->wpdb );
+        $GLOBALS['_mock_post_titles'] = [];
     }
 
     public function test_get_table_name_uses_prefix(): void {
-        $this->assertSame( 'wp_wp_mfa_access_stats', StatsRepository::get_table_name( $this->wpdb ) );
+        $this->assertSame( 'wp_mfa_access_stats', StatsRepository::get_table_name( $this->wpdb ) );
     }
 
     public function test_get_create_table_sql_contains_columns(): void {
@@ -80,7 +81,8 @@ class StatsRepositoryTest extends TestCase {
         $this->repo->get_stats( [ 'limit' => 25, 'offset' => 50 ] );
 
         $last = end( $this->wpdb->queries );
-        $this->assertStringContainsString( 'LIMIT', $last['query'] );
+        $this->assertStringContainsString( 'LIMIT 25', $last['query'] );
+        $this->assertStringContainsString( 'OFFSET 50', $last['query'] );
     }
 
     public function test_get_total_count_returns_integer(): void {
