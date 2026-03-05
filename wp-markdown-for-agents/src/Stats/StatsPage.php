@@ -51,22 +51,23 @@ class StatsPage {
         }
 
         $filter_post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;    // phpcs:ignore WordPress.Security.NonceVerification
-        $filter_agent   = isset( $_GET['agent'] ) ? sanitize_file_name( (string) $_GET['agent'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+        $filter_agent   = isset( $_GET['agent'] ) ? sanitize_text_field( (string) $_GET['agent'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
         $paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
 
-        $filters = [];
+        $count_filters = [];
         if ( $filter_post_id > 0 ) {
-            $filters['post_id'] = $filter_post_id;
+            $count_filters['post_id'] = $filter_post_id;
         }
         if ( '' !== $filter_agent ) {
-            $filters['agent'] = $filter_agent;
+            $count_filters['agent'] = $filter_agent;
         }
 
+        $filters           = $count_filters;
         $filters['limit']  = self::PER_PAGE;
         $filters['offset'] = ( $paged - 1 ) * self::PER_PAGE;
 
         $rows        = $this->repository->get_stats( $filters );
-        $total       = $this->repository->get_total_count( $filters );
+        $total       = $this->repository->get_total_count( $count_filters );
         $agents      = $this->repository->get_distinct_agents();
         $posts       = $this->repository->get_posts_with_stats();
         $total_pages = (int) ceil( $total / self::PER_PAGE );
