@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tclp\WpMarkdownForAgents\Negotiate;
+
+use Tclp\WpMarkdownForAgents\Generator\Generator;
+
+/**
+ * Handles HTTP content negotiation for Markdown responses.
+ *
+ * Hooks into template_redirect to serve pre-generated .md files when the
+ * client sends Accept: text/markdown. Also emits a <link rel="alternate">
+ * tag in wp_head when a .md file exists for the current page.
+ *
+ * @since  1.0.0
+ * @package Tclp\WpMarkdownForAgents\Negotiate
+ */
+class Negotiator {
+
+    /**
+     * @since  1.0.0
+     * @param  array<string, mixed> $options   Plugin options.
+     * @param  Generator            $generator Generator instance (provides get_export_path).
+     */
+    public function __construct(
+        private readonly array $options,
+        private readonly Generator $generator
+    ) {}
+
+    /**
+     * Serve the Markdown file if the request accepts text/markdown.
+     *
+     * Hooked to `template_redirect` at priority 1.
+     *
+     * @since  1.0.0
+     */
+    public function maybe_serve_markdown(): void {
+        if ( ! $this->is_eligible_singular() ) {
+            return;
+        }
+
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( ! str_contains( $accept, 'text/markdown' ) ) {
+            return;
+        }
+
+        $post = get_queried_object();
+        if ( ! $post instanceof \WP_Post ) {
+            return;
+        }
+
+        $filepath = $this->generator->get_export_path( $post );
+
+        if ( ! file_exists( $filepath ) ) {
+            return;
+        }
+
+        // Validate path stays within export base before serving.
+        if ( ! $this->is_safe_filepath( $filepath ) ) {
+            return;
+        }
+
+        header( 'Content-Type: text/markdown; charset=utf-8' );
+        header( 'Vary: Accept' );
+
+        readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+        exit;
+    }
+
+    /**
+     * Output a <link rel="alternate"> tag for the current page's .md file.
+     *
+     * Hooked to `wp_head` at priority 1. Only emits when the .md file exists.
+     *
+     * @since  1.0.0
+     */
+    public function output_link_tag(): void {
+        if ( ! $this->is_eligible_singular() ) {
+            return;
+        }
+
+        $post = get_queried_object();
+        if ( ! $post instanceof \WP_Post ) {
+            return;
+        }
+
+        $filepath = $this->generator->get_export_path( $post );
+
+        if ( ! file_exists( $filepath ) ) {
+            return;
+        }
+
+        $url = esc_url( get_permalink( $post->ID ) );
+        echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n";
+    }
+
+    /**
+     * Check whether the current request is for a singular post of a configured type.
+     *
+     * @since  1.0.0
+     * @return bool
+     */
+    private function is_eligible_singular(): bool {
+        $post_types = (array) ( $this->options['post_types'] ?? [] );
+        return is_singular( $post_types );
+    }
+
+    /**
+     * Validate that a filepath stays within the configured export directory.
+     *
+     * Prevents path traversal before passing to readfile().
+     *
+     * @since  1.0.0
+     * @param  string $filepath The path to validate.
+     * @return bool
+     */
+    private function is_safe_filepath( string $filepath ): bool {
+        $export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name(
+            (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' )
+        );
+
+        $real_base = realpath( $export_dir );
+        $real_file = realpath( $filepath );
+
+        if ( false === $real_base || false === $real_file ) {
+            return false;
+        }
+
+        return str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR );
+    }
+}
