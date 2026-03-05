@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Negotiate;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 
 /**
@@ -33,13 +34,17 @@ class NegotiatorTest extends TestCase {
     protected function tearDown(): void {
         $this->remove_dir( $this->tmp_dir );
         unset( $_SERVER['HTTP_ACCEPT'] );
+        unset( $_SERVER['HTTP_USER_AGENT'] );
     }
 
     private function make_negotiator( array $options = [] ): Negotiator {
-        return new Negotiator(
-            array_merge( [ 'post_types' => [ 'post', 'page' ], 'export_dir' => 'wp-mfa-exports' ], $options ),
-            $this->generator
-        );
+        $merged = array_merge( [
+            'post_types'       => [ 'post', 'page' ],
+            'export_dir'       => 'wp-mfa-exports',
+            'ua_force_enabled' => false,
+            'ua_agent_strings' => [],
+        ], $options );
+        return new Negotiator( $merged, $this->generator, new AgentDetector( $merged ) );
     }
 
     private function make_post(): \WP_Post {
@@ -150,6 +155,58 @@ class NegotiatorTest extends TestCase {
         $this->assertStringContainsString( 'rel="alternate"', $output );
         $this->assertStringContainsString( 'type="text/markdown"', $output );
         $this->assertStringContainsString( 'https://example.com/test-post/', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — UA detection
+    // -----------------------------------------------------------------------
+
+    public function test_calls_get_export_path_when_ua_matches_known_agent(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        // File does not exist → exits early after get_export_path, before readfile/exit.
+        $this->generator->expects( $this->once() )
+            ->method( 'get_export_path' )
+            ->willReturn( '/nonexistent/path/post.md' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        $neg->maybe_serve_markdown();
+    }
+
+    public function test_does_nothing_when_ua_force_disabled_even_if_ua_matches(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => false,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        $neg->maybe_serve_markdown();
+    }
+
+    public function test_does_nothing_when_ua_unknown_and_no_accept_header(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'Mozilla/5.0 Chrome/120';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        $neg->maybe_serve_markdown();
     }
 
     // -----------------------------------------------------------------------

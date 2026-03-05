@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Negotiate;
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 
 /**
  * Handles HTTP content negotiation for Markdown responses.
@@ -25,7 +26,8 @@ class Negotiator {
      */
     public function __construct(
         private readonly array $options,
-        private readonly Generator $generator
+        private readonly Generator $generator,
+        private readonly AgentDetector $agent_detector
     ) {}
 
     /**
@@ -40,8 +42,9 @@ class Negotiator {
             return;
         }
 
-        $accept = $_SERVER['HTTP_ACCEPT'] ?? ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        if ( ! str_contains( $accept, 'text/markdown' ) ) {
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $ua     = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        if ( ! str_contains( $accept, 'text/markdown' ) && ! $this->agent_detector->is_known_agent( $ua ) ) {
             return;
         }
 
