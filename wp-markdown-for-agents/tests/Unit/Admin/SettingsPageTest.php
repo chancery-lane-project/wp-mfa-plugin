@@ -85,4 +85,46 @@ class SettingsPageTest extends TestCase {
         ] );
         $this->assertSame( [ 'my_field', 'another_field' ], $result['meta_keys'] );
     }
+
+    public function test_register_adds_ua_detection_section(): void {
+        $this->make_page()->register();
+        $sections = $GLOBALS['_mock_settings_sections']['wp-markdown-for-agents'] ?? [];
+        $this->assertContains( 'wp_mfa_ua_detection', $sections );
+    }
+
+    public function test_register_adds_ua_detection_fields(): void {
+        $this->make_page()->register();
+        $fields = $GLOBALS['_mock_settings_fields']['wp-markdown-for-agents'] ?? [];
+        $this->assertContains( 'wp_mfa_ua_force_enabled', $fields );
+        $this->assertContains( 'wp_mfa_ua_agent_strings', $fields );
+    }
+
+    public function test_sanitize_ua_force_enabled_cast_to_bool(): void {
+        $result = $this->make_page()->sanitize_options( [ 'ua_force_enabled' => '1' ] );
+        $this->assertTrue( $result['ua_force_enabled'] );
+
+        $result = $this->make_page()->sanitize_options( [] );
+        $this->assertFalse( $result['ua_force_enabled'] );
+    }
+
+    public function test_sanitize_ua_agent_strings_parses_textarea_lines(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'ua_agent_strings' => "GPTBot\nClaudeBot\n\nPerplexityBot\n",
+        ] );
+        $this->assertSame( [ 'GPTBot', 'ClaudeBot', 'PerplexityBot' ], $result['ua_agent_strings'] );
+    }
+
+    public function test_sanitize_ua_agent_strings_trims_whitespace(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'ua_agent_strings' => "  GPTBot  \n  ClaudeBot  \n",
+        ] );
+        $this->assertSame( [ 'GPTBot', 'ClaudeBot' ], $result['ua_agent_strings'] );
+    }
+
+    public function test_sanitize_ua_agent_strings_drops_empty_lines(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'ua_agent_strings' => "\n\nGPTBot\n\n",
+        ] );
+        $this->assertSame( [ 'GPTBot' ], $result['ua_agent_strings'] );
+    }
 }

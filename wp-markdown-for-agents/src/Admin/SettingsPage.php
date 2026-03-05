@@ -84,6 +84,16 @@ class SettingsPage {
         add_settings_field( 'wp_mfa_auto_generate', __( 'Auto-generate on save', 'wp-markdown-for-agents' ), [ $this, 'field_auto_generate' ], self::PAGE_SLUG, 'wp_mfa_general' );
         add_settings_field( 'wp_mfa_include_taxonomies', __( 'Include taxonomies', 'wp-markdown-for-agents' ), [ $this, 'field_include_taxonomies' ], self::PAGE_SLUG, 'wp_mfa_general' );
         add_settings_field( 'wp_mfa_include_meta', __( 'Include post meta', 'wp-markdown-for-agents' ), [ $this, 'field_include_meta' ], self::PAGE_SLUG, 'wp_mfa_general' );
+
+        add_settings_section(
+            'wp_mfa_ua_detection',
+            __( 'Agent Detection', 'wp-markdown-for-agents' ),
+            '__return_false',
+            self::PAGE_SLUG
+        );
+
+        add_settings_field( 'wp_mfa_ua_force_enabled', __( 'Enable UA detection', 'wp-markdown-for-agents' ), [ $this, 'field_ua_force_enabled' ], self::PAGE_SLUG, 'wp_mfa_ua_detection' );
+        add_settings_field( 'wp_mfa_ua_agent_strings', __( 'Agent user-agent strings', 'wp-markdown-for-agents' ), [ $this, 'field_ua_agent_strings' ], self::PAGE_SLUG, 'wp_mfa_ua_detection' );
     }
 
     /**
@@ -124,6 +134,13 @@ class SettingsPage {
         $clean['meta_keys'] = array_values( $meta_lines );
 
         $clean['delete_files_on_uninstall'] = ! empty( $input['delete_files_on_uninstall'] );
+
+        $clean['ua_force_enabled'] = ! empty( $input['ua_force_enabled'] );
+
+        // UA agent strings: one per line, trim whitespace, drop empty lines.
+        $ua_raw              = (string) ( $input['ua_agent_strings'] ?? '' );
+        $ua_lines            = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
+        $clean['ua_agent_strings'] = array_values( $ua_lines );
 
         return $clean;
     }
@@ -231,6 +248,20 @@ class SettingsPage {
         echo '<p class="description">' . esc_html__( 'Include post meta in frontmatter.', 'wp-markdown-for-agents' ) . '</p>';
         echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[meta_keys]" rows="4" class="large-text">' . $meta_val . '</textarea>';
         echo '<p class="description">' . esc_html__( 'One meta key per line.', 'wp-markdown-for-agents' ) . '</p>';
+    }
+
+    /** @since 1.1.0 */
+    public function field_ua_force_enabled(): void {
+        $checked = checked( ! empty( $this->options['ua_force_enabled'] ), true, false );
+        echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[ua_force_enabled]" value="1" ' . $checked . '>';
+        echo '<p class="description">' . esc_html__( 'Serve Markdown to known LLM agent crawlers based on User-Agent string.', 'wp-markdown-for-agents' ) . '</p>';
+    }
+
+    /** @since 1.1.0 */
+    public function field_ua_agent_strings(): void {
+        $val = esc_textarea( implode( "\n", (array) ( $this->options['ua_agent_strings'] ?? [] ) ) );
+        echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[ua_agent_strings]" rows="8" class="large-text">' . $val . '</textarea>';
+        echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'wp-markdown-for-agents' ) . '</p>';
     }
 }
 
