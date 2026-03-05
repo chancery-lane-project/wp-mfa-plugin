@@ -9,6 +9,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
+use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Negotiate\Negotiator
@@ -20,11 +21,15 @@ class NegotiatorTest extends TestCase {
     /** @var Generator&MockObject */
     private Generator $generator;
 
+    /** @var AccessLogger&MockObject */
+    private AccessLogger $logger;
+
     protected function setUp(): void {
         $this->tmp_dir = sys_get_temp_dir() . '/wp-mfa-neg-' . uniqid();
         mkdir( $this->tmp_dir, 0755, true );
 
         $this->generator = $this->createMock( Generator::class );
+        $this->logger    = $this->createMock( AccessLogger::class );
 
         $GLOBALS['_mock_is_singular']    = false;
         $GLOBALS['_mock_queried_object'] = null;
@@ -44,7 +49,7 @@ class NegotiatorTest extends TestCase {
             'ua_force_enabled' => false,
             'ua_agent_strings' => [],
         ], $options );
-        return new Negotiator( $merged, $this->generator, new AgentDetector( $merged ) );
+        return new Negotiator( $merged, $this->generator, new AgentDetector( $merged ), $this->logger );
     }
 
     private function make_post(): \WP_Post {
@@ -206,6 +211,50 @@ class NegotiatorTest extends TestCase {
             'ua_force_enabled' => true,
             'ua_agent_strings' => [ 'GPTBot' ],
         ] );
+        $neg->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — access logging
+    // -----------------------------------------------------------------------
+
+    public function test_log_access_not_called_when_file_missing(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )
+            ->willReturn( '/nonexistent/path/post.md' );
+
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $neg = $this->make_negotiator();
+        $neg->maybe_serve_markdown();
+    }
+
+    public function test_log_access_not_called_when_no_match(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'Mozilla/5.0 Chrome/120';
+
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        $neg->maybe_serve_markdown();
+    }
+
+    public function test_log_access_not_called_when_not_singular(): void {
+        $GLOBALS['_mock_is_singular'] = false;
+        $_SERVER['HTTP_ACCEPT']       = 'text/markdown';
+
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $neg = $this->make_negotiator();
         $neg->maybe_serve_markdown();
     }
 

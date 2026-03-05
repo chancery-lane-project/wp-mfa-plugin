@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\Negotiate;
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
+use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 
 /**
  * Handles HTTP content negotiation for Markdown responses.
@@ -21,13 +22,16 @@ class Negotiator {
 
     /**
      * @since  1.0.0
-     * @param  array<string, mixed> $options   Plugin options.
-     * @param  Generator            $generator Generator instance (provides get_export_path).
+     * @param  array<string, mixed> $options       Plugin options.
+     * @param  Generator            $generator     Generator instance (provides get_export_path).
+     * @param  AgentDetector        $agent_detector Detects known AI agent user-agents.
+     * @param  AccessLogger         $access_logger  Records agent access events for statistics.
      */
     public function __construct(
         private readonly array $options,
         private readonly Generator $generator,
-        private readonly AgentDetector $agent_detector
+        private readonly AgentDetector $agent_detector,
+        private readonly AccessLogger $access_logger
     ) {}
 
     /**
@@ -44,7 +48,11 @@ class Negotiator {
 
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $ua     = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        if ( ! str_contains( $accept, 'text/markdown' ) && ! $this->agent_detector->is_known_agent( $ua ) ) {
+
+        $matched_agent = $this->agent_detector->get_matched_agent( $ua );
+        $via_accept    = str_contains( $accept, 'text/markdown' );
+
+        if ( ! $via_accept && null === $matched_agent ) {
             return;
         }
 
@@ -63,6 +71,9 @@ class Negotiator {
         if ( ! $this->is_safe_filepath( $filepath ) ) {
             return;
         }
+
+        $agent_label = $matched_agent ?? 'accept-header';
+        $this->access_logger->log_access( $post->ID, $agent_label );
 
         header( 'Content-Type: text/markdown; charset=utf-8' );
         header( 'Vary: Accept' );
