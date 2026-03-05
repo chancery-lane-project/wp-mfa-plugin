@@ -1,0 +1,177 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tclp\WpMarkdownForAgents\Stats;
+
+/**
+ * Database access layer for agent access statistics.
+ *
+ * All queries against the custom `wp_mfa_access_stats` table go through
+ * this class. Counters are aggregated daily per post + agent combination.
+ *
+ * @since  1.1.0
+ * @package Tclp\WpMarkdownForAgents\Stats
+ */
+class StatsRepository {
+
+    private const TABLE_SUFFIX = 'wp_mfa_access_stats';
+
+    /**
+     * @since  1.1.0
+     * @param  \wpdb $wpdb WordPress database abstraction.
+     */
+    public function __construct( private readonly \wpdb $wpdb ) {}
+
+    /**
+     * Return the full table name including prefix.
+     *
+     * @since  1.1.0
+     */
+    public static function get_table_name( \wpdb $wpdb ): string {
+        return $wpdb->prefix . self::TABLE_SUFFIX;
+    }
+
+    /**
+     * Return the CREATE TABLE SQL for use with dbDelta().
+     *
+     * @since  1.1.0
+     */
+    public static function get_create_table_sql( \wpdb $wpdb ): string {
+        $table   = self::get_table_name( $wpdb );
+        $charset = $wpdb->get_charset_collate();
+
+        return "CREATE TABLE {$table} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            post_id bigint(20) unsigned NOT NULL,
+            agent varchar(100) NOT NULL,
+            access_date date NOT NULL,
+            count int unsigned NOT NULL DEFAULT 1,
+            PRIMARY KEY  (id),
+            UNIQUE KEY post_agent_date (post_id, agent, access_date),
+            KEY access_date (access_date)
+        ) {$charset};";
+    }
+
+    /**
+     * Record a single access — upserts the daily counter.
+     *
+     * @since  1.1.0
+     * @param  int    $post_id The accessed post ID.
+     * @param  string $agent   The matched UA substring or "accept-header".
+     */
+    public function record_access( int $post_id, string $agent ): void {
+        $table = self::get_table_name( $this->wpdb );
+        $date  = gmdate( 'Y-m-d' );
+
+        $sql = $this->wpdb->prepare(
+            "INSERT INTO {$table} (post_id, agent, access_date, count)
+             VALUES (%d, %s, %s, 1)
+             ON DUPLICATE KEY UPDATE count = count + 1",
+            $post_id,
+            $agent,
+            $date
+        );
+
+        $this->wpdb->query( $sql );
+    }
+
+    /**
+     * Query stats rows with optional filters.
+     *
+     * @since  1.1.0
+     * @param  array<string, mixed> $filters Optional: post_id, agent, limit, offset.
+     * @return array<int, object>
+     */
+    public function get_stats( array $filters = [] ): array {
+        $table  = self::get_table_name( $this->wpdb );
+        $where  = [];
+        $values = [];
+
+        if ( ! empty( $filters['post_id'] ) ) {
+            $where[]  = 'post_id = %d';
+            $values[] = (int) $filters['post_id'];
+        }
+
+        if ( ! empty( $filters['agent'] ) ) {
+            $where[]  = 'agent = %s';
+            $values[] = (string) $filters['agent'];
+        }
+
+        $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
+        $limit     = (int) ( $filters['limit'] ?? 50 );
+        $offset    = (int) ( $filters['offset'] ?? 0 );
+
+        $sql = "SELECT post_id, agent, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT {$limit} OFFSET {$offset}";
+
+        if ( ! empty( $values ) ) {
+            $sql = $this->wpdb->prepare( $sql, ...$values );
+        }
+
+        return $this->wpdb->get_results( $sql );
+    }
+
+    /**
+     * Count total rows matching the given filters (for pagination).
+     *
+     * @since  1.1.0
+     * @param  array<string, mixed> $filters Optional: post_id, agent.
+     * @return int
+     */
+    public function get_total_count( array $filters = [] ): int {
+        $table  = self::get_table_name( $this->wpdb );
+        $where  = [];
+        $values = [];
+
+        if ( ! empty( $filters['post_id'] ) ) {
+            $where[]  = 'post_id = %d';
+            $values[] = (int) $filters['post_id'];
+        }
+
+        if ( ! empty( $filters['agent'] ) ) {
+            $where[]  = 'agent = %s';
+            $values[] = (string) $filters['agent'];
+        }
+
+        $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
+        $sql       = "SELECT COUNT(*) FROM {$table} {$where_sql}";
+
+        if ( ! empty( $values ) ) {
+            $sql = $this->wpdb->prepare( $sql, ...$values );
+        }
+
+        return (int) $this->wpdb->get_var( $sql );
+    }
+
+    /**
+     * Return all distinct agent strings that have recorded stats.
+     *
+     * @since  1.1.0
+     * @return string[]
+     */
+    public function get_distinct_agents(): array {
+        $table = self::get_table_name( $this->wpdb );
+        $rows  = $this->wpdb->get_results( "SELECT DISTINCT agent FROM {$table} ORDER BY agent ASC" );
+
+        return array_map( fn( object $row ) => $row->agent, $rows );
+    }
+
+    /**
+     * Return post IDs and titles for posts that have at least one stat row.
+     *
+     * @since  1.1.0
+     * @return array<int, string> Map of post_id => title.
+     */
+    public function get_posts_with_stats(): array {
+        $table = self::get_table_name( $this->wpdb );
+        $rows  = $this->wpdb->get_results( "SELECT DISTINCT post_id FROM {$table} ORDER BY post_id ASC" );
+
+        $result = [];
+        foreach ( $rows as $row ) {
+            $id            = (int) $row->post_id;
+            $result[ $id ] = get_the_title( $id );
+        }
+
+        return $result;
+    }
+}

@@ -1,0 +1,112 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tclp\WpMarkdownForAgents\Tests\Unit\Stats;
+
+use PHPUnit\Framework\TestCase;
+use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
+
+/**
+ * @covers \Tclp\WpMarkdownForAgents\Stats\StatsRepository
+ */
+class StatsRepositoryTest extends TestCase {
+
+    private \wpdb $wpdb;
+    private StatsRepository $repo;
+
+    protected function setUp(): void {
+        $this->wpdb = new \wpdb();
+        $this->repo = new StatsRepository( $this->wpdb );
+    }
+
+    public function test_get_table_name_uses_prefix(): void {
+        $this->assertSame( 'wp_wp_mfa_access_stats', StatsRepository::get_table_name( $this->wpdb ) );
+    }
+
+    public function test_get_create_table_sql_contains_columns(): void {
+        $sql = StatsRepository::get_create_table_sql( $this->wpdb );
+        $this->assertStringContainsString( 'post_id', $sql );
+        $this->assertStringContainsString( 'agent', $sql );
+        $this->assertStringContainsString( 'access_date', $sql );
+        $this->assertStringContainsString( 'count', $sql );
+        $this->assertStringContainsString( 'UNIQUE KEY', $sql );
+    }
+
+    public function test_record_access_builds_upsert_query(): void {
+        $this->repo->record_access( 42, 'GPTBot' );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'INSERT INTO', $last['query'] );
+        $this->assertStringContainsString( 'ON DUPLICATE KEY UPDATE', $last['query'] );
+    }
+
+    public function test_record_access_includes_post_id_and_agent(): void {
+        $this->repo->record_access( 99, 'ClaudeBot' );
+
+        $queries_str = implode( ' ', array_column( $this->wpdb->queries, 'query' ) );
+        $this->assertStringContainsString( '99', $queries_str );
+        $this->assertStringContainsString( 'ClaudeBot', $queries_str );
+    }
+
+    public function test_get_stats_returns_mock_results(): void {
+        $this->wpdb->mock_get_results = [
+            (object) [ 'post_id' => 1, 'agent' => 'GPTBot', 'access_date' => '2026-03-05', 'count' => 10 ],
+        ];
+
+        $results = $this->repo->get_stats();
+        $this->assertCount( 1, $results );
+        $this->assertSame( 'GPTBot', $results[0]->agent );
+    }
+
+    public function test_get_stats_with_post_id_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'post_id' => 42 ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( '42', $last['query'] );
+    }
+
+    public function test_get_stats_with_agent_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'agent' => 'GPTBot' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'GPTBot', $last['query'] );
+    }
+
+    public function test_get_stats_with_limit_and_offset(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'limit' => 25, 'offset' => 50 ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'LIMIT', $last['query'] );
+    }
+
+    public function test_get_total_count_returns_integer(): void {
+        $this->wpdb->mock_get_var = '5';
+        $count = $this->repo->get_total_count();
+        $this->assertSame( 5, $count );
+    }
+
+    public function test_get_distinct_agents_returns_array(): void {
+        $this->wpdb->mock_get_results = [
+            (object) [ 'agent' => 'GPTBot' ],
+            (object) [ 'agent' => 'ClaudeBot' ],
+        ];
+
+        $agents = $this->repo->get_distinct_agents();
+        $this->assertSame( [ 'GPTBot', 'ClaudeBot' ], $agents );
+    }
+
+    public function test_get_posts_with_stats_returns_id_title_pairs(): void {
+        $GLOBALS['_mock_post_titles'] = [ 1 => 'Hello World', 2 => 'Another Post' ];
+        $this->wpdb->mock_get_results = [
+            (object) [ 'post_id' => 1 ],
+            (object) [ 'post_id' => 2 ],
+        ];
+
+        $posts = $this->repo->get_posts_with_stats();
+        $this->assertSame( [ 1 => 'Hello World', 2 => 'Another Post' ], $posts );
+    }
+}
