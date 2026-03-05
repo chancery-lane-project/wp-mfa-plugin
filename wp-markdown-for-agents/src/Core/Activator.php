@@ -40,9 +40,7 @@ class Activator {
 
         // Create the access stats table.
         global $wpdb;
-        if ( file_exists( ABSPATH . 'wp-admin/includes/upgrade.php' ) ) {
-            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        }
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
     }
 }
