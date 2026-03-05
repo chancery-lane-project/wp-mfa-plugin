@@ -109,4 +109,13 @@ class StatsRepositoryTest extends TestCase {
         $posts = $this->repo->get_posts_with_stats();
         $this->assertSame( [ 1 => 'Hello World', 2 => 'Another Post' ], $posts );
     }
+
+    public function test_get_stats_with_post_id_and_agent_filters(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'post_id' => 42, 'agent' => 'GPTBot' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( '42', $last['query'] );
+        $this->assertStringContainsString( 'GPTBot', $last['query'] );
+    }
 }
