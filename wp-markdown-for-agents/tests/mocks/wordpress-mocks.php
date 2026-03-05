@@ -549,3 +549,100 @@ if (!function_exists('headers_sent')) {
         return $GLOBALS['_mock_headers_sent'] ?? false;
     }
 }
+
+// ---------------------------------------------------------------------------
+// wpdb mock
+// ---------------------------------------------------------------------------
+
+if (!class_exists('wpdb')) {
+    class wpdb {
+        public string $prefix = 'wp_';
+        public string $charset = 'utf8mb4';
+
+        /** @var list<array{query: string, args: list<mixed>}> */
+        public array $queries = [];
+        /** @var mixed */
+        public $last_result = [];
+        /** @var mixed */
+        public $mock_get_results = [];
+        /** @var mixed */
+        public $mock_get_var = null;
+
+        public function prepare(string $query, mixed ...$args): string {
+            $this->queries[] = ['query' => $query, 'args' => $args];
+            $prepared = $query;
+            foreach ($args as $arg) {
+                $pos = strpos($prepared, '%');
+                if (false !== $pos) {
+                    $end = $pos + 2; // skip %d, %s, etc.
+                    $prepared = substr($prepared, 0, $pos) . (is_string($arg) ? "'" . $arg . "'" : (string) $arg) . substr($prepared, $end);
+                }
+            }
+            return $prepared;
+        }
+
+        public function query(string $query): int|bool {
+            $this->queries[] = ['query' => $query, 'args' => []];
+            return true;
+        }
+
+        public function get_results(string $query, string $output = 'OBJECT'): array {
+            $this->queries[] = ['query' => $query, 'args' => []];
+            return $this->mock_get_results;
+        }
+
+        public function get_var(string $query): mixed {
+            $this->queries[] = ['query' => $query, 'args' => []];
+            return $this->mock_get_var;
+        }
+
+        public function get_charset_collate(): string {
+            return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Admin menu stubs
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_menu_pages'] = [];
+
+if (!function_exists('add_menu_page')) {
+    function add_menu_page(string $page_title, string $menu_title, string $capability, string $menu_slug, ?callable $callback = null, string $icon_url = '', ?int $position = null): string {
+        $GLOBALS['_mock_menu_pages'][$menu_slug] = compact('page_title', 'menu_title', 'capability', 'icon_url');
+        return 'toplevel_page_' . $menu_slug;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// dbDelta stub
+// ---------------------------------------------------------------------------
+
+if (!function_exists('dbDelta')) {
+    function dbDelta(string|array $queries = '', bool $execute = true): array {
+        $GLOBALS['_mock_dbdelta_queries'] = is_array($queries) ? $queries : [$queries];
+        return [];
+    }
+}
+
+// ---------------------------------------------------------------------------
+// absint stub
+// ---------------------------------------------------------------------------
+
+if (!function_exists('absint')) {
+    function absint(mixed $maybeint): int {
+        return abs((int) $maybeint);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// get_the_title stub
+// ---------------------------------------------------------------------------
+
+if (!function_exists('get_the_title')) {
+    function get_the_title(int|\WP_Post $post = 0): string {
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_post_titles'][$id] ?? 'Post ' . $id;
+    }
+}
