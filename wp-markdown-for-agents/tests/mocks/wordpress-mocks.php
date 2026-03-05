@@ -651,3 +651,26 @@ if (!function_exists('get_the_title')) {
         return $GLOBALS['_mock_post_titles'][$id] ?? 'Post ' . $id;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Form helper stubs for StatsPage
+// ---------------------------------------------------------------------------
+
+if (!function_exists('selected')) {
+    function selected(mixed $selected, mixed $current = true, bool $echo = true): string {
+        $result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+        if ($echo) {
+            echo $result;
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('add_query_arg')) {
+    function add_query_arg(string|array $key, mixed $value = null, string $url = ''): string {
+        if (is_string($key)) {
+            return '?page=wp-mfa-stats&' . $key . '=' . $value;
+        }
+        return $url;
+    }
+}
