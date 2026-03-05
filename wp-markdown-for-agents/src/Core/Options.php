@@ -40,6 +40,22 @@ class Options {
             'meta_keys'                => [],
             'frontmatter_format'       => 'yaml',
             'delete_files_on_uninstall' => false,
+            'ua_force_enabled'         => true,
+            'ua_agent_strings'         => [
+                'GPTBot',
+                'ChatGPT-User',
+                'ClaudeBot',
+                'Claude-Web',
+                'anthropic-ai',
+                'PerplexityBot',
+                'Google-Extended',
+                'Amazonbot',
+                'cohere-ai',
+                'meta-externalagent',
+                'Bytespider',
+                'CCBot',
+                'Applebot-Extended',
+            ],
         ];
     }
 

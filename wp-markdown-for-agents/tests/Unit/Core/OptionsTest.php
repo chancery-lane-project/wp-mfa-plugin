@@ -55,4 +55,27 @@ class OptionsTest extends TestCase {
         $options = Options::get();
         $this->assertSame( Options::get_defaults(), $options );
     }
+
+    public function test_defaults_contain_ua_detection_keys(): void {
+        $defaults = Options::get_defaults();
+        $this->assertArrayHasKey( 'ua_force_enabled', $defaults );
+        $this->assertArrayHasKey( 'ua_agent_strings', $defaults );
+    }
+
+    public function test_defaults_ua_force_enabled_is_true(): void {
+        $this->assertTrue( Options::get_defaults()['ua_force_enabled'] );
+    }
+
+    public function test_defaults_ua_agent_strings_is_non_empty_array(): void {
+        $strings = Options::get_defaults()['ua_agent_strings'];
+        $this->assertIsArray( $strings );
+        $this->assertNotEmpty( $strings );
+    }
+
+    public function test_defaults_ua_agent_strings_contains_known_agents(): void {
+        $strings = Options::get_defaults()['ua_agent_strings'];
+        $this->assertContains( 'GPTBot', $strings );
+        $this->assertContains( 'ClaudeBot', $strings );
+        $this->assertContains( 'PerplexityBot', $strings );
+    }
 }
