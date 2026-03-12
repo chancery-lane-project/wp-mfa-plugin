@@ -1,5 +1,7 @@
 # Phase 1 & 2: Bug Fixes + HTTP Response Parity
 
+> **Status: ✅ COMPLETE — merged to `main` on 2026-03-12. 169 tests, 261 assertions. See `comparison-plan.md` § "Phase 1 & 2 implementation notes" for decisions that affect future work.**
+
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix four known bugs (broken frontmatter parser, leaked production mock, broken discovery link, missing query-parameter negotiation) and add four HTTP response improvements (response headers, per-post kill switch, filterable post-type allowlist), committing only on a green test suite.
@@ -201,7 +203,7 @@ git commit -m "fix: move get_bloginfo mock from production code to test mock lay
 - Modify: `src/Generator/LlmsTxtGenerator.php`
 - Modify: `tests/Unit/Generator/LlmsTxtGeneratorTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `LlmsTxtGeneratorTest`:
 
@@ -241,7 +243,7 @@ public function test_parse_frontmatter_strips_double_quoted_values(): void {
 }
 ```
 
-- [ ] **Step 2: Run new tests — confirm at least one fails**
+- [x] **Step 2: Run new tests — confirm at least one fails**
 
 ```bash
 composer test -- --filter="test_parse_frontmatter_skips_yaml_array|test_parse_frontmatter_strips_single|test_parse_frontmatter_strips_double"
@@ -249,7 +251,7 @@ composer test -- --filter="test_parse_frontmatter_skips_yaml_array|test_parse_fr
 
 Expected: `test_parse_frontmatter_strips_single_quoted_values` fails (quotes present in value).
 
-- [ ] **Step 3: Fix `parse_frontmatter()` in `src/Generator/LlmsTxtGenerator.php`**
+- [x] **Step 3: Fix `parse_frontmatter()` in `src/Generator/LlmsTxtGenerator.php`**
 
 Replace the inner block (lines 129–132):
 
@@ -294,7 +296,7 @@ if ( $in_fm ) {
 }
 ```
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 ```bash
 composer test
@@ -302,7 +304,7 @@ composer test
 
 Expected: all pass including the three new tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/Generator/LlmsTxtGenerator.php tests/Unit/Generator/LlmsTxtGeneratorTest.php
@@ -323,7 +325,7 @@ Three tightly coupled changes to `Negotiator.php`:
 - Modify: `src/Negotiate/Negotiator.php`
 - Modify: `tests/Unit/Negotiate/NegotiatorTest.php`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 First, update `tearDown()` to clean up `$_GET`:
 
@@ -446,7 +448,7 @@ public function test_log_access_label_is_query_param_when_served_via_query_param
 }
 ```
 
-- [ ] **Step 2: Run new tests — confirm they fail**
+- [x] **Step 2: Run new tests — confirm they fail**
 
 ```bash
 composer test -- --filter="test_serves_markdown_via_output_format|test_does_nothing_when_output_format|test_link_tag_href_includes_output_format|test_log_access_label_is_query_param"
@@ -454,7 +456,7 @@ composer test -- --filter="test_serves_markdown_via_output_format|test_does_noth
 
 Expected: all fail — query param not yet detected, link tag has no `output_format`.
 
-- [ ] **Step 3: Update `maybe_serve_markdown()` in `src/Negotiate/Negotiator.php`**
+- [x] **Step 3: Update `maybe_serve_markdown()` in `src/Negotiate/Negotiator.php`**
 
 Replace the variable declarations and early-return guard:
 
@@ -511,7 +513,7 @@ if ( $via_accept ) {
 }
 ```
 
-- [ ] **Step 4: Update `output_link_tag()` to append `?output_format=md`**
+- [x] **Step 4: Update `output_link_tag()` to append `?output_format=md`**
 
 Replace:
 
@@ -525,7 +527,7 @@ With:
 $url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
 ```
 
-- [ ] **Step 5: Run all tests**
+- [x] **Step 5: Run all tests**
 
 ```bash
 composer test
@@ -533,7 +535,7 @@ composer test
 
 Expected: all pass including the new tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/Negotiate/Negotiator.php tests/Unit/Negotiate/NegotiatorTest.php

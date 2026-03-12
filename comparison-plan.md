@@ -11,6 +11,42 @@ This document is self-contained. It includes enough detail — file paths, metho
 
 ---
 
+## Implementation Status
+
+| Phase | Status | Completed | Notes |
+|-------|--------|-----------|-------|
+| **1 — Bug fixes** | ✅ Done | 2026-03-12 | Merged to `main` |
+| **2 — HTTP parity** | ✅ Done | 2026-03-12 | Merged to `main` |
+| **3 — ConfigReader** | ⬜ Pending | — | |
+| **4 — Rich frontmatter** | ⬜ Pending | — | Blocked on Phase 3 for ACF (T3) |
+| **5 — Content & serving** | ⬜ Pending | — | |
+| **6 — Bulk generation UI** | ⬜ Pending | — | |
+
+### Phase 1 & 2 implementation notes
+
+These decisions were made during implementation and affect future work:
+
+**Filters added to `src/Negotiate/Negotiator.php`** (document in any user-facing changelog):
+- `wp_mfa_serve_enabled` — `(bool $enabled, \WP_Post $post)` — per-post kill switch; fires after `WP_Post` check, before `get_export_path`. Return `false` to suppress serving for that post.
+- `wp_mfa_serve_post_types` — `(string[] $post_types)` — runtime post-type allowlist; fires inside `is_eligible_singular()`. Return modified array to add/remove types.
+- `wp_mfa_content_signal` — `(string $signal)` — value for the `Content-Signal` response header. Return empty string to suppress the header.
+
+**Query parameter negotiation:** `?output_format=md` or `?output_format=markdown` now triggers Markdown serving. The `<link rel="alternate">` tag in `<head>` points to the permalink with `?output_format=md` appended. Access log label is `'query-param'` (vs `'accept-header'` or the matched UA string).
+
+**`Vary: Accept`** is only sent when the request was served via the Accept header — not for UA-matched or query-param requests.
+
+**`Content-Signal` header value** is CRLF-sanitised before being passed to `header()` to prevent injection from filter callbacks.
+
+**`sanitize_key`** is used for `$_GET['output_format']` input (strips to `[a-z0-9_-]`, lowercases). This is safe for the current allowed values (`md`, `markdown`) but is technically the wrong sanitiser for enumerated input — noted as a latent risk if the allowed list is extended.
+
+**Test infrastructure changes** (relevant when adding tests to `tests/Unit/Negotiate/`):
+- `$GLOBALS['_mock_apply_filters'][$hook]` — register a per-test callback to override `apply_filters` for a specific hook. Always `unset()` in test teardown.
+- `$GLOBALS['_mock_sent_headers']` — captures all `header()` calls within `Tclp\WpMarkdownForAgents\Negotiate` namespace. Reset to `[]` in `setUp()`. Use `assertContains('Header-Name: value', $GLOBALS['_mock_sent_headers'])` to assert headers.
+- `WP_CONTENT_DIR` is `sys_get_temp_dir()` in tests (not `/var/www/html/wp-content`) — required because `is_safe_filepath()` calls `realpath()` which needs real filesystem paths. Test temp dirs must be created under `sys_get_temp_dir() . '/wp-mfa-exports/'`.
+- `tests/mocks/namespace-mocks.php` defines `header()` and `readfile()` as namespace shims inside `Tclp\WpMarkdownForAgents\Negotiate`. `readfile()` throws `\RuntimeException` to prevent `exit` from terminating PHPUnit. Wrap serve-path tests in `try { ... } catch (\RuntimeException $e) {}`.
+
+---
+
 ## Current File Structure (Reference)
 
 ```
@@ -1581,8 +1617,8 @@ if ( $total_posts > 500 ) {
 
 | Phase | Items | Effort | Dependencies |
 |-------|-------|--------|--------------|
-| **1 — Bug fixes** | B1, B2, B3, B4, G4 (Vary fix) | Small | None |
-| **2 — HTTP parity** | G2, G3, G6, G7 | Small | None |
+| **1 — Bug fixes** | B1, B2, B3, B4, G4 (Vary fix) | ✅ Done | None |
+| **2 — HTTP parity** | G2, G3, G6, G7 | ✅ Done | None |
 | **3 — ConfigReader** | T1, T8 (taxonomy allowlist), example YAML | Medium-Large | None |
 | **4 — Rich frontmatter** | T3 (ACF), T4 (hierarchy), T5 (author), T6 (relative images), T7 (topics) | Large | Phase 3 for T3 |
 | **5 — Content & serving** | T2 (content filter), G1 (taxonomy archives) | Medium | None (G1 benefits from Phase 3) |
