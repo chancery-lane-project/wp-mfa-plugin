@@ -67,6 +67,12 @@ if (!function_exists('add_filter')) {
 
 if (!function_exists('apply_filters')) {
     function apply_filters(string $hook, mixed $value, mixed ...$args): mixed {
+        // Per-test override: $GLOBALS['_mock_apply_filters']['hook'] = fn($val, ...$args) => $modified
+        if ( isset( $GLOBALS['_mock_apply_filters'][ $hook ] ) ) {
+            $cb = $GLOBALS['_mock_apply_filters'][ $hook ];
+            return $cb( $value, ...$args );
+        }
+        // Fallback: transparent passthrough for all unregistered hooks.
         return $value;
     }
 }
@@ -191,7 +197,11 @@ if (!function_exists('wp_upload_dir')) {
 $GLOBALS['_mock_is_singular'] = false;
 
 if (!function_exists('is_singular')) {
-    function is_singular(string|array $post_types = ''): bool {
+    function is_singular( string|array $post_types = '' ): bool {
+        // An empty allowlist means no types are eligible — match real WP behaviour.
+        if ( is_array( $post_types ) && empty( $post_types ) ) {
+            return false;
+        }
         return $GLOBALS['_mock_is_singular'];
     }
 }
@@ -679,10 +689,13 @@ if (!function_exists('selected')) {
 }
 
 if (!function_exists('add_query_arg')) {
-    function add_query_arg(string|array $key, mixed $value = null, string $url = ''): string {
-        if (is_string($key)) {
-            return '?page=wp-mfa-stats&' . $key . '=' . $value;
+    function add_query_arg( string|array $key, mixed $value = null, string $url = '' ): string {
+        $pairs = is_array( $key ) ? $key : [ $key => $value ];
+        $query = http_build_query( $pairs );
+        if ( '' === $url ) {
+            return '?' . $query;
         }
-        return $url;
+        $sep = str_contains( $url, '?' ) ? '&' : '?';
+        return $url . $sep . $query;
     }
 }
