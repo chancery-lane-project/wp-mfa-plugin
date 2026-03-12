@@ -39,11 +39,12 @@ class Converter {
 	 */
 	public function __construct( array $options = array() ) {
 		$defaults = array(
-			'header_style' => 'atx',
-			'bold_style'   => '**',
-			'italic_style' => '_',
-			'hard_break'   => true,
-			'strip_tags'   => true,
+			'header_style'   => 'atx',
+			'bold_style'     => '**',
+			'italic_style'   => '_',
+			'hard_break'     => true,
+			'strip_tags'     => true,
+			'suppress_errors' => true,
 		);
 
 		/**
