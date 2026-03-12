@@ -19,7 +19,8 @@ wp-markdown-for-agents/
 ├── uninstall.php                        # Clean uninstall (deletes wp_mfa_options)
 ├── composer.json                        # PSR-4 autoload, league/html-to-markdown
 ├── config/                              # NEW — Phase 3
-│   └── export-profiles.yaml            # NEW — per-post-type config
+│   ├── export-profiles.yaml            # NEW — per-post-type config (WP core types only)
+│   └── example-post-type.yaml         # NEW — example for extending with custom post types
 ├── src/
 │   ├── Admin/
 │   │   ├── Admin.php                    # Admin coordinator, POST handlers
@@ -334,6 +335,10 @@ This is the plugin's own config file. It ships with sensible defaults for `post`
 # Runtime toggles (enabled, auto_generate, ua_agent_strings) live in
 # the admin UI (wp_mfa_options). This file handles structural config
 # that is better expressed declaratively.
+#
+# This file ships with sensible defaults for WordPress core post types only.
+# To add custom post types, copy config/example-post-type.yaml and add
+# your entries under post_type_configs below.
 
 defaults:
   include_title_header: true
@@ -350,7 +355,7 @@ defaults:
 #
 # Available options:
 #   include_title_header: bool   — Prepend # Title as H1 in body (default: true)
-#   exclude_content: bool        — Skip post_content, frontmatter + ACF only (default: false)
+#   exclude_content: bool        — Skip post_content, frontmatter + meta only (default: false)
 #   taxonomies: [slugs]          — Which taxonomies to include (default: all registered for type)
 #   include_hierarchy: bool      — Add parent/ancestors to frontmatter (default: true)
 #   include_acf_labels: bool     — Use ACF field labels as H2 headers in body (default: false)
@@ -736,6 +741,72 @@ Key test cases:
 
 ---
 
+### 3.8: Create `config/example-post-type.yaml`
+
+**File:** `config/example-post-type.yaml` (new)
+
+A commented, copy-paste-ready example showing how to configure a custom post type. This file is never loaded by the plugin — it exists purely as documentation. Site owners copy the relevant sections into their own `export-profiles.yaml`.
+
+```yaml
+# wp-markdown-for-agents — Example Custom Post Type Configuration
+#
+# Copy entries from this file into config/export-profiles.yaml under
+# post_type_configs to enable custom post type support.
+#
+# Replace "your_post_type" with your actual registered post type slug.
+
+post_type_configs:
+
+  # -------------------------------------------------------------------
+  # Minimal example — just enable the post type with all defaults.
+  # The plugin will export all registered taxonomies and the post body.
+  # -------------------------------------------------------------------
+  your_post_type: {}
+
+  # -------------------------------------------------------------------
+  # Full example — all available options shown with explanations.
+  # -------------------------------------------------------------------
+  your_post_type:
+
+    # Prepend the post title as an H1 heading in the Markdown body.
+    include_title_header: true
+
+    # Set to true to skip post_content entirely.
+    # Useful when all meaningful content lives in ACF/meta fields.
+    exclude_content: false
+
+    # Restrict which taxonomies appear in frontmatter.
+    # Leave empty ([]) to exclude all, omit this key to include all
+    # taxonomies registered to the post type.
+    taxonomies: [your_taxonomy_slug, another_taxonomy_slug]
+
+    # Include parent/ancestor post IDs and titles in frontmatter.
+    # Only meaningful for hierarchical post types.
+    include_hierarchy: false
+
+    # Use ACF field labels as H2 headings when injecting content fields.
+    include_acf_labels: true
+
+    # ACF field mappings (requires Advanced Custom Fields plugin).
+    # Use dot notation for nested group fields: group_name.field_name
+    acf_fields:
+      # Fields to include as top-level YAML frontmatter keys.
+      frontmatter:
+        - your_field_group.summary_field
+        - your_field_group.date_field
+      # Fields whose values are injected into the Markdown body.
+      content:
+        - your_field_group.summary_field
+        - your_field_group.main_content_field
+
+    # Standard WordPress post meta keys to include in frontmatter.
+    meta_fields:
+      - _your_meta_key
+      - another_meta_key
+```
+
+---
+
 ## Phase 4: Richer Frontmatter
 
 All items in this phase update `FrontmatterBuilder::build()` and potentially `Generator::generate_post()`.
@@ -985,14 +1056,14 @@ if ( ! function_exists( 'get_the_author_meta' ) ) {
 
 ### T3: ACF field support
 
-**Depends on:** Phase 3 (ConfigReader). The YAML config provides the field list:
+**Depends on:** Phase 3 (ConfigReader). The YAML config provides the field list. Add entries for your custom post type in `config/export-profiles.yaml` (see `config/example-post-type.yaml` for a full reference):
 
 ```yaml
 post_type_configs:
-  clause:
+  event:
     acf_fields:
-      frontmatter: [clause_fields.clause_summary, clause_fields.clause_last_updated_date]
-      content: [clause_fields.clause_content, clause_fields.clause_updates]
+      frontmatter: [event_details.event_date, event_details.event_location]
+      content: [event_details.event_summary, event_details.event_description]
     include_acf_labels: true
 ```
 
@@ -1381,23 +1452,155 @@ Also update `output_link_tag()` to emit `<link>` tags for taxonomy archives (che
 
 ---
 
+## Phase 6: Bulk Generation Admin UI
+
+A single admin button that generates Markdown files for every published post across all enabled post types, storing them in the configured export directory (`wp-content/wp-mfa-exports/` by default).
+
+**Why:** Operators need a zero-config, one-click way to bootstrap or fully refresh the export directory without using WP-CLI. This is especially important on first activation and after bulk content imports.
+
+### 6.1: Add "Generate All Content" button to the Settings page
+
+**File:** `src/Admin/SettingsPage.php` (and `admin/partials/wp-mfa-admin-settings.php`)
+
+Add a dedicated section below the per-post-type generate buttons:
+
+```html
+<div class="wp-mfa-bulk-generate">
+    <h2><?php esc_html_e( 'Bulk Generation', 'wp-markdown-for-agents' ); ?></h2>
+    <p><?php esc_html_e( 'Generate Markdown files for all published content across every enabled post type. Files are written to the configured export directory.', 'wp-markdown-for-agents' ); ?></p>
+    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+        <input type="hidden" name="action" value="wp_mfa_generate_all">
+        <?php wp_nonce_field( 'wp_mfa_generate_all', 'wp_mfa_generate_all_nonce' ); ?>
+        <?php submit_button( __( 'Generate All Content', 'wp-markdown-for-agents' ), 'primary', 'submit', false ); ?>
+    </form>
+</div>
+```
+
+---
+
+### 6.3: Handle the `wp_mfa_generate_all` admin-post action
+
+**File:** `src/Admin/Admin.php`
+
+Register the action in `define_hooks()`:
+
+```php
+$this->loader->add_action( 'admin_post_wp_mfa_generate_all', $admin, 'handle_generate_all' );
+```
+
+Add the handler method:
+
+```php
+/**
+ * Handle bulk "Generate All Content" form submission.
+ *
+ * Processes all enabled post types, batched at 100 posts at a time.
+ * Reports success/failure counts via admin notice transient.
+ */
+public function handle_generate_all(): void {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( esc_html__( 'You do not have permission to perform this action.', 'wp-markdown-for-agents' ) );
+    }
+
+    check_admin_referer( 'wp_mfa_generate_all', 'wp_mfa_generate_all_nonce' );
+
+    $options    = Options::get();
+    $post_types = (array) ( $options['post_types'] ?? [] );
+
+    $totals = [ 'success' => 0, 'failed' => 0, 'skipped' => 0 ];
+
+    foreach ( $post_types as $post_type ) {
+        $result = $this->generator->generate_post_type( $post_type );
+        $totals['success'] += $result['success'];
+        $totals['failed']  += $result['failed'];
+        $totals['skipped'] += $result['skipped'];
+    }
+
+    set_transient(
+        'wp_mfa_admin_notice',
+        [
+            'type'    => $totals['failed'] > 0 ? 'warning' : 'success',
+            'message' => sprintf(
+                /* translators: 1: success count, 2: failed count, 3: skipped count */
+                __( 'Bulk generation complete: %1$d generated, %2$d failed, %3$d skipped.', 'wp-markdown-for-agents' ),
+                $totals['success'],
+                $totals['failed'],
+                $totals['skipped']
+            ),
+        ],
+        30
+    );
+
+    wp_safe_redirect( add_query_arg( 'page', 'wp-markdown-for-agents', admin_url( 'options-general.php' ) ) );
+    exit;
+}
+```
+
+**Note:** For large sites (thousands of posts), this synchronous approach may hit PHP execution time limits. A time-limit warning should be shown in the UI when the total published post count across enabled types exceeds 500. Future work: integrate `WP_Background_Process` for async processing.
+
+---
+
+### 6.4: Show post count warning for large sites
+
+**File:** `src/Admin/SettingsPage.php`
+
+Before rendering the "Generate All Content" button, count total published posts across enabled post types and display a warning if the count exceeds the threshold:
+
+```php
+$total_posts = 0;
+foreach ( $post_types as $post_type ) {
+    $count       = wp_count_posts( $post_type );
+    $total_posts += (int) ( $count->publish ?? 0 );
+}
+
+if ( $total_posts > 500 ) {
+    echo '<div class="notice notice-warning inline"><p>';
+    printf(
+        /* translators: %d: number of posts */
+        esc_html__( 'This site has %d published posts across enabled post types. Bulk generation may take several minutes and could time out on shared hosting. Consider using WP-CLI instead: wp markdown-agents generate', 'wp-markdown-for-agents' ),
+        (int) $total_posts
+    );
+    echo '</p></div>';
+}
+```
+
+---
+
+### 6.5: Tests
+
+**File:** `tests/Unit/Admin/AdminTest.php`
+
+- `handle_generate_all()` calls `generate_post_type()` for each enabled post type
+- `handle_generate_all()` sets admin notice transient with correct counts
+- `handle_generate_all()` rejects requests without `manage_options` capability
+- `handle_generate_all()` rejects requests with invalid nonce
+
+---
+
 ## Phase Summary
 
 | Phase | Items | Effort | Dependencies |
 |-------|-------|--------|--------------|
 | **1 — Bug fixes** | B1, B2, B3, B4, G4 (Vary fix) | Small | None |
 | **2 — HTTP parity** | G2, G3, G6, G7 | Small | None |
-| **3 — ConfigReader** | T1, T8 (taxonomy allowlist) | Medium-Large | None |
+| **3 — ConfigReader** | T1, T8 (taxonomy allowlist), example YAML | Medium-Large | None |
 | **4 — Rich frontmatter** | T3 (ACF), T4 (hierarchy), T5 (author), T6 (relative images), T7 (topics) | Large | Phase 3 for T3 |
 | **5 — Content & serving** | T2 (content filter), G1 (taxonomy archives) | Medium | None (G1 benefits from Phase 3) |
+| **6 — Bulk generation UI** | Generate All button, large-site warning | Small-Medium | None |
 
-Phases 1 and 2 can ship immediately. Phase 3 unblocks Phase 4's ACF support. Phase 5 is independent.
+Phases 1 and 2 can ship immediately. Phase 3 unblocks Phase 4's ACF support. Phases 5 and 6 are independent.
 
 ---
 
-## Reference: wp-to-file export-profiles.yaml (this site)
+## Reference: wp-to-file export-profiles.yaml
 
-Included for reference when building the new plugin's config file. This is the YAML from `wp-content/mu-plugins/wp-to-file/config/export-profiles.yaml`:
+This section is TCLP-specific and not part of the plugin. Retained here for reference when building site-specific `export-profiles.yaml` configurations that extend the plugin.
+
+The plugin itself ships only with `post` and `page` configurations (see section 3.1). Custom post types are configured by site owners using `config/example-post-type.yaml` as a guide.
+
+---
+
+### TCLP site config (not shipped with plugin)
 
 ```yaml
 defaults:
