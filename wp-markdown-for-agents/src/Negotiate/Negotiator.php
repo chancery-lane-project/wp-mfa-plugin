@@ -63,6 +63,21 @@ class Negotiator {
             return;
         }
 
+        /**
+         * Whether to serve Markdown for this specific post.
+         *
+         * Only fires when the request has already been identified as a Markdown
+         * request (Accept header, query param, or known UA). Return false to
+         * prevent serving for this post without affecting others.
+         *
+         * @since 1.1.0
+         * @param bool     $enabled Whether serving is enabled. Default true.
+         * @param \WP_Post $post    The queried post.
+         */
+        if ( ! apply_filters( 'wp_mfa_serve_enabled', true, $post ) ) {
+            return;
+        }
+
         $filepath = $this->generator->get_export_path( $post );
 
         if ( ! file_exists( $filepath ) ) {

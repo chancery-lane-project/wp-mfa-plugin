@@ -428,6 +428,27 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // maybe_serve_markdown — per-post kill switch (G6)
+    // -----------------------------------------------------------------------
+
+    public function test_does_nothing_when_serve_enabled_filter_returns_false(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // Filter fires on hot path — after Accept check, after WP_Post check.
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] = static fn( bool $val, \WP_Post $p ): bool => false;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
