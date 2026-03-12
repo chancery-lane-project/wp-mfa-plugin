@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('WP_CONTENT_DIR')) {
-    define('WP_CONTENT_DIR', '/var/www/html/wp-content');
+    define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
 
 // ---------------------------------------------------------------------------

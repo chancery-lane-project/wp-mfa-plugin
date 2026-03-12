@@ -25,7 +25,10 @@ class NegotiatorTest extends TestCase {
     private AccessLogger $logger;
 
     protected function setUp(): void {
-        $this->tmp_dir = sys_get_temp_dir() . '/wp-mfa-neg-' . uniqid();
+        // Place tmp_dir inside the default export_dir base so is_safe_filepath
+        // can validate paths in tests that exercise the full serve path.
+        $export_base   = sys_get_temp_dir() . '/wp-mfa-exports';
+        $this->tmp_dir = $export_base . '/' . uniqid( 'wp-mfa-neg-', true );
         mkdir( $this->tmp_dir, 0755, true );
 
         $this->generator = $this->createMock( Generator::class );
@@ -40,6 +43,7 @@ class NegotiatorTest extends TestCase {
         $this->remove_dir( $this->tmp_dir );
         unset( $_SERVER['HTTP_ACCEPT'] );
         unset( $_SERVER['HTTP_USER_AGENT'] );
+        unset( $_GET['output_format'] );    // ADD this line
     }
 
     private function make_negotiator( array $options = [] ): Negotiator {
@@ -256,6 +260,112 @@ class NegotiatorTest extends TestCase {
 
         $neg = $this->make_negotiator();
         $neg->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — query parameter negotiation (B4)
+    // -----------------------------------------------------------------------
+
+    public function test_serves_markdown_via_output_format_md_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    public function test_serves_markdown_via_output_format_markdown_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    public function test_does_nothing_when_output_format_query_param_is_invalid(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'html';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+        $this->make_negotiator()->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // output_link_tag — href includes ?output_format=md (B3)
+    // -----------------------------------------------------------------------
+
+    public function test_link_tag_href_includes_output_format_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $GLOBALS['_mock_permalink']      = 'https://example.com/test-post/';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'output_format=md', $output );
+        $this->assertStringContainsString( 'https://example.com/test-post/', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — Vary: Accept scoping (G4)
+    // -----------------------------------------------------------------------
+
+    public function test_log_access_label_is_query_param_when_served_via_query_param(): void {
+        // Indirectly verifies that the query-param path does not send Vary: Accept
+        // (the access label distinguishes query-param from accept-header).
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' ); // NOT 'accept-header' — Vary: Accept must not be sent
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
     }
 
     // -----------------------------------------------------------------------

@@ -46,13 +46,15 @@ class Negotiator {
             return;
         }
 
-        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $ua     = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $accept    = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $ua        = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
         $matched_agent = $this->agent_detector->get_matched_agent( $ua );
         $via_accept    = str_contains( $accept, 'text/markdown' );
+        $via_query     = in_array( $format_qp, [ 'md', 'markdown' ], true );
 
-        if ( ! $via_accept && null === $matched_agent ) {
+        if ( ! $via_accept && ! $via_query && null === $matched_agent ) {
             return;
         }
 
@@ -72,11 +74,16 @@ class Negotiator {
             return;
         }
 
-        $agent_label = $matched_agent ?? 'accept-header';
+        $agent_label = $matched_agent ?? ( $via_accept ? 'accept-header' : 'query-param' );
         $this->access_logger->log_access( $post->ID, $agent_label );
 
         header( 'Content-Type: text/markdown; charset=utf-8' );
-        header( 'Vary: Accept' );
+
+        // Vary: Accept only when the request was Accept-header negotiated —
+        // not for UA-matched or query-param requests.
+        if ( $via_accept ) {
+            header( 'Vary: Accept' );
+        }
 
         readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
         exit;
@@ -105,7 +112,7 @@ class Negotiator {
             return;
         }
 
-        $url = esc_url( get_permalink( $post->ID ) );
+        $url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
         echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n";
     }
 
