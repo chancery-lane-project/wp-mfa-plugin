@@ -14,33 +14,33 @@ use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
  */
 class Activator {
 
-    /**
-     * Run on plugin activation.
-     *
-     * Creates the export directory, writes a protective .htaccess, and sets
-     * default options (does not overwrite existing saved options).
-     *
-     * @since  1.0.0
-     */
-    public static function activate(): void {
-        $options    = Options::get();
-        $export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
+	/**
+	 * Run on plugin activation.
+	 *
+	 * Creates the export directory, writes a protective .htaccess, and sets
+	 * default options (does not overwrite existing saved options).
+	 *
+	 * @since  1.0.0
+	 */
+	public static function activate(): void {
+		$options    = Options::get();
+		$export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
 
-        if ( wp_mkdir_p( $export_dir ) ) {
-            $htaccess = $export_dir . '/.htaccess';
-            if ( ! file_exists( $htaccess ) ) {
-                file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-                    $htaccess,
-                    "# Deny direct access to generated Markdown files.\nDeny from all\n"
-                );
-            }
-        }
+		if ( wp_mkdir_p( $export_dir ) ) {
+			$htaccess = $export_dir . '/.htaccess';
+			if ( ! file_exists( $htaccess ) ) {
+				file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+					$htaccess,
+					"# Deny direct access to generated Markdown files.\nDeny from all\n"
+				);
+			}
+		}
 
-        add_option( Options::OPTION_KEY, Options::get_defaults() );
+		add_option( Options::OPTION_KEY, Options::get_defaults() );
 
-        // Create the access stats table.
-        global $wpdb;
-        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-        dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
-    }
+		// Create the access stats table.
+		global $wpdb;
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
+	}
 }

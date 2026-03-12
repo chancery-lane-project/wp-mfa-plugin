@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 // Exit if not called by WordPress uninstall.
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-    exit;
+	exit;
 }
 
 delete_option( 'wp_mfa_options' );
