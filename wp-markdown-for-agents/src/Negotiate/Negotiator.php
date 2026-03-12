@@ -85,6 +85,21 @@ class Negotiator {
             header( 'Vary: Accept' );
         }
 
+        header( 'X-Markdown-Source: wp-markdown-for-agents' );
+
+        /**
+         * Filter the Content-Signal header value.
+         *
+         * Return an empty string to suppress the header entirely.
+         *
+         * @since 1.1.0
+         * @param string $signal The default signal value.
+         */
+        $content_signal = apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' );
+        if ( $content_signal ) {
+            header( 'Content-Signal: ' . $content_signal );
+        }
+
         readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
         exit;
     }

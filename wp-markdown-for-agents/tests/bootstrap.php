@@ -13,3 +13,6 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 // WordPress function stubs for unit tests.
 require_once __DIR__ . '/mocks/wordpress-mocks.php';
+
+// Namespace-scoped function stubs (e.g. header() shim for Negotiate namespace).
+require_once __DIR__ . '/mocks/namespace-mocks.php';

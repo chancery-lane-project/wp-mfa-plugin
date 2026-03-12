@@ -369,6 +369,62 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // maybe_serve_markdown — Content-Signal header filter (G3)
+    // -----------------------------------------------------------------------
+
+    public function test_content_signal_filter_receives_correct_default_value(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $filter_received = null;
+        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static function ( string $val ) use ( &$filter_received ): string {
+            $filter_received = $val;
+            return $val;
+        };
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( 'ai-input=yes, search=yes', $filter_received );
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+    }
+
+    public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static fn( string $val ): string => '';
+
+        // The method must proceed all the way to log_access (no fatal early-return
+        // when the filter suppresses the Content-Signal header).
+        $this->logger->expects( $this->once() )->method( 'log_access' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
