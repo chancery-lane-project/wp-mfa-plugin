@@ -9,6 +9,13 @@
  * overridden globally, without needing extensions such as runkit7.
  */
 
+namespace {
+    if ( defined( 'WP_MFA_NAMESPACE_MOCKS_LOADED' ) ) {
+        return;
+    }
+    define( 'WP_MFA_NAMESPACE_MOCKS_LOADED', true );
+}
+
 namespace Tclp\WpMarkdownForAgents\Negotiate {
     /**
      * Namespace-scoped stub for PHP's header() built-in.

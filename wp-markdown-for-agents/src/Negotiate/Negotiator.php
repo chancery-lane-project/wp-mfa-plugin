@@ -95,7 +95,7 @@ class Negotiator {
          * @since 1.1.0
          * @param string $signal The default signal value.
          */
-        $content_signal = apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' );
+        $content_signal = str_replace( [ "\r", "\n" ], '', (string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' ) );
         if ( $content_signal ) {
             header( 'Content-Signal: ' . $content_signal );
         }

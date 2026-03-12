@@ -36,6 +36,7 @@ class NegotiatorTest extends TestCase {
 
         $GLOBALS['_mock_is_singular']    = false;
         $GLOBALS['_mock_queried_object'] = null;
+        $GLOBALS['_mock_sent_headers']   = [];
         $_SERVER['HTTP_ACCEPT']          = '';
     }
 
@@ -396,6 +397,8 @@ class NegotiatorTest extends TestCase {
         } catch ( \Exception $e ) {}
 
         $this->assertSame( 'ai-input=yes, search=yes', $filter_received );
+        $this->assertContains( 'Content-Signal: ai-input=yes, search=yes', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-Markdown-Source: wp-markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
         unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
     }
 
