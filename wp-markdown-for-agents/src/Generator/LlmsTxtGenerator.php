@@ -126,9 +126,34 @@ class LlmsTxtGenerator {
                 break; // End of frontmatter.
             }
 
-            if ( $in_fm && str_contains( $trimmed, ':' ) ) {
-                [ $key, $value ] = explode( ':', $trimmed, 2 );
-                $data[ trim( $key ) ] = trim( trim( $value ), '"' );
+            if ( $in_fm ) {
+                // Skip indented lines (YAML values like "  - News") and
+                // bare list items at column 0 ("- value").
+                if ( '' !== $trimmed && ( $line !== ltrim( $line ) || '-' === $trimmed[0] ) ) {
+                    continue;
+                }
+
+                if ( str_contains( $trimmed, ':' ) ) {
+                    $parts = explode( ':', $trimmed, 2 );
+                    $key   = trim( $parts[0] );
+                    $value = trim( $parts[1] );
+
+                    // Strip surrounding single or double quotes (matched pairs only,
+                    // length >= 2 required to avoid substr returning false).
+                    if (
+                        strlen( $value ) >= 2 &&
+                        (
+                            ( str_starts_with( $value, '"' ) && str_ends_with( $value, '"' ) ) ||
+                            ( str_starts_with( $value, "'" ) && str_ends_with( $value, "'" ) )
+                        )
+                    ) {
+                        $value = substr( $value, 1, -1 );
+                    }
+
+                    if ( '' !== $key ) {
+                        $data[ $key ] = $value;
+                    }
+                }
             }
         }
 
