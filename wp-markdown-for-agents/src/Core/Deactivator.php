@@ -12,12 +12,12 @@ namespace Tclp\WpMarkdownForAgents\Core;
  */
 class Deactivator {
 
-    /**
-     * Run on plugin deactivation.
-     *
-     * @since  1.0.0
-     */
-    public static function deactivate(): void {
-        flush_rewrite_rules();
-    }
+	/**
+	 * Run on plugin deactivation.
+	 *
+	 * @since  1.0.0
+	 */
+	public static function deactivate(): void {
+		flush_rewrite_rules();
+	}
 }

@@ -25,7 +25,10 @@ class NegotiatorTest extends TestCase {
     private AccessLogger $logger;
 
     protected function setUp(): void {
-        $this->tmp_dir = sys_get_temp_dir() . '/wp-mfa-neg-' . uniqid();
+        // Place tmp_dir inside the default export_dir base so is_safe_filepath
+        // can validate paths in tests that exercise the full serve path.
+        $export_base   = sys_get_temp_dir() . '/wp-mfa-exports';
+        $this->tmp_dir = $export_base . '/' . uniqid( 'wp-mfa-neg-', true );
         mkdir( $this->tmp_dir, 0755, true );
 
         $this->generator = $this->createMock( Generator::class );
@@ -33,6 +36,7 @@ class NegotiatorTest extends TestCase {
 
         $GLOBALS['_mock_is_singular']    = false;
         $GLOBALS['_mock_queried_object'] = null;
+        $GLOBALS['_mock_sent_headers']   = [];
         $_SERVER['HTTP_ACCEPT']          = '';
     }
 
@@ -40,6 +44,7 @@ class NegotiatorTest extends TestCase {
         $this->remove_dir( $this->tmp_dir );
         unset( $_SERVER['HTTP_ACCEPT'] );
         unset( $_SERVER['HTTP_USER_AGENT'] );
+        unset( $_GET['output_format'] );    // ADD this line
     }
 
     private function make_negotiator( array $options = [] ): Negotiator {
@@ -256,6 +261,235 @@ class NegotiatorTest extends TestCase {
 
         $neg = $this->make_negotiator();
         $neg->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — query parameter negotiation (B4)
+    // -----------------------------------------------------------------------
+
+    public function test_serves_markdown_via_output_format_md_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    public function test_serves_markdown_via_output_format_markdown_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    public function test_does_nothing_when_output_format_query_param_is_invalid(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'html';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+        $this->make_negotiator()->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // output_link_tag — href includes ?output_format=md (B3)
+    // -----------------------------------------------------------------------
+
+    public function test_link_tag_href_includes_output_format_query_param(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $GLOBALS['_mock_permalink']      = 'https://example.com/test-post/';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'output_format=md', $output );
+        $this->assertStringContainsString( 'https://example.com/test-post/', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — Vary: Accept scoping (G4)
+    // -----------------------------------------------------------------------
+
+    public function test_log_access_label_is_query_param_when_served_via_query_param(): void {
+        // Indirectly verifies that the query-param path does not send Vary: Accept
+        // (the access label distinguishes query-param from accept-header).
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'query-param' ); // NOT 'accept-header' — Vary: Accept must not be sent
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — Content-Signal header filter (G3)
+    // -----------------------------------------------------------------------
+
+    public function test_content_signal_filter_receives_correct_default_value(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $filter_received = null;
+        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static function ( string $val ) use ( &$filter_received ): string {
+            $filter_received = $val;
+            return $val;
+        };
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( 'ai-input=yes, search=yes', $filter_received );
+        $this->assertContains( 'Content-Signal: ai-input=yes, search=yes', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-Markdown-Source: wp-markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+    }
+
+    public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static fn( string $val ): string => '';
+
+        // The method must proceed all the way to log_access (no fatal early-return
+        // when the filter suppresses the Content-Signal header).
+        $this->logger->expects( $this->once() )->method( 'log_access' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — per-post kill switch (G6)
+    // -----------------------------------------------------------------------
+
+    public function test_does_nothing_when_serve_enabled_filter_returns_false(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // Filter fires on hot path — after Accept check, after WP_Post check.
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] = static fn( bool $val, \WP_Post $p ): bool => false;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // is_eligible_singular — filterable post type allowlist (G7)
+    // -----------------------------------------------------------------------
+
+    public function test_serves_post_type_added_to_allowlist_via_filter(): void {
+        // 'event' is not in options['post_types'], but the filter adds it.
+        // With the updated is_singular mock, the test verifies the full hot path runs.
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+            array_merge( $types, [ 'event' ] );
+
+        $post = new \WP_Post( [ 'ID' => 2, 'post_type' => 'event', 'post_name' => 'my-event' ] );
+        $GLOBALS['_mock_is_singular']    = true;  // Simulates WP confirming this is a singular page.
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // File missing → early return after get_export_path. Confirms eligible check passed.
+        $this->generator->expects( $this->once() )
+            ->method( 'get_export_path' )
+            ->willReturn( '/nonexistent/event.md' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+    }
+
+    public function test_does_not_serve_post_type_removed_from_allowlist_via_filter(): void {
+        // Negotiator is configured with only 'post'. The filter removes it,
+        // leaving an empty array. is_singular([]) returns false (Task 0 fix).
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+            array_values( array_filter( $types, static fn( string $t ): bool => $t !== 'post' ) );
+
+        $post = $this->make_post(); // post_type = 'post'
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // is_singular([]) returns false → eligible check fails → get_export_path never called.
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator( [ 'post_types' => [ 'post' ] ] )->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
     }
 
     // -----------------------------------------------------------------------

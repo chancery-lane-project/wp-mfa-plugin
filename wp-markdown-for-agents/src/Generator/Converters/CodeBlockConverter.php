@@ -17,56 +17,56 @@ use League\HTMLToMarkdown\ElementInterface;
  */
 class CodeBlockConverter implements ConverterInterface {
 
-    /**
-     * @return string[]
-     */
-    public function getSupportedTags(): array {
-        return [ 'pre' ];
-    }
+	/**
+	 * @return string[]
+	 */
+	public function getSupportedTags(): array {
+		return array( 'pre' );
+	}
 
-    public function convert( ElementInterface $element ): string {
-        $class = $element->getAttribute( 'class' ) ?? '';
+	public function convert( ElementInterface $element ): string {
+		$class = $element->getAttribute( 'class' ) ?? '';
 
-        if ( ! str_contains( $class, 'wp-block-code' ) ) {
-            return $element->getValue();
-        }
+		if ( ! str_contains( $class, 'wp-block-code' ) ) {
+			return $element->getValue();
+		}
 
-        $language = $this->extract_language( $class );
-        $code     = $this->extract_code( $element );
+		$language = $this->extract_language( $class );
+		$code     = $this->extract_code( $element );
 
-        // Strip any existing fenced markers the default converter may have added.
-        $code = preg_replace( '/^```[a-z]*\n/m', '', $code ) ?? $code;
-        $code = preg_replace( '/\n```$/m', '', $code ) ?? $code;
-        $code = trim( $code );
+		// Strip any existing fenced markers the default converter may have added.
+		$code = preg_replace( '/^```[a-z]*\n/m', '', $code ) ?? $code;
+		$code = preg_replace( '/\n```$/m', '', $code ) ?? $code;
+		$code = trim( $code );
 
-        return "\n```{$language}\n{$code}\n```\n\n";
-    }
+		return "\n```{$language}\n{$code}\n```\n\n";
+	}
 
-    private function extract_language( string $class ): string {
-        if ( preg_match( '/is-style-(\w+)/', $class, $matches ) ) {
-            return $matches[1];
-        }
-        return '';
-    }
+	private function extract_language( string $class ): string {
+		if ( preg_match( '/is-style-(\w+)/', $class, $matches ) ) {
+			return $matches[1];
+		}
+		return '';
+	}
 
-    private function extract_code( ElementInterface $element ): string {
-        try {
-            $reflection   = new \ReflectionClass( $element );
-            $node_property = $reflection->getProperty( 'node' );
-            $node_property->setAccessible( true );
-            $dom_node = $node_property->getValue( $element );
+	private function extract_code( ElementInterface $element ): string {
+		try {
+			$reflection    = new \ReflectionClass( $element );
+			$node_property = $reflection->getProperty( 'node' );
+			$node_property->setAccessible( true );
+			$dom_node = $node_property->getValue( $element );
 
-            if ( $dom_node instanceof \DOMNode ) {
-                $code = $dom_node->textContent ?? '';
-                $code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-                return rtrim( $code );
-            }
-        } catch ( \ReflectionException $e ) {
-            // Fall through to fallback.
-        }
+			if ( $dom_node instanceof \DOMNode ) {
+				$code = $dom_node->textContent ?? '';
+				$code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				return rtrim( $code );
+			}
+		} catch ( \ReflectionException $e ) {
+			// Fall through to fallback.
+		}
 
-        $code = strip_tags( $element->getChildrenAsString() );
-        $code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-        return rtrim( $code );
-    }
+		$code = strip_tags( $element->getChildrenAsString() );
+		$code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		return rtrim( $code );
+	}
 }

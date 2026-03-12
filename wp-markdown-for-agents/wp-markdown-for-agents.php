@@ -21,7 +21,7 @@ declare(strict_types=1);
 
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+	exit;
 }
 
 define( 'WP_MFA_VERSION', '1.0.0' );
@@ -34,8 +34,8 @@ use Tclp\WpMarkdownForAgents\Core\Activator;
 use Tclp\WpMarkdownForAgents\Core\Deactivator;
 use Tclp\WpMarkdownForAgents\Core\Plugin;
 
-register_activation_hook( __FILE__, [ Activator::class, 'activate' ] );
-register_deactivation_hook( __FILE__, [ Deactivator::class, 'deactivate' ] );
+register_activation_hook( __FILE__, array( Activator::class, 'activate' ) );
+register_deactivation_hook( __FILE__, array( Deactivator::class, 'deactivate' ) );
 
 $plugin = new Plugin( WP_MFA_VERSION );
 $plugin->run();

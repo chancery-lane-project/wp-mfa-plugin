@@ -101,6 +101,40 @@ class LlmsTxtGeneratorTest extends TestCase {
         $this->assertSame( [], $result );
     }
 
+    public function test_parse_frontmatter_skips_yaml_array_items(): void {
+        $file = $this->base_dir . '/array.md';
+        file_put_contents(
+            $file,
+            "---\ntitle: My Post\ncategories:\n  - News\n  - Sport\npermalink: https://example.com/\n---\n\nBody\n"
+        );
+
+        $result = $this->gen->parse_frontmatter( $file );
+
+        $this->assertSame( 'My Post', $result['title'] );
+        $this->assertSame( 'https://example.com/', $result['permalink'] );
+        $this->assertArrayNotHasKey( '  - News', $result );
+        $this->assertArrayNotHasKey( '- News', $result );
+    }
+
+    public function test_parse_frontmatter_strips_single_quoted_values(): void {
+        $file = $this->base_dir . '/single-quotes.md';
+        file_put_contents( $file, "---\ntitle: 'Single Quoted Title'\nexcerpt: 'A short excerpt'\n---\n" );
+
+        $result = $this->gen->parse_frontmatter( $file );
+
+        $this->assertSame( 'Single Quoted Title', $result['title'] );
+        $this->assertSame( 'A short excerpt', $result['excerpt'] );
+    }
+
+    public function test_parse_frontmatter_strips_double_quoted_values(): void {
+        $file = $this->base_dir . '/double-quotes.md';
+        file_put_contents( $file, "---\ntitle: \"Double Quoted\"\n---\n" );
+
+        $result = $this->gen->parse_frontmatter( $file );
+
+        $this->assertSame( 'Double Quoted', $result['title'] );
+    }
+
     private function remove_dir( string $dir ): void {
         if ( ! is_dir( $dir ) ) {
             return;

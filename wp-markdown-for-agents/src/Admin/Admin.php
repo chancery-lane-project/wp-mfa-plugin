@@ -15,157 +15,157 @@ use Tclp\WpMarkdownForAgents\Generator\Generator;
  */
 class Admin {
 
-    private SettingsPage $settings_page;
-    private MetaBox $meta_box;
+	private SettingsPage $settings_page;
+	private MetaBox $meta_box;
 
-    /**
-     * @since  1.0.0
-     * @param  array<string, mixed> $options   Current plugin options.
-     * @param  Generator            $generator Generator instance.
-     */
-    public function __construct(
-        private readonly array $options,
-        private readonly Generator $generator
-    ) {
-        $this->settings_page = new SettingsPage( $options, $generator );
-        $this->meta_box      = new MetaBox( $options, $generator );
-    }
+	/**
+	 * @since  1.0.0
+	 * @param  array<string, mixed> $options   Current plugin options.
+	 * @param  Generator            $generator Generator instance.
+	 */
+	public function __construct(
+		private readonly array $options,
+		private readonly Generator $generator
+	) {
+		$this->settings_page = new SettingsPage( $options, $generator );
+		$this->meta_box      = new MetaBox( $options, $generator );
+	}
 
-    /**
-     * Register the settings page.
-     *
-     * Hooked to `admin_menu`.
-     *
-     * @since  1.0.0
-     */
-    public function add_settings_page(): void {
-        $this->settings_page->add_page();
-    }
+	/**
+	 * Register the settings page.
+	 *
+	 * Hooked to `admin_menu`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function add_settings_page(): void {
+		$this->settings_page->add_page();
+	}
 
-    /**
-     * Register settings, sections, and fields.
-     *
-     * Hooked to `admin_init`.
-     *
-     * @since  1.0.0
-     */
-    public function register_settings(): void {
-        $this->settings_page->register();
-    }
+	/**
+	 * Register settings, sections, and fields.
+	 *
+	 * Hooked to `admin_init`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function register_settings(): void {
+		$this->settings_page->register();
+	}
 
-    /**
-     * Register per-post meta boxes.
-     *
-     * Hooked to `add_meta_boxes`.
-     *
-     * @since  1.0.0
-     */
-    public function add_meta_boxes(): void {
-        $this->meta_box->register();
-    }
+	/**
+	 * Register per-post meta boxes.
+	 *
+	 * Hooked to `add_meta_boxes`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function add_meta_boxes(): void {
+		$this->meta_box->register();
+	}
 
-    /**
-     * Handle the bulk-generate POST action.
-     *
-     * Hooked to `admin_post_wp_mfa_generate`.
-     *
-     * @since  1.0.0
-     */
-    public function handle_generate_action(): void {
-        $post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification
+	/**
+	 * Handle the bulk-generate POST action.
+	 *
+	 * Hooked to `admin_post_wp_mfa_generate`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function handle_generate_action(): void {
+		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification
 
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
-        }
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
+		}
 
-        check_admin_referer( 'wp_mfa_generate_' . $post_type );
+		check_admin_referer( 'wp_mfa_generate_' . $post_type );
 
-        $results = $this->generator->generate_post_type( $post_type );
+		$results = $this->generator->generate_post_type( $post_type );
 
-        set_transient(
-            'wp_mfa_admin_notice',
-            [
-                'type'    => 'success',
-                'message' => sprintf(
-                    /* translators: 1: success count, 2: failed count */
-                    __( 'Generated %1$d files. Failed: %2$d.', 'wp-markdown-for-agents' ),
-                    $results['success'],
-                    $results['failed']
-                ),
-            ],
-            60
-        );
+		set_transient(
+			'wp_mfa_admin_notice',
+			array(
+				'type'    => 'success',
+				'message' => sprintf(
+					/* translators: 1: success count, 2: failed count */
+					__( 'Generated %1$d files. Failed: %2$d.', 'wp-markdown-for-agents' ),
+					$results['success'],
+					$results['failed']
+				),
+			),
+			60
+		);
 
-        wp_safe_redirect( admin_url( 'options-general.php?page=wp-markdown-for-agents' ) );
-        exit;
-    }
+		wp_safe_redirect( admin_url( 'options-general.php?page=wp-markdown-for-agents' ) );
+		exit;
+	}
 
-    /**
-     * Handle the single-post regenerate POST action.
-     *
-     * Hooked to `admin_post_wp_mfa_regenerate_post`.
-     *
-     * @since  1.0.0
-     */
-    public function handle_regenerate_post_action(): void {
-        $post_id = (int) ( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+	/**
+	 * Handle the single-post regenerate POST action.
+	 *
+	 * Hooked to `admin_post_wp_mfa_regenerate_post`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function handle_regenerate_post_action(): void {
+		$post_id = (int) ( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
 
-        if ( ! current_user_can( 'edit_post', $post_id ) ) {
-            wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
-        }
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
+		}
 
-        check_admin_referer( 'wp_mfa_regenerate_' . $post_id );
+		check_admin_referer( 'wp_mfa_regenerate_' . $post_id );
 
-        $post = get_post( $post_id );
+		$post = get_post( $post_id );
 
-        if ( $post instanceof \WP_Post ) {
-            $ok = $this->generator->generate_post( $post );
-            set_transient(
-                'wp_mfa_admin_notice',
-                [
-                    'type'    => $ok ? 'success' : 'error',
-                    'message' => $ok
-                        ? __( 'Markdown file regenerated.', 'wp-markdown-for-agents' )
-                        : __( 'Failed to regenerate Markdown file.', 'wp-markdown-for-agents' ),
-                ],
-                60
-            );
-        }
+		if ( $post instanceof \WP_Post ) {
+			$ok = $this->generator->generate_post( $post );
+			set_transient(
+				'wp_mfa_admin_notice',
+				array(
+					'type'    => $ok ? 'success' : 'error',
+					'message' => $ok
+						? __( 'Markdown file regenerated.', 'wp-markdown-for-agents' )
+						: __( 'Failed to regenerate Markdown file.', 'wp-markdown-for-agents' ),
+				),
+				60
+			);
+		}
 
-        wp_safe_redirect( admin_url( 'post.php?post=' . $post_id . '&action=edit' ) );
-        exit;
-    }
+		wp_safe_redirect( admin_url( 'post.php?post=' . $post_id . '&action=edit' ) );
+		exit;
+	}
 
-    /**
-     * Display transient-based admin notices.
-     *
-     * Hooked to `admin_notices`.
-     *
-     * @since  1.0.0
-     */
-    public function display_admin_notices(): void {
-        $notice = get_transient( 'wp_mfa_admin_notice' );
+	/**
+	 * Display transient-based admin notices.
+	 *
+	 * Hooked to `admin_notices`.
+	 *
+	 * @since  1.0.0
+	 */
+	public function display_admin_notices(): void {
+		$notice = get_transient( 'wp_mfa_admin_notice' );
 
-        if ( ! is_array( $notice ) ) {
-            return;
-        }
+		if ( ! is_array( $notice ) ) {
+			return;
+		}
 
-        delete_transient( 'wp_mfa_admin_notice' );
+		delete_transient( 'wp_mfa_admin_notice' );
 
-        $type    = in_array( $notice['type'], [ 'success', 'error', 'warning', 'info' ], true )
-            ? $notice['type'] : 'info';
-        $message = wp_kses_post( (string) ( $notice['message'] ?? '' ) );
+		$type    = in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true )
+			? $notice['type'] : 'info';
+		$message = wp_kses_post( (string) ( $notice['message'] ?? '' ) );
 
-        printf(
-            '<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
-            esc_attr( $type ),
-            $message
-        );
-    }
+		printf(
+			'<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
+			esc_attr( $type ),
+			$message
+		);
+	}
 }
 
 if ( ! function_exists( 'wp_kses_post' ) ) {
-    function wp_kses_post( string $data ): string {
-        return $data;
-    }
+	function wp_kses_post( string $data ): string {
+		return $data;
+	}
 }

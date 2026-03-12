@@ -20,127 +20,173 @@ use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
  */
 class Negotiator {
 
-    /**
-     * @since  1.0.0
-     * @param  array<string, mixed> $options       Plugin options.
-     * @param  Generator            $generator     Generator instance (provides get_export_path).
-     * @param  AgentDetector        $agent_detector Detects known AI agent user-agents.
-     * @param  AccessLogger         $access_logger  Records agent access events for statistics.
-     */
-    public function __construct(
-        private readonly array $options,
-        private readonly Generator $generator,
-        private readonly AgentDetector $agent_detector,
-        private readonly AccessLogger $access_logger
-    ) {}
+	/**
+	 * @since  1.0.0
+	 * @param  array<string, mixed> $options       Plugin options.
+	 * @param  Generator            $generator     Generator instance (provides get_export_path).
+	 * @param  AgentDetector        $agent_detector Detects known AI agent user-agents.
+	 * @param  AccessLogger         $access_logger  Records agent access events for statistics.
+	 */
+	public function __construct(
+		private readonly array $options,
+		private readonly Generator $generator,
+		private readonly AgentDetector $agent_detector,
+		private readonly AccessLogger $access_logger
+	) {}
 
-    /**
-     * Serve the Markdown file if the request accepts text/markdown.
-     *
-     * Hooked to `template_redirect` at priority 1.
-     *
-     * @since  1.0.0
-     */
-    public function maybe_serve_markdown(): void {
-        if ( ! $this->is_eligible_singular() ) {
-            return;
-        }
+	/**
+	 * Serve the Markdown file if the request accepts text/markdown.
+	 *
+	 * Hooked to `template_redirect` at priority 1.
+	 *
+	 * @since  1.0.0
+	 */
+	public function maybe_serve_markdown(): void {
+		if ( ! $this->is_eligible_singular() ) {
+			return;
+		}
 
-        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-        $ua     = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$accept    = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$ua        = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-        $matched_agent = $this->agent_detector->get_matched_agent( $ua );
-        $via_accept    = str_contains( $accept, 'text/markdown' );
+		$matched_agent = $this->agent_detector->get_matched_agent( $ua );
+		$via_accept    = str_contains( $accept, 'text/markdown' );
+		$via_query     = in_array( $format_qp, array( 'md', 'markdown' ), true );
 
-        if ( ! $via_accept && null === $matched_agent ) {
-            return;
-        }
+		if ( ! $via_accept && ! $via_query && null === $matched_agent ) {
+			return;
+		}
 
-        $post = get_queried_object();
-        if ( ! $post instanceof \WP_Post ) {
-            return;
-        }
+		$post = get_queried_object();
+		if ( ! $post instanceof \WP_Post ) {
+			return;
+		}
 
-        $filepath = $this->generator->get_export_path( $post );
+		/**
+		 * Whether to serve Markdown for this specific post.
+		 *
+		 * Only fires when the request has already been identified as a Markdown
+		 * request (Accept header, query param, or known UA). Return false to
+		 * prevent serving for this post without affecting others.
+		 *
+		 * @since 1.1.0
+		 * @param bool     $enabled Whether serving is enabled. Default true.
+		 * @param \WP_Post $post    The queried post.
+		 */
+		if ( ! apply_filters( 'wp_mfa_serve_enabled', true, $post ) ) {
+			return;
+		}
 
-        if ( ! file_exists( $filepath ) ) {
-            return;
-        }
+		$filepath = $this->generator->get_export_path( $post );
 
-        // Validate path stays within export base before serving.
-        if ( ! $this->is_safe_filepath( $filepath ) ) {
-            return;
-        }
+		if ( ! file_exists( $filepath ) ) {
+			return;
+		}
 
-        $agent_label = $matched_agent ?? 'accept-header';
-        $this->access_logger->log_access( $post->ID, $agent_label );
+		// Validate path stays within export base before serving.
+		if ( ! $this->is_safe_filepath( $filepath ) ) {
+			return;
+		}
 
-        header( 'Content-Type: text/markdown; charset=utf-8' );
-        header( 'Vary: Accept' );
+		$agent_label = $matched_agent ?? ( $via_accept ? 'accept-header' : 'query-param' );
+		$this->access_logger->log_access( $post->ID, $agent_label );
 
-        readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
-        exit;
-    }
+		header( 'Content-Type: text/markdown; charset=utf-8' );
 
-    /**
-     * Output a <link rel="alternate"> tag for the current page's .md file.
-     *
-     * Hooked to `wp_head` at priority 1. Only emits when the .md file exists.
-     *
-     * @since  1.0.0
-     */
-    public function output_link_tag(): void {
-        if ( ! $this->is_eligible_singular() ) {
-            return;
-        }
+		// Vary: Accept only when the request was Accept-header negotiated —
+		// not for UA-matched or query-param requests.
+		if ( $via_accept ) {
+			header( 'Vary: Accept' );
+		}
 
-        $post = get_queried_object();
-        if ( ! $post instanceof \WP_Post ) {
-            return;
-        }
+		header( 'X-Markdown-Source: wp-markdown-for-agents' );
 
-        $filepath = $this->generator->get_export_path( $post );
+		/**
+		 * Filter the Content-Signal header value.
+		 *
+		 * Return an empty string to suppress the header entirely.
+		 *
+		 * @since 1.1.0
+		 * @param string $signal The default signal value.
+		 */
+		$content_signal = str_replace( array( "\r", "\n" ), '', (string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' ) );
+		if ( $content_signal ) {
+			header( 'Content-Signal: ' . $content_signal );
+		}
 
-        if ( ! file_exists( $filepath ) ) {
-            return;
-        }
+		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+		exit;
+	}
 
-        $url = esc_url( get_permalink( $post->ID ) );
-        echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n";
-    }
+	/**
+	 * Output a <link rel="alternate"> tag for the current page's .md file.
+	 *
+	 * Hooked to `wp_head` at priority 1. Only emits when the .md file exists.
+	 *
+	 * @since  1.0.0
+	 */
+	public function output_link_tag(): void {
+		if ( ! $this->is_eligible_singular() ) {
+			return;
+		}
 
-    /**
-     * Check whether the current request is for a singular post of a configured type.
-     *
-     * @since  1.0.0
-     * @return bool
-     */
-    private function is_eligible_singular(): bool {
-        $post_types = (array) ( $this->options['post_types'] ?? [] );
-        return is_singular( $post_types );
-    }
+		$post = get_queried_object();
+		if ( ! $post instanceof \WP_Post ) {
+			return;
+		}
 
-    /**
-     * Validate that a filepath stays within the configured export directory.
-     *
-     * Prevents path traversal before passing to readfile().
-     *
-     * @since  1.0.0
-     * @param  string $filepath The path to validate.
-     * @return bool
-     */
-    private function is_safe_filepath( string $filepath ): bool {
-        $export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name(
-            (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' )
-        );
+		$filepath = $this->generator->get_export_path( $post );
 
-        $real_base = realpath( $export_dir );
-        $real_file = realpath( $filepath );
+		if ( ! file_exists( $filepath ) ) {
+			return;
+		}
 
-        if ( false === $real_base || false === $real_file ) {
-            return false;
-        }
+		$url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
+		echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
 
-        return str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR );
-    }
+	/**
+	 * Check whether the current request is for a singular post of a configured type.
+	 *
+	 * @since  1.0.0
+	 * @return bool
+	 */
+	private function is_eligible_singular(): bool {
+		$post_types = (array) ( $this->options['post_types'] ?? array() );
+
+		/**
+		 * Filter the post types eligible for Markdown serving.
+		 *
+		 * @since 1.1.0
+		 * @param string[] $post_types Post type slugs from plugin settings.
+		 */
+		$post_types = (array) apply_filters( 'wp_mfa_serve_post_types', $post_types );
+
+		return is_singular( $post_types );
+	}
+
+	/**
+	 * Validate that a filepath stays within the configured export directory.
+	 *
+	 * Prevents path traversal before passing to readfile().
+	 *
+	 * @since  1.0.0
+	 * @param  string $filepath The path to validate.
+	 * @return bool
+	 */
+	private function is_safe_filepath( string $filepath ): bool {
+		$export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name(
+			(string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' )
+		);
+
+		$real_base = realpath( $export_dir );
+		$real_file = realpath( $filepath );
+
+		if ( false === $real_base || false === $real_file ) {
+			return false;
+		}
+
+		return str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR );
+	}
 }
