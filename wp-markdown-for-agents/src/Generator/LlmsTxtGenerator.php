@@ -153,9 +153,3 @@ class LlmsTxtGenerator {
         return mb_substr( $text, 0, $length - 1 ) . '…';
     }
 }
-
-if ( ! function_exists( 'get_bloginfo' ) ) {
-    function get_bloginfo( string $show = '' ): string {
-        return $GLOBALS['_mock_bloginfo'][$show] ?? '';
-    }
-}

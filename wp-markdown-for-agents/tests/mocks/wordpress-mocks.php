@@ -152,6 +152,12 @@ if (!function_exists('home_url')) {
     }
 }
 
+if ( ! function_exists( 'get_bloginfo' ) ) {
+    function get_bloginfo( string $show = '' ): string {
+        return $GLOBALS['_mock_bloginfo'][ $show ] ?? '';
+    }
+}
+
 if (!function_exists('get_post_meta')) {
     function get_post_meta(int $post_id, string $key = '', bool $single = false): mixed {
         return $GLOBALS['_mock_post_meta'][$post_id][$key] ?? ($single ? '' : []);
