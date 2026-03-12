@@ -449,6 +449,50 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // is_eligible_singular — filterable post type allowlist (G7)
+    // -----------------------------------------------------------------------
+
+    public function test_serves_post_type_added_to_allowlist_via_filter(): void {
+        // 'event' is not in options['post_types'], but the filter adds it.
+        // With the updated is_singular mock, the test verifies the full hot path runs.
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+            array_merge( $types, [ 'event' ] );
+
+        $post = new \WP_Post( [ 'ID' => 2, 'post_type' => 'event', 'post_name' => 'my-event' ] );
+        $GLOBALS['_mock_is_singular']    = true;  // Simulates WP confirming this is a singular page.
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // File missing → early return after get_export_path. Confirms eligible check passed.
+        $this->generator->expects( $this->once() )
+            ->method( 'get_export_path' )
+            ->willReturn( '/nonexistent/event.md' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+    }
+
+    public function test_does_not_serve_post_type_removed_from_allowlist_via_filter(): void {
+        // Negotiator is configured with only 'post'. The filter removes it,
+        // leaving an empty array. is_singular([]) returns false (Task 0 fix).
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+            array_values( array_filter( $types, static fn( string $t ): bool => $t !== 'post' ) );
+
+        $post = $this->make_post(); // post_type = 'post'
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        // is_singular([]) returns false → eligible check fails → get_export_path never called.
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator( [ 'post_types' => [ 'post' ] ] )->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

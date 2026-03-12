@@ -154,6 +154,15 @@ class Negotiator {
      */
     private function is_eligible_singular(): bool {
         $post_types = (array) ( $this->options['post_types'] ?? [] );
+
+        /**
+         * Filter the post types eligible for Markdown serving.
+         *
+         * @since 1.1.0
+         * @param string[] $post_types Post type slugs from plugin settings.
+         */
+        $post_types = (array) apply_filters( 'wp_mfa_serve_post_types', $post_types );
+
         return is_singular( $post_types );
     }
 
