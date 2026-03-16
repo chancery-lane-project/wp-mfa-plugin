@@ -83,7 +83,42 @@ class SettingsPage {
 		add_settings_field( 'wp_mfa_export_dir', __( 'Export directory', 'wp-markdown-for-agents' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'wp_mfa_general' );
 		add_settings_field( 'wp_mfa_auto_generate', __( 'Auto-generate on save', 'wp-markdown-for-agents' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'wp_mfa_general' );
 		add_settings_field( 'wp_mfa_include_taxonomies', __( 'Include taxonomies', 'wp-markdown-for-agents' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'wp_mfa_general' );
-		add_settings_field( 'wp_mfa_include_meta', __( 'Include post meta', 'wp-markdown-for-agents' ), array( $this, 'field_include_meta' ), self::PAGE_SLUG, 'wp_mfa_general' );
+
+		// Per-post-type field configuration sections.
+		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
+		foreach ( $enabled_types as $type_slug ) {
+			$type_obj    = get_post_type_object( $type_slug );
+			$type_label  = $type_obj ? $type_obj->label : $type_slug;
+			$section_id  = 'wp_mfa_type_' . $type_slug;
+
+			add_settings_section(
+				$section_id,
+				/* translators: %s: post type label */
+				sprintf( __( 'Field Configuration: %s', 'wp-markdown-for-agents' ), $type_label ),
+				'__return_false',
+				self::PAGE_SLUG
+			);
+
+			add_settings_field(
+				'wp_mfa_frontmatter_fields_' . $type_slug,
+				__( 'Frontmatter fields', 'wp-markdown-for-agents' ),
+				function () use ( $type_slug ): void {
+					$this->field_type_frontmatter_fields( $type_slug );
+				},
+				self::PAGE_SLUG,
+				$section_id
+			);
+
+			add_settings_field(
+				'wp_mfa_content_fields_' . $type_slug,
+				__( 'Content fields', 'wp-markdown-for-agents' ),
+				function () use ( $type_slug ): void {
+					$this->field_type_content_fields( $type_slug );
+				},
+				self::PAGE_SLUG,
+				$section_id
+			);
+		}
 
 		add_settings_section(
 			'wp_mfa_ua_detection',
@@ -114,7 +149,6 @@ class SettingsPage {
 		$clean['enabled']            = ! empty( $input['enabled'] );
 		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
 		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
-		$clean['include_meta']       = ! empty( $input['include_meta'] );
 		$clean['frontmatter_format'] = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
@@ -128,10 +162,23 @@ class SettingsPage {
 		$submitted_types     = (array) ( $input['post_types'] ?? array() );
 		$clean['post_types'] = array_values( array_intersect( $submitted_types, $public_types ) );
 
-		// Meta keys: one per line, sanitise each.
-		$meta_raw           = (string) ( $input['meta_keys'] ?? '' );
-		$meta_lines         = array_filter( array_map( 'sanitize_key', explode( "\n", $meta_raw ) ) );
-		$clean['meta_keys'] = array_values( $meta_lines );
+		// Per-post-type field configs: sanitise field names (allow dots for ACF groups).
+		$type_configs = array();
+		foreach ( $clean['post_types'] as $type_slug ) {
+			$raw_frontmatter = (string) ( $input['post_type_configs'][ $type_slug ]['frontmatter_fields'] ?? '' );
+			$raw_content     = (string) ( $input['post_type_configs'][ $type_slug ]['content_fields'] ?? '' );
+
+			$frontmatter_fields = $this->sanitize_field_list( $raw_frontmatter );
+			$content_fields     = $this->sanitize_field_list( $raw_content );
+
+			if ( ! empty( $frontmatter_fields ) || ! empty( $content_fields ) ) {
+				$type_configs[ $type_slug ] = array(
+					'frontmatter_fields' => $frontmatter_fields,
+					'content_fields'     => $content_fields,
+				);
+			}
+		}
+		$clean['post_type_configs'] = $type_configs;
 
 		$clean['delete_files_on_uninstall'] = ! empty( $input['delete_files_on_uninstall'] );
 
@@ -240,14 +287,62 @@ class SettingsPage {
 		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_taxonomies]" value="1" ' . $checked . '>';
 	}
 
-	/** @since 1.0.0 */
-	public function field_include_meta(): void {
-		$checked  = checked( ! empty( $this->options['include_meta'] ), true, false );
-		$meta_val = esc_textarea( implode( "\n", (array) ( $this->options['meta_keys'] ?? array() ) ) );
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_meta]" value="1" ' . $checked . '>';
-		echo '<p class="description">' . esc_html__( 'Include post meta in frontmatter.', 'wp-markdown-for-agents' ) . '</p>';
-		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[meta_keys]" rows="4" class="large-text">' . $meta_val . '</textarea>';
-		echo '<p class="description">' . esc_html__( 'One meta key per line.', 'wp-markdown-for-agents' ) . '</p>';
+	/**
+	 * Render the frontmatter fields textarea for a post type.
+	 *
+	 * @since  1.1.0
+	 * @param  string $type_slug Post type slug.
+	 */
+	public function field_type_frontmatter_fields( string $type_slug ): void {
+		$configs = (array) ( $this->options['post_type_configs'] ?? array() );
+		$fields  = (array) ( $configs[ $type_slug ]['frontmatter_fields'] ?? array() );
+		$val     = esc_textarea( implode( "\n", $fields ) );
+		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][frontmatter_fields]';
+
+		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
+		echo '<p class="description">' . esc_html__( 'Meta or ACF fields to include in YAML frontmatter. One per line. Use dot notation for ACF groups (e.g. group_name.field_name).', 'wp-markdown-for-agents' ) . '</p>';
+	}
+
+	/**
+	 * Render the content fields textarea for a post type.
+	 *
+	 * @since  1.1.0
+	 * @param  string $type_slug Post type slug.
+	 */
+	public function field_type_content_fields( string $type_slug ): void {
+		$configs = (array) ( $this->options['post_type_configs'] ?? array() );
+		$fields  = (array) ( $configs[ $type_slug ]['content_fields'] ?? array() );
+		$val     = esc_textarea( implode( "\n", $fields ) );
+		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][content_fields]';
+
+		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
+		echo '<p class="description">' . esc_html__( 'ACF or meta fields to use as the body content. When set, post_content is automatically excluded. One per line. Use dot notation for ACF groups.', 'wp-markdown-for-agents' ) . '</p>';
+	}
+
+	/**
+	 * Sanitise a newline-separated list of field names.
+	 *
+	 * Allows alphanumeric characters, underscores, hyphens, and dots
+	 * (dots are required for ACF group dot notation like group.field).
+	 *
+	 * @since  1.1.0
+	 * @param  string $raw Raw textarea input.
+	 * @return string[] Sanitised field names.
+	 */
+	private function sanitize_field_list( string $raw ): array {
+		$lines = explode( "\n", $raw );
+		$clean = array();
+
+		foreach ( $lines as $line ) {
+			$field = trim( $line );
+			// Allow only safe characters: a-z, 0-9, underscore, hyphen, dot.
+			$field = preg_replace( '/[^a-zA-Z0-9_.\-]/', '', $field );
+			if ( '' !== $field ) {
+				$clean[] = $field;
+			}
+		}
+
+		return array_values( array_unique( $clean ) );
 	}
 
 	/** @since 1.1.0 */

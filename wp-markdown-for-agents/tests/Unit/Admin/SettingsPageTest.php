@@ -48,7 +48,7 @@ class SettingsPageTest extends TestCase {
         $this->make_page()->register();
         $fields = $GLOBALS['_mock_settings_fields']['wp-markdown-for-agents'] ?? [];
         foreach ( [ 'wp_mfa_enabled', 'wp_mfa_post_types', 'wp_mfa_export_dir',
-                    'wp_mfa_auto_generate', 'wp_mfa_include_taxonomies', 'wp_mfa_include_meta' ] as $field ) {
+                    'wp_mfa_auto_generate', 'wp_mfa_include_taxonomies' ] as $field ) {
             $this->assertContains( $field, $fields );
         }
     }
@@ -78,12 +78,18 @@ class SettingsPageTest extends TestCase {
         $this->assertSame( Options::get_defaults(), $result );
     }
 
-    public function test_sanitize_meta_keys_one_per_line(): void {
+    public function test_sanitize_post_type_configs_field_lists(): void {
         $result = $this->make_page()->sanitize_options( [
-            'include_meta' => '1',
-            'meta_keys'    => "my_field\nanother_field\n",
+            'post_types'        => [ 'post' ],
+            'post_type_configs' => [
+                'post' => [
+                    'frontmatter_fields' => "my_field\ngroup.subfield\n",
+                    'content_fields'     => "group.content_body\n",
+                ],
+            ],
         ] );
-        $this->assertSame( [ 'my_field', 'another_field' ], $result['meta_keys'] );
+        $this->assertSame( [ 'my_field', 'group.subfield' ], $result['post_type_configs']['post']['frontmatter_fields'] );
+        $this->assertSame( [ 'group.content_body' ], $result['post_type_configs']['post']['content_fields'] );
     }
 
     public function test_register_adds_ua_detection_section(): void {

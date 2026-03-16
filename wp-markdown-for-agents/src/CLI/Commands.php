@@ -58,19 +58,25 @@ class Commands {
 	 * [--with-manifest]
 	 * : Generate manifest.json with content hashes and change tracking.
 	 *
+	 * [--incremental]
+	 * : Only export changed documents (requires previous manifest.json).
+	 *   Implies --with-manifest. Generates changes.json delta file.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *   wp markdown-agents generate --post-type=post
 	 *   wp markdown-agents generate --post-id=42
+	 *   wp markdown-agents generate --incremental
 	 *
 	 * @since  1.0.0
 	 * @param  array<int, string>    $args       Positional args.
 	 * @param  array<string, string> $assoc_args Named args.
 	 */
 	public function generate( array $args, array $assoc_args ): void {
-		$dry_run   = isset( $assoc_args['dry-run'] );
-		$post_id   = isset( $assoc_args['post-id'] ) ? (int) $assoc_args['post-id'] : null;
-		$post_type = $assoc_args['post-type'] ?? null;
+		$dry_run     = isset( $assoc_args['dry-run'] );
+		$incremental = isset( $assoc_args['incremental'] );
+		$post_id     = isset( $assoc_args['post-id'] ) ? (int) $assoc_args['post-id'] : null;
+		$post_type   = $assoc_args['post-type'] ?? null;
 
 		if ( null !== $post_id ) {
 			$this->generate_single( $post_id, $dry_run );
@@ -81,17 +87,21 @@ class Commands {
 			? array( $post_type )
 			: (array) ( $this->options['post_types'] ?? array() );
 
-		foreach ( $types as $type ) {
-			$this->generate_type( $type, $dry_run );
-		}
-
 		$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
 
-		if ( isset( $assoc_args['with-manifest'] ) && $this->file_writer ) {
-			$result = $this->generate_manifest( $export_base, $types );
-			$result
-				? \WP_CLI::success( 'manifest.json generated.' )
-				: \WP_CLI::warning( 'manifest.json generation failed.' );
+		if ( $incremental && $this->file_writer ) {
+			$this->generate_incremental( $export_base, $types, $dry_run );
+		} else {
+			foreach ( $types as $type ) {
+				$this->generate_type( $type, $dry_run );
+			}
+
+			if ( isset( $assoc_args['with-manifest'] ) && $this->file_writer ) {
+				$result = $this->generate_manifest( $export_base, $types );
+				$result
+					? \WP_CLI::success( 'manifest.json generated.' )
+					: \WP_CLI::warning( 'manifest.json generation failed.' );
+			}
 		}
 
 		if ( isset( $assoc_args['with-llmstxt'] ) && $this->llms_txt ) {
@@ -251,6 +261,94 @@ class Commands {
 				$results['failed']
 			)
 		);
+	}
+
+	/**
+	 * Run an incremental export for the given post types.
+	 *
+	 * Loads the previous manifest, skips unchanged documents, and generates
+	 * manifest.json + changes.json for each post type.
+	 *
+	 * @since  1.1.0
+	 * @param  string   $export_base Absolute path to the export base directory.
+	 * @param  string[] $post_types  Post type slugs to include.
+	 * @param  bool     $dry_run     If true, report without writing files.
+	 */
+	private function generate_incremental( string $export_base, array $post_types, bool $dry_run ): void {
+		$batch_size = 100;
+
+		foreach ( $post_types as $post_type ) {
+			$type_dir = trailingslashit( $export_base ) . $post_type . '/';
+			$manifest = new ManifestGenerator( $type_dir, $this->file_writer );
+			$type_ids = array();
+			$offset   = 0;
+			$exported = 0;
+			$skipped  = 0;
+			$failed   = 0;
+
+			do {
+				$posts = get_posts(
+					array(
+						'post_type'      => $post_type,
+						'post_status'    => 'publish',
+						'posts_per_page' => $batch_size, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
+						'offset'         => $offset,
+						'orderby'        => 'ID',
+						'order'          => 'ASC',
+						'no_found_rows'  => true,
+					)
+				);
+
+				$fetched = count( $posts );
+
+				foreach ( $posts as $post ) {
+					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$type_ids[]    = $post->ID;
+
+					if ( $manifest->is_changed( $post ) ) {
+						if ( $dry_run ) {
+							\WP_CLI::log( "[dry-run] Would export: {$post->post_name}" );
+						} elseif ( $this->generator->generate_post( $post ) ) {
+							++$exported;
+						} else {
+							++$failed;
+						}
+					} else {
+						++$skipped;
+					}
+
+					// Add all documents to the manifest (changed or not).
+					$full_path = $this->generator->get_export_path( $post );
+					if ( file_exists( $full_path ) ) {
+						$manifest->add_document( $post, $relative_path );
+					}
+				}
+
+				$offset += $batch_size;
+			} while ( $fetched === $batch_size );
+
+			$manifest->mark_deleted_documents( $type_ids );
+
+			if ( $dry_run ) {
+				\WP_CLI::log(
+					sprintf( '[dry-run] %s: %d changed, %d unchanged.', $post_type, $exported + $failed, $skipped )
+				);
+				continue;
+			}
+
+			$manifest->save();
+			$manifest->save_changes_file();
+
+			\WP_CLI::success(
+				sprintf(
+					'%s: %d exported, %d unchanged, %d failed.',
+					$post_type,
+					$exported,
+					$skipped,
+					$failed
+				)
+			);
+		}
 	}
 
 	/**

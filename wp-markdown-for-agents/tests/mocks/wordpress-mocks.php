@@ -313,7 +313,9 @@ if (!class_exists('WP_Post')) {
         public string $post_name = '';
         public string $post_type = 'post';
         public string $post_status = 'publish';
+        public string $post_date = '2025-01-01 12:00:00';
         public string $post_date_gmt = '2025-01-01 12:00:00';
+        public string $post_modified = '2025-06-01 12:00:00';
         public string $post_modified_gmt = '2025-06-01 12:00:00';
         public string $post_author = '1';
 
@@ -414,6 +416,16 @@ if (!function_exists('add_meta_box')) {
 if (!function_exists('get_post_types')) {
     function get_post_types(array $args = [], string $output = 'names'): array {
         return $GLOBALS['_mock_post_types'] ?? ['post' => 'post', 'page' => 'page'];
+    }
+}
+
+if (!function_exists('get_post_type_object')) {
+    function get_post_type_object(string $post_type): ?object {
+        $objects = $GLOBALS['_mock_post_type_objects'] ?? [
+            'post' => (object) ['name' => 'post', 'label' => 'Posts'],
+            'page' => (object) ['name' => 'page', 'label' => 'Pages'],
+        ];
+        return $objects[$post_type] ?? null;
     }
 }
 

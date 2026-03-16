@@ -20,7 +20,7 @@ class OptionsTest extends TestCase {
         $defaults = Options::get_defaults();
 
         foreach ( [ 'enabled', 'post_types', 'export_dir', 'auto_generate',
-                    'include_taxonomies', 'include_meta', 'meta_keys' ] as $key ) {
+                    'include_taxonomies', 'post_type_configs' ] as $key ) {
             $this->assertArrayHasKey( $key, $defaults );
         }
     }

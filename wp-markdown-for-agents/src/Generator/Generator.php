@@ -48,8 +48,8 @@ class Generator {
 
 		$frontmatter = $this->frontmatter_builder->build( $post );
 
-		$html     = apply_filters( 'the_content', $post->post_content );
-		$html     = $this->content_filter->filter( $html );
+		$html = $this->get_post_content( $post );
+		$html = $this->content_filter->filter( $html );
 		$markdown = $this->converter->convert( $html, $post );
 
 		$yaml    = $this->yaml_formatter->format( $frontmatter );
@@ -216,6 +216,55 @@ class Generator {
 		}
 
 		delete_post_meta( $post_id, '_wp_mfa_generating' );
+	}
+
+	/**
+	 * Get the HTML content for a post.
+	 *
+	 * When content fields are configured for the post type, those fields are
+	 * used as the body content and post_content is excluded. Otherwise falls
+	 * back to standard post_content.
+	 *
+	 * @since  1.1.0
+	 * @param  \WP_Post $post The post.
+	 * @return string HTML content.
+	 */
+	private function get_post_content( \WP_Post $post ): string {
+		$type_config    = $this->options['post_type_configs'][ $post->post_type ] ?? array();
+		$content_fields = (array) ( $type_config['content_fields'] ?? array() );
+
+		if ( empty( $content_fields ) ) {
+			return apply_filters( 'the_content', $post->post_content );
+		}
+
+		// Build body from configured content fields.
+		$parts = array();
+
+		foreach ( $content_fields as $field_path ) {
+			$value = FrontmatterBuilder::resolve_field_value( $post->ID, $field_path );
+
+			if ( null === $value || '' === $value ) {
+				continue;
+			}
+
+			// Convert to string if needed.
+			if ( is_array( $value ) ) {
+				$value = implode( "\n\n", array_filter( array_map( 'strval', $value ) ) );
+			} else {
+				$value = (string) $value;
+			}
+
+			// Wrap plain text in <p> tags if not already block-level HTML.
+			if ( ! preg_match( '/^<(p|div|h[1-6]|ul|ol|table|blockquote|pre|figure|section|article)\b/i', trim( $value ) ) ) {
+				$value = '<p>' . $value . '</p>';
+			}
+
+			$parts[] = $value;
+		}
+
+		$html = implode( "\n\n", $parts );
+
+		return apply_filters( 'the_content', $html );
 	}
 
 	/**

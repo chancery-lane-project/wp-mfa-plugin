@@ -50,12 +50,15 @@ class FrontmatterBuilder {
 			$frontmatter = array_merge( $frontmatter, $terms );
 		}
 
-		if ( ! empty( $this->options['include_meta'] ) && ! empty( $this->options['meta_keys'] ) ) {
-			foreach ( (array) $this->options['meta_keys'] as $key ) {
-				$key = sanitize_key( (string) $key );
-				if ( '' !== $key ) {
-					$frontmatter[ $key ] = get_post_meta( $post->ID, $key, true );
-				}
+		// Per-post-type frontmatter fields (takes priority over global meta_keys).
+		$type_config = $this->options['post_type_configs'][ $post->post_type ] ?? array();
+		$fm_fields   = (array) ( $type_config['frontmatter_fields'] ?? array() );
+
+		foreach ( $fm_fields as $field_path ) {
+			$key   = $this->field_key( $field_path );
+			$value = $this->resolve_field_value( $post->ID, $field_path );
+			if ( null !== $value && '' !== $value ) {
+				$frontmatter[ $key ] = self::normalize_value( $value );
 			}
 		}
 
@@ -98,6 +101,93 @@ class FrontmatterBuilder {
 		}
 
 		return $frontmatter;
+	}
+
+	/**
+	 * Resolve a field value for a post — handles both plain meta keys and ACF dot notation.
+	 *
+	 * - Plain key (e.g. `_yoast_wpseo_title`): uses get_post_meta().
+	 * - Dot notation (e.g. `group.subfield`): uses get_field() and traverses the group array.
+	 *
+	 * @since  1.1.0
+	 * @param  int    $post_id    The post ID.
+	 * @param  string $field_path Field key or dot-notation path.
+	 * @return mixed Field value or null if not found.
+	 */
+	public static function resolve_field_value( int $post_id, string $field_path ): mixed {
+		// ACF dot notation: group.subfield.
+		if ( str_contains( $field_path, '.' ) ) {
+			$segments  = explode( '.', $field_path );
+			$root_key  = $segments[0];
+
+			if ( function_exists( 'get_field' ) ) {
+				$root_value = get_field( $root_key, $post_id );
+
+				if ( is_array( $root_value ) ) {
+					$value = $root_value;
+					for ( $i = 1; $i < count( $segments ); $i++ ) { // phpcs:ignore Generic.CodeAnalysis.ForLoopWithTestFunctionCall.NotAllowed
+						if ( ! is_array( $value ) || ! isset( $value[ $segments[ $i ] ] ) ) {
+							return null;
+						}
+						$value = $value[ $segments[ $i ] ];
+					}
+					return $value;
+				}
+			}
+
+			return null;
+		}
+
+		// Plain meta key — try ACF first (handles type processing), fall back to post meta.
+		if ( function_exists( 'get_field' ) ) {
+			$value = get_field( $field_path, $post_id );
+			if ( null !== $value && false !== $value ) {
+				return $value;
+			}
+		}
+
+		return get_post_meta( $post_id, $field_path, true ) ?: null;
+	}
+
+	/**
+	 * Normalize a field value for safe YAML serialisation.
+	 *
+	 * Converts WP_Post objects (e.g. from ACF relationship fields) to their
+	 * titles. Recursively normalizes arrays.
+	 *
+	 * @since  1.1.0
+	 * @param  mixed $value The raw field value.
+	 * @return mixed Normalised value safe for YamlFormatter.
+	 */
+	private static function normalize_value( mixed $value ): mixed {
+		if ( $value instanceof \WP_Post ) {
+			return $value->post_title;
+		}
+
+		if ( is_array( $value ) ) {
+			return array_map( array( self::class, 'normalize_value' ), $value );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Extract the display key from a field path.
+	 *
+	 * For dot-notation paths, returns the last segment (e.g. `group.subfield` → `subfield`).
+	 * For plain keys, returns the key as-is.
+	 *
+	 * @since  1.1.0
+	 * @param  string $field_path Field key or dot-notation path.
+	 * @return string
+	 */
+	private function field_key( string $field_path ): string {
+		if ( str_contains( $field_path, '.' ) ) {
+			$segments = explode( '.', $field_path );
+			return end( $segments );
+		}
+
+		return $field_path;
 	}
 
 	/**

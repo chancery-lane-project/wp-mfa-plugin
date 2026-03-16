@@ -116,21 +116,24 @@ class FrontmatterBuilderTest extends TestCase {
 
         $post   = $this->make_post();
         $result = $this->make_builder( [
-            'include_meta' => true,
-            'meta_keys'    => [ 'my_field' ],
+            'post_type_configs' => [
+                'post' => [
+                    'frontmatter_fields' => [ 'my_field' ],
+                    'content_fields'     => [],
+                ],
+            ],
         ] )->build( $post );
 
         $this->assertArrayHasKey( 'my_field', $result );
         $this->assertSame( 'custom value', $result['my_field'] );
     }
 
-    public function test_post_meta_not_included_when_option_disabled(): void {
+    public function test_post_meta_not_included_when_not_configured(): void {
         $GLOBALS['_mock_post_meta'][42]['my_field'] = 'custom value';
 
         $post   = $this->make_post();
         $result = $this->make_builder( [
-            'include_meta' => false,
-            'meta_keys'    => [ 'my_field' ],
+            'post_type_configs' => [],
         ] )->build( $post );
 
         $this->assertArrayNotHasKey( 'my_field', $result );

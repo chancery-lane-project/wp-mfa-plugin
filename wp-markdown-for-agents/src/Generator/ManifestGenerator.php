@@ -57,7 +57,7 @@ class ManifestGenerator {
 	public function add_document( \WP_Post $post, string $filepath ): void {
 		$content_hash = md5( $post->post_content );
 		$meta_hash    = md5( $post->post_modified . $post->post_title );
-		$full_hash    = md5( $content_hash . $meta_hash );
+		$full_hash    = self::compute_full_hash( $post );
 
 		$change_status = $this->determine_change_status( $post->ID, $full_hash );
 
@@ -151,6 +151,110 @@ class ManifestGenerator {
 	 */
 	public function get_manifest(): array {
 		return $this->manifest;
+	}
+
+	/**
+	 * Check whether a post has changed since the last export.
+	 *
+	 * Computes the current hash and compares against the previous manifest.
+	 * Returns true for new posts or posts with a different hash.
+	 *
+	 * @since  1.1.0
+	 * @param  \WP_Post $post The post to check.
+	 * @return bool True if the post is new or modified.
+	 */
+	public function is_changed( \WP_Post $post ): bool {
+		$full_hash = self::compute_full_hash( $post );
+		return 'unchanged' !== $this->determine_change_status( $post->ID, $full_hash );
+	}
+
+	/**
+	 * Generate a changes.json delta file for RAG system integration.
+	 *
+	 * Lists new, modified, and deleted documents so downstream systems
+	 * know exactly what to re-embed or remove from their index.
+	 *
+	 * @since  1.1.0
+	 * @return string Pretty-printed JSON.
+	 */
+	public function generate_changes_file(): string {
+		if ( empty( $this->previous_manifest ) ) {
+			$changes = array(
+				'message'         => 'No previous export found, this is a full export',
+				'previous_export' => null,
+				'current_export'  => $this->manifest['export_timestamp'],
+				'is_full_export'  => true,
+			);
+
+			return (string) wp_json_encode( $changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		}
+
+		$new      = array();
+		$modified = array();
+
+		foreach ( $this->manifest['documents'] as $doc ) {
+			$entry = array(
+				'id'    => $doc['id'],
+				'path'  => $doc['path'],
+				'title' => $doc['title'],
+			);
+
+			if ( 'new' === $doc['change_status'] ) {
+				$entry['reason'] = 'newly published';
+				$new[]           = $entry;
+			} elseif ( 'modified' === $doc['change_status'] ) {
+				$entry['reason'] = 'content or metadata changed';
+				$modified[]      = $entry;
+			}
+		}
+
+		$total_changed = $this->manifest['change_summary']['new']
+					   + $this->manifest['change_summary']['modified'];
+
+		$changes = array(
+			'previous_export' => $this->previous_manifest['export_timestamp'] ?? 'unknown',
+			'current_export'  => $this->manifest['export_timestamp'],
+			'is_incremental'  => true,
+			'changes'         => array(
+				'new'      => $new,
+				'modified' => $modified,
+				'deleted'  => $this->manifest['deleted_documents'] ?? array(),
+			),
+			'statistics'      => array(
+				'total_documents'   => $this->manifest['total_documents'],
+				'changed_documents' => $total_changed,
+				'change_percentage' => $this->manifest['change_percentage'] ?? 0,
+			),
+		);
+
+		return (string) wp_json_encode( $changes, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+	}
+
+	/**
+	 * Save changes.json to the export directory.
+	 *
+	 * @since  1.1.0
+	 * @return bool True on success.
+	 */
+	public function save_changes_file(): bool {
+		$json = $this->generate_changes_file();
+		$path = rtrim( $this->export_dir, '/\\' ) . '/changes.json';
+
+		return $this->file_writer->write( $path, $json );
+	}
+
+	/**
+	 * Compute the full hash for a post (content + metadata).
+	 *
+	 * @since  1.1.0
+	 * @param  \WP_Post $post The post.
+	 * @return string MD5 hash.
+	 */
+	public static function compute_full_hash( \WP_Post $post ): string {
+		$content_hash = md5( $post->post_content );
+		$meta_hash    = md5( $post->post_modified . $post->post_title );
+
+		return md5( $content_hash . $meta_hash );
 	}
 
 	// -----------------------------------------------------------------------

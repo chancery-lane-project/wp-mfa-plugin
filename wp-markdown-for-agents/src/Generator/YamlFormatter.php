@@ -81,6 +81,15 @@ class YamlFormatter {
 			return $yaml;
 		}
 
+		// Safety net: convert objects to a string representation.
+		if ( is_object( $value ) ) {
+			if ( $value instanceof \WP_Post ) {
+				$value = $value->post_title;
+			} else {
+				$value = (string) get_class( $value );
+			}
+		}
+
 		if ( is_bool( $value ) ) {
 			return "{$indent}{$key}: " . ( $value ? 'true' : 'false' ) . "\n";
 		}
