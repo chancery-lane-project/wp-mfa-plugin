@@ -32,6 +32,7 @@ to AI agents and language model tools that request it via HTTP content negotiati
 * Configurable post types, export directory, and meta key export
 * Content negotiation (`Vary: Accept` header, proper `Content-Type`)
 * `llms.txt` index generation following the llmstxt.org specification
+* Manifest generation with content hashes and change tracking per post type
 * WP-CLI commands: `wp markdown-agents generate`, `status`, `delete`
 * Fully unit-tested
 
@@ -55,6 +56,14 @@ plugin settings. The directory is protected from direct browser access via
 No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
+
+= What is the manifest.json file? =
+
+When you generate with `--with-manifest`, a `manifest.json` is created inside each
+post-type export folder (e.g. `wp-mfa-exports/post/manifest.json`). It contains a
+registry of all exported documents with content hashes and change tracking
+(new/modified/unchanged/deleted), enabling RAG systems to identify what changed
+since the last export without reprocessing all documents.
 
 = Can I customise the Markdown output? =
 

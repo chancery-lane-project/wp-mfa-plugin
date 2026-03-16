@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\CLI;
 
+use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
+use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 
 /**
  * WP-CLI commands for WP Markdown for Agents.
@@ -21,14 +23,16 @@ class Commands {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed>  $options   Plugin options.
-	 * @param  Generator             $generator Generator instance.
-	 * @param  LlmsTxtGenerator|null $llms_txt  Optional llms.txt generator.
+	 * @param  array<string, mixed>  $options    Plugin options.
+	 * @param  Generator             $generator  Generator instance.
+	 * @param  LlmsTxtGenerator|null $llms_txt   Optional llms.txt generator.
+	 * @param  FileWriter|null       $file_writer FileWriter for manifest I/O.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
-		private readonly ?LlmsTxtGenerator $llms_txt = null
+		private readonly ?LlmsTxtGenerator $llms_txt = null,
+		private readonly ?FileWriter $file_writer = null
 	) {}
 
 	/**
@@ -50,6 +54,9 @@ class Commands {
 	 *
 	 * [--with-llmstxt]
 	 * : Also regenerate llms.txt after export.
+	 *
+	 * [--with-manifest]
+	 * : Generate manifest.json with content hashes and change tracking.
 	 *
 	 * ## EXAMPLES
 	 *
@@ -78,14 +85,20 @@ class Commands {
 			$this->generate_type( $type, $dry_run );
 		}
 
+		$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
+
+		if ( isset( $assoc_args['with-manifest'] ) && $this->file_writer ) {
+			$result = $this->generate_manifest( $export_base, $types );
+			$result
+				? \WP_CLI::success( 'manifest.json generated.' )
+				: \WP_CLI::warning( 'manifest.json generation failed.' );
+		}
+
 		if ( isset( $assoc_args['with-llmstxt'] ) && $this->llms_txt ) {
-			$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
-			$result      = $this->llms_txt->generate( $export_base );
-			if ( $result ) {
-				\WP_CLI::success( 'llms.txt generated.' );
-			} else {
-				\WP_CLI::warning( 'llms.txt generation failed.' );
-			}
+			$result = $this->llms_txt->generate( $export_base );
+			$result
+				? \WP_CLI::success( 'llms.txt generated.' )
+				: \WP_CLI::warning( 'llms.txt generation failed.' );
 		}
 	}
 
@@ -238,6 +251,65 @@ class Commands {
 				$results['failed']
 			)
 		);
+	}
+
+	/**
+	 * Build and save a manifest.json per post-type folder.
+	 *
+	 * Each post type gets its own manifest inside its export subdirectory,
+	 * enabling independent change tracking per content type.
+	 *
+	 * @since  1.1.0
+	 * @param  string   $export_base Absolute path to the export base directory.
+	 * @param  string[] $post_types  Post type slugs to include.
+	 * @return bool True if all manifests saved successfully.
+	 */
+	private function generate_manifest( string $export_base, array $post_types ): bool {
+		$success    = true;
+		$batch_size = 100;
+
+		foreach ( $post_types as $post_type ) {
+			$type_dir = trailingslashit( $export_base ) . $post_type . '/';
+			$manifest = new ManifestGenerator( $type_dir, $this->file_writer );
+			$type_ids = array();
+			$offset   = 0;
+
+			do {
+				$posts = get_posts(
+					array(
+						'post_type'      => $post_type,
+						'post_status'    => 'publish',
+						'posts_per_page' => $batch_size, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
+						'offset'         => $offset,
+						'orderby'        => 'ID',
+						'order'          => 'ASC',
+						'no_found_rows'  => true,
+					)
+				);
+
+				$fetched = count( $posts );
+
+				foreach ( $posts as $post ) {
+					$full_path     = $this->generator->get_export_path( $post );
+					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$type_ids[]    = $post->ID;
+
+					if ( file_exists( $full_path ) ) {
+						$manifest->add_document( $post, $relative_path );
+					}
+				}
+
+				$offset += $batch_size;
+			} while ( $fetched === $batch_size );
+
+			$manifest->mark_deleted_documents( $type_ids );
+
+			if ( ! $manifest->save() ) {
+				$success = false;
+			}
+		}
+
+		return $success;
 	}
 
 	/**

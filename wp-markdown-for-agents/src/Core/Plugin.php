@@ -79,8 +79,8 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_generator( array $options ): void {
-		$export_base = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
-		$file_writer = new FileWriter( $export_base );
+		$export_base       = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
+		$this->file_writer = new FileWriter( $export_base );
 
 		$generator = new Generator(
 			$options,
@@ -88,7 +88,7 @@ class Plugin {
 			new ContentFilter(),
 			new Converter(),
 			new YamlFormatter(),
-			$file_writer
+			$this->file_writer
 		);
 
 		// Store on object so other methods can access it.
@@ -156,7 +156,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ) )
+			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer )
 		);
 	}
 
@@ -171,4 +171,7 @@ class Plugin {
 
 	/** @var Generator */
 	private Generator $generator;
+
+	/** @var FileWriter */
+	private FileWriter $file_writer;
 }
