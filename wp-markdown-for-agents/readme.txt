@@ -81,10 +81,18 @@ Yes. Several filters are available:
 
 == Changelog ==
 
+= 1.1.0 =
+* Added manifest.json generation with content hashes and change tracking.
+* New `--with-manifest` flag for `wp markdown-agents generate`.
+* Manifest is generated per post-type folder for independent change tracking.
+
 = 1.0.0 =
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.1.0 =
+New manifest generation feature for RAG/AI pipeline change tracking.
 
 = 1.0.0 =
 Initial release.
