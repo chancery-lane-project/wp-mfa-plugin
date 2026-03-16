@@ -203,7 +203,9 @@ class FileWriter {
 	 * @return bool
 	 */
 	private function put_contents( string $filepath, string $content ): bool {
-		// Use WP_Filesystem when available (admin context).
+		// Use WP_Filesystem when available and using direct method (admin context).
+		// FTP/SSH methods require credentials we cannot supply; the web server
+		// always owns files created by this plugin, so direct writes are safe.
 		if ( ! defined( 'WP_CLI' ) && function_exists( 'WP_Filesystem' ) ) {
 			global $wp_filesystem;
 
@@ -211,8 +213,9 @@ class FileWriter {
 				WP_Filesystem();
 			}
 
-			if ( $wp_filesystem instanceof \WP_Filesystem_Base ) {
-				return (bool) $wp_filesystem->put_contents( $filepath, $content, FS_CHMOD_FILE );
+			if ( $wp_filesystem instanceof \WP_Filesystem_Base && 'direct' === $wp_filesystem->method ) {
+				$perms = defined( 'FS_CHMOD_FILE' ) ? FS_CHMOD_FILE : 0644;
+				return (bool) $wp_filesystem->put_contents( $filepath, $content, $perms );
 			}
 		}
 
