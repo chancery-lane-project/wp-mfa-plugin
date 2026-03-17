@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
-use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
-
 /**
  * Assembles the frontmatter array for a post.
  *
