@@ -156,10 +156,33 @@ sendBatch(postType, offset, accumulated, button):
 - `post_type` is sanitised via `sanitize_key`
 - `limit` is capped at 50
 
+### `tests/mocks/wordpress-mocks.php` (extend)
+
+The test suite currently stubs `get_posts()` but has no `WP_Query` class stub. `generate_batch()` uses `new WP_Query(...)` directly and reads `$query->posts` (array of IDs) and `$query->found_posts` (int). Add a stub class:
+
+```php
+if ( ! class_exists( 'WP_Query' ) ) {
+    class WP_Query {
+        public array $posts      = [];
+        public int   $found_posts = 0;
+
+        public function __construct( array $args ) {
+            global $_mock_wp_query;
+            if ( isset( $_mock_wp_query ) && is_callable( $_mock_wp_query ) ) {
+                [ $this->posts, $this->found_posts ] = ( $_mock_wp_query )( $args );
+            }
+        }
+    }
+}
+```
+
+Tests set `$GLOBALS['_mock_wp_query']` to a callable that returns `[array $ids, int $found_posts]`.
+
 ### `tests/Unit/Generator/GeneratorTest.php` (extend)
 
 - `generate_batch()` returns correct `total` and `processed` count
 - Post that throws is collected in `errors`; remaining posts are still processed
+- Post where `generate_post()` returns `false` (ineligible) is silently skipped — not counted in `processed`, not in `errors`
 - Empty result set returns `['total' => 0, 'processed' => 0, 'errors' => []]`
 
 ---
@@ -173,6 +196,7 @@ sendBatch(postType, offset, accumulated, button):
 | `src/Admin/SettingsPage.php` | Update button markup |
 | `src/Core/Plugin.php` | Register `wp_ajax_mfa_generate_batch` and `admin_enqueue_scripts` hooks |
 | `assets/js/bulk-generate.js` | New |
+| `tests/mocks/wordpress-mocks.php` | Add `WP_Query` stub class |
 | `tests/Unit/Admin/AdminAjaxTest.php` | New |
 | `tests/Unit/Generator/GeneratorTest.php` | Extend with batch tests |
 
