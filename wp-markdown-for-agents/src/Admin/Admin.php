@@ -227,9 +227,3 @@ class Admin {
 		);
 	}
 }
-
-if ( ! function_exists( 'wp_kses_post' ) ) {
-	function wp_kses_post( string $data ): string {
-		return $data;
-	}
-}

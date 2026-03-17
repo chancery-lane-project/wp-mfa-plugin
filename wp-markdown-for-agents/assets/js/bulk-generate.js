@@ -49,7 +49,7 @@
 
             button.textContent = accumulated.processed + ' / ' + data.total;
 
-            if (offset + BATCH_SIZE < data.total) {
+            if (accumulated.processed < data.total) {
                 sendBatch(postType, offset + BATCH_SIZE, accumulated, button);
             } else {
                 var errorSummary = accumulated.errors.length
