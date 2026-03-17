@@ -282,6 +282,83 @@ class GeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // generate_batch()
+    // -----------------------------------------------------------------------
+
+    public function test_generate_batch_returns_zero_totals_when_no_posts(): void {
+        $GLOBALS['_mock_wp_query'] = fn( array $args ): array => [ [], 0 ];
+
+        $result = $this->generator->generate_batch( 'post', 0, 10 );
+
+        $this->assertSame( 0, $result['total'] );
+        $this->assertSame( 0, $result['processed'] );
+        $this->assertSame( [], $result['errors'] );
+    }
+
+    public function test_generate_batch_returns_processed_count(): void {
+        $post1 = $this->make_post( [ 'ID' => 10, 'post_name' => 'post-10' ] );
+        $post2 = $this->make_post( [ 'ID' => 11, 'post_name' => 'post-11' ] );
+
+        $GLOBALS['_mock_wp_query']     = fn( array $args ): array => [ [ 10, 11 ], 2 ];
+        $GLOBALS['_mock_post_objects'] = [ 10 => $post1, 11 => $post2 ];
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $result = $this->generator->generate_batch( 'post', 0, 10 );
+
+        $this->assertSame( 2, $result['total'] );
+        $this->assertSame( 2, $result['processed'] );
+        $this->assertSame( [], $result['errors'] );
+    }
+
+    public function test_generate_batch_collects_error_and_continues(): void {
+        $post1 = $this->make_post( [ 'ID' => 20, 'post_name' => 'post-20' ] );
+        $post2 = $this->make_post( [ 'ID' => 21, 'post_name' => 'post-21' ] );
+
+        $GLOBALS['_mock_wp_query']     = fn( array $args ): array => [ [ 20, 21 ], 2 ];
+        $GLOBALS['_mock_post_objects'] = [ 20 => $post1, 21 => $post2 ];
+
+        $call = 0;
+        $this->frontmatter_builder->method( 'build' )
+            ->willReturnCallback( function () use ( &$call ): array {
+                if ( ++$call === 2 ) {
+                    throw new \RuntimeException( 'build failed' );
+                }
+                return [];
+            } );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $result = $this->generator->generate_batch( 'post', 0, 10 );
+
+        $this->assertSame( 2, $result['total'] );
+        $this->assertSame( 1, $result['processed'] );
+        $this->assertCount( 1, $result['errors'] );
+        $this->assertSame( 21, $result['errors'][0]['post_id'] );
+        $this->assertSame( 'build failed', $result['errors'][0]['message'] );
+    }
+
+    public function test_generate_batch_silently_skips_ineligible_post(): void {
+        // post_type 'event' is not in options['post_types'], so generate_post returns false.
+        $post = $this->make_post( [ 'ID' => 30, 'post_name' => 'event-30', 'post_type' => 'event' ] );
+
+        $GLOBALS['_mock_wp_query']     = fn( array $args ): array => [ [ 30 ], 1 ];
+        $GLOBALS['_mock_post_objects'] = [ 30 => $post ];
+
+        $result = $this->generator->generate_batch( 'event', 0, 10 );
+
+        $this->assertSame( 1, $result['total'] );
+        $this->assertSame( 0, $result['processed'] );
+        $this->assertSame( [], $result['errors'] );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

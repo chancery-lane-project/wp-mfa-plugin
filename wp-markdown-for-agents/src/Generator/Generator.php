@@ -126,6 +126,61 @@ class Generator {
 	}
 
 	/**
+	 * Generate Markdown files for a paginated slice of published posts.
+	 *
+	 * Processes $limit posts starting at $offset. Uses WP_Query so found_posts
+	 * is always populated (do not set no_found_rows). Returns a summary of the
+	 * batch suitable for JSON responses.
+	 *
+	 * @since  1.1.0
+	 * @param  string $post_type The post type slug.
+	 * @param  int    $offset    Zero-based offset into the full result set.
+	 * @param  int    $limit     Maximum posts to process in this batch.
+	 * @return array{total: int, processed: int, errors: list<array{post_id: int, message: string}>}
+	 */
+	public function generate_batch( string $post_type, int $offset, int $limit ): array {
+		$query = new \WP_Query(
+			array(
+				'post_type'      => $post_type,
+				'post_status'    => 'publish',
+				'posts_per_page' => $limit, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
+				'offset'         => $offset,
+				'fields'         => 'ids',
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
+			)
+		);
+
+		$processed = 0;
+		$errors    = array();
+
+		foreach ( $query->posts as $post_id ) {
+			$post = get_post( $post_id );
+
+			if ( ! $post instanceof \WP_Post ) {
+				continue;
+			}
+
+			try {
+				if ( $this->generate_post( $post ) ) {
+					++$processed;
+				}
+			} catch ( \Throwable $e ) {
+				$errors[] = array(
+					'post_id' => $post_id,
+					'message' => $e->getMessage(),
+				);
+			}
+		}
+
+		return array(
+			'total'     => $query->found_posts,
+			'processed' => $processed,
+			'errors'    => $errors,
+		);
+	}
+
+	/**
 	 * Delete the Markdown export file for a post.
 	 *
 	 * @since  1.0.0
