@@ -46,9 +46,9 @@ bulk-generate.js
 public function generate_batch(string $post_type, int $offset, int $limit): array
 ```
 
-- Runs `WP_Query` with `post_type`, `post_status=publish`, `posts_per_page=$limit`, `offset=$offset`, `fields=ids`
+- Runs `WP_Query` with `post_type`, `post_status=publish`, `posts_per_page=$limit`, `offset=$offset`, `fields=ids`. Do **not** set `no_found_rows=true` — `found_posts` must be populated.
 - `found_posts` provides the total matching posts (returned on every response so JS can use the first)
-- Calls `$this->generate_post(int $post_id)` per result — extracted from the existing `generate_post_type()` loop
+- For each post ID, calls `get_post($post_id)` to obtain a `\WP_Post` object, then calls the existing `$this->generate_post(\WP_Post $post)` (already public, already in use)
 - Wraps each call in `try { } catch (\Throwable $e)` — failed post is appended to `$errors`, remaining posts continue
 - Returns:
   ```php
@@ -59,15 +59,7 @@ public function generate_batch(string $post_type, int $offset, int $limit): arra
   ]
   ```
 
-### Extracted method: `generate_post()`
-
-`generate_post_type()` currently iterates posts internally. Its per-post logic is extracted into:
-
-```php
-private function generate_post(int $post_id): void
-```
-
-`generate_post_type()` is updated to call `generate_post()` in its loop (no behaviour change).
+**No new private method needed.** `generate_post(\WP_Post $post)` already exists (line 46 of `Generator.php`). `generate_batch()` resolves IDs to `\WP_Post` objects via `get_post()` and calls it directly. `generate_post_type()` is unchanged.
 
 ---
 
@@ -87,9 +79,11 @@ public function handle_generate_batch_ajax(): void
 
 ### Hook registration
 
-In `Admin::register_hooks()`:
+Hooks are registered in `Plugin.php` via the loader, alongside the existing admin hooks (lines 138–143). Add two lines after line 143:
+
 ```php
-add_action('wp_ajax_mfa_generate_batch', [$this, 'handle_generate_batch_ajax']);
+$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
+$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 ```
 
 ---
@@ -106,7 +100,7 @@ The wrapping `<form>` element and `admin_url('admin-post.php')` action are remov
 
 ### Script enqueue
 
-New `enqueue_scripts(string $hook)` method, hooked to `admin_enqueue_scripts`:
+New `enqueue_scripts(string $hook)` method on `Admin`, registered via `Plugin.php` (see Hook registration above):
 - Returns early unless `$hook === 'settings_page_wp-markdown-for-agents'`
 - `wp_enqueue_script('mfa-bulk-generate', plugin_dir_url(...) . 'assets/js/bulk-generate.js', [], MFA_VERSION, true)`
 - `wp_localize_script('mfa-bulk-generate', 'mfaBulkGenerate', ['nonce' => wp_create_nonce('mfa_generate_batch'), 'ajaxurl' => admin_url('admin-ajax.php')])`
@@ -171,9 +165,10 @@ sendBatch(postType, offset, accumulated, button):
 
 | File | Change |
 |------|--------|
-| `src/Generator/Generator.php` | Add `generate_batch()`, extract `generate_post()` |
-| `src/Admin/Admin.php` | Add `handle_generate_batch_ajax()`, register hook |
-| `src/Admin/SettingsPage.php` | Update button markup, add `enqueue_scripts()` |
+| `src/Generator/Generator.php` | Add `generate_batch()` |
+| `src/Admin/Admin.php` | Add `handle_generate_batch_ajax()` and `enqueue_scripts()` |
+| `src/Admin/SettingsPage.php` | Update button markup |
+| `src/Core/Plugin.php` | Register `wp_ajax_mfa_generate_batch` and `admin_enqueue_scripts` hooks |
 | `assets/js/bulk-generate.js` | New |
 | `tests/Unit/Admin/AdminAjaxTest.php` | New |
 | `tests/Unit/Generator/GeneratorTest.php` | Extend with batch tests |
