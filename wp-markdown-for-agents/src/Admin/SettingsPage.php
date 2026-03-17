@@ -231,19 +231,14 @@ class SettingsPage {
 		<h2><?php esc_html_e( 'Generate Markdown files', 'wp-markdown-for-agents' ); ?></h2>
 		<p><?php esc_html_e( 'Regenerate all Markdown files for a post type. This may take a while on large sites.', 'wp-markdown-for-agents' ); ?></p>
 		<?php foreach ( $post_types as $post_type ) : ?>
-			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-				<input type="hidden" name="action" value="wp_mfa_generate">
-				<input type="hidden" name="post_type" value="<?php echo esc_attr( $post_type ); ?>">
-				<?php wp_nonce_field( 'wp_mfa_generate_' . $post_type ); ?>
-				<p>
-					<button type="submit" class="button button-secondary">
-						<?php
-						/* translators: %s: post type slug */
-						printf( esc_html__( 'Generate all: %s', 'wp-markdown-for-agents' ), esc_html( $post_type ) );
-						?>
-					</button>
-				</p>
-			</form>
+			<p>
+				<button type="button" class="button button-secondary" data-post-type="<?php echo esc_attr( $post_type ); ?>">
+					<?php
+					/* translators: %s: post type slug */
+					printf( esc_html__( 'Generate all: %s', 'wp-markdown-for-agents' ), esc_html( $post_type ) );
+					?>
+				</button>
+			</p>
 		<?php endforeach; ?>
 		<?php
 	}
