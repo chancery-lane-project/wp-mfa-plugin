@@ -21,6 +21,14 @@ if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
 
+if (!defined('WP_MFA_PLUGIN_URL')) {
+    define('WP_MFA_PLUGIN_URL', 'https://example.com/wp-content/plugins/wp-markdown-for-agents/');
+}
+
+if (!defined('WP_MFA_VERSION')) {
+    define('WP_MFA_VERSION', '1.0.0-test');
+}
+
 // ---------------------------------------------------------------------------
 // Hook tracking
 // ---------------------------------------------------------------------------
@@ -328,6 +336,29 @@ if (!class_exists('WP_Post')) {
 }
 
 // ---------------------------------------------------------------------------
+// WP_Query stub
+// ---------------------------------------------------------------------------
+
+if (!class_exists('WP_Query')) {
+    class WP_Query {
+        public array $posts       = [];
+        public int   $found_posts = 0;
+
+        /**
+         * Constructor reads $GLOBALS['_mock_wp_query'] callable.
+         * Callable signature: (array $args): array{0: int[], 1: int}
+         * Returns [post_id_array, found_posts_count].
+         */
+        public function __construct(array $args) {
+            global $_mock_wp_query;
+            if (isset($_mock_wp_query) && is_callable($_mock_wp_query)) {
+                [$this->posts, $this->found_posts] = ($_mock_wp_query)($args);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // WP_Error stub
 // ---------------------------------------------------------------------------
 
@@ -459,6 +490,20 @@ if (!function_exists('check_admin_referer')) {
     }
 }
 
+if (!function_exists('check_ajax_referer')) {
+    /**
+     * Verifies AJAX nonce. Calls wp_die(-1) if nonce is invalid.
+     * Tests control validity via $GLOBALS['_mock_verify_nonce'] (truthy = valid, falsy = invalid).
+     */
+    function check_ajax_referer(string $action = '-1', string $query_arg = 'nonce'): int|false {
+        $valid = $GLOBALS['_mock_verify_nonce'] ?? 1;
+        if (!$valid) {
+            wp_die(-1);
+        }
+        return 1;
+    }
+}
+
 if (!function_exists('wp_create_nonce')) {
     function wp_create_nonce(string $action): string {
         return 'test_nonce_' . $action;
@@ -481,6 +526,34 @@ if (!function_exists('wp_safe_redirect')) {
 if (!function_exists('wp_die')) {
     function wp_die(string|int $message = '', string $title = '', array|int $args = []): void {
         throw new \RuntimeException('wp_die called: ' . $message);
+    }
+}
+
+if (!function_exists('wp_send_json_success')) {
+    /**
+     * Captures response in $GLOBALS['_mock_json_response'].
+     * Shape: ['success' => true, 'data' => mixed]
+     */
+    function wp_send_json_success(mixed $data = null, int $status_code = 200): void {
+        $GLOBALS['_mock_json_response'] = [
+            'success' => true,
+            'data'    => $data,
+            'status'  => $status_code,
+        ];
+    }
+}
+
+if (!function_exists('wp_send_json_error')) {
+    /**
+     * Captures response in $GLOBALS['_mock_json_response'].
+     * Shape: ['success' => false, 'data' => mixed, 'status' => int]
+     */
+    function wp_send_json_error(mixed $data = null, int $status_code = 0): void {
+        $GLOBALS['_mock_json_response'] = [
+            'success' => false,
+            'data'    => $data,
+            'status'  => $status_code,
+        ];
     }
 }
 
@@ -735,5 +808,25 @@ if (!function_exists('add_query_arg')) {
         }
         $sep = str_contains( $url, '?' ) ? '&' : '?';
         return $url . $sep . $query;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Script enqueue stubs for Admin::enqueue_scripts()
+// ---------------------------------------------------------------------------
+
+if (!function_exists('wp_enqueue_script')) {
+    function wp_enqueue_script(string $handle, string $src = '', array $deps = [], mixed $ver = false, mixed $args = false): void {
+        $GLOBALS['_mock_enqueued_scripts'][$handle] = $src;
+    }
+}
+
+if (!function_exists('wp_localize_script')) {
+    function wp_localize_script(string $handle, string $object_name, array $l10n): bool {
+        $GLOBALS['_mock_localized_scripts'][$handle] = [
+            'object' => $object_name,
+            'data'   => $l10n,
+        ];
+        return true;
     }
 }
