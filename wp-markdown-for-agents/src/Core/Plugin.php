@@ -141,6 +141,8 @@ class Plugin {
 		$this->loader->add_action( 'admin_post_wp_mfa_generate', $admin, 'handle_generate_action' );
 		$this->loader->add_action( 'admin_post_wp_mfa_regenerate_post', $admin, 'handle_regenerate_post_action' );
 		$this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
+		$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
+		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 
 		global $wpdb;
 		$stats_page = new StatsPage( new StatsRepository( $wpdb ) );
