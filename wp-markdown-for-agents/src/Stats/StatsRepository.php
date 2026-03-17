@@ -85,20 +85,10 @@ class StatsRepository {
 	 */
 	public function get_stats( array $filters = array() ): array {
 		$table  = self::get_table_name( $this->wpdb );
-		$where  = array();
-		$values = array();
+		$clause = $this->build_where( $filters );
 
-		if ( ! empty( $filters['post_id'] ) ) {
-			$where[]  = 'post_id = %d';
-			$values[] = (int) $filters['post_id'];
-		}
-
-		if ( ! empty( $filters['agent'] ) ) {
-			$where[]  = 'agent = %s';
-			$values[] = (string) $filters['agent'];
-		}
-
-		$where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
+		$where_sql = $clause['sql'];
+		$values    = $clause['values'];
 		$limit     = max( 1, (int) ( $filters['limit'] ?? 50 ) );
 		$offset    = max( 0, (int) ( $filters['offset'] ?? 0 ) );
 
@@ -120,6 +110,29 @@ class StatsRepository {
 	 */
 	public function get_total_count( array $filters = array() ): int {
 		$table  = self::get_table_name( $this->wpdb );
+		$clause = $this->build_where( $filters );
+
+		$where_sql = $clause['sql'];
+		$values    = $clause['values'];
+		$sql       = "SELECT COUNT(*) FROM {$table} {$where_sql}";
+
+		if ( ! empty( $values ) ) {
+			$sql = $this->wpdb->prepare( $sql, ...$values );
+		}
+
+		return (int) $this->wpdb->get_var( $sql );
+	}
+
+	/**
+	 * Build a WHERE clause and prepared values from a filters array.
+	 *
+	 * Supports 'post_id' (int) and 'agent' (string) keys.
+	 *
+	 * @since  1.2.0
+	 * @param  array<string, mixed> $filters
+	 * @return array{sql: string, values: list<mixed>}
+	 */
+	private function build_where( array $filters ): array {
 		$where  = array();
 		$values = array();
 
@@ -133,14 +146,10 @@ class StatsRepository {
 			$values[] = (string) $filters['agent'];
 		}
 
-		$where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
-		$sql       = "SELECT COUNT(*) FROM {$table} {$where_sql}";
-
-		if ( ! empty( $values ) ) {
-			$sql = $this->wpdb->prepare( $sql, ...$values );
-		}
-
-		return (int) $this->wpdb->get_var( $sql );
+		return array(
+			'sql'    => ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '',
+			'values' => $values,
+		);
 	}
 
 	/**
