@@ -48,18 +48,21 @@ public function generate_batch(string $post_type, int $offset, int $limit): arra
 
 - Runs `WP_Query` with `post_type`, `post_status=publish`, `posts_per_page=$limit`, `offset=$offset`, `fields=ids`. Do **not** set `no_found_rows=true` — `found_posts` must be populated.
 - `found_posts` provides the total matching posts (returned on every response so JS can use the first)
-- For each post ID, calls `get_post($post_id)` to obtain a `\WP_Post` object, then calls the existing `$this->generate_post(\WP_Post $post)` (already public, already in use)
-- Wraps each call in `try { } catch (\Throwable $e)` — failed post is appended to `$errors`, remaining posts continue
+- For each post ID, calls `get_post($post_id)` to obtain a `\WP_Post` object, then calls the existing `$this->generate_post(\WP_Post $post)` (already public, line 46 of `Generator.php`)
+- Three outcomes per post:
+  - `generate_post()` returns `true` → increment `$processed`
+  - `generate_post()` returns `false` (ineligible/skipped) → no count, no error
+  - `generate_post()` throws `\Throwable` → append to `$errors`, continue
 - Returns:
   ```php
   [
       'total'     => int,   // WP_Query::found_posts
-      'processed' => int,   // successful posts this batch
+      'processed' => int,   // posts where generate_post() returned true
       'errors'    => [['post_id' => int, 'message' => string], ...],
   ]
   ```
 
-**No new private method needed.** `generate_post(\WP_Post $post)` already exists (line 46 of `Generator.php`). `generate_batch()` resolves IDs to `\WP_Post` objects via `get_post()` and calls it directly. `generate_post_type()` is unchanged.
+**No new private method needed.** `generate_batch()` resolves IDs to `\WP_Post` objects via `get_post()` and calls the existing `generate_post()`. `generate_post_type()` is unchanged.
 
 ---
 
@@ -102,7 +105,7 @@ The wrapping `<form>` element and `admin_url('admin-post.php')` action are remov
 
 New `enqueue_scripts(string $hook)` method on `Admin`, registered via `Plugin.php` (see Hook registration above):
 - Returns early unless `$hook === 'settings_page_wp-markdown-for-agents'`
-- `wp_enqueue_script('mfa-bulk-generate', plugin_dir_url(...) . 'assets/js/bulk-generate.js', [], MFA_VERSION, true)`
+- `wp_enqueue_script('mfa-bulk-generate', WP_MFA_PLUGIN_URL . 'assets/js/bulk-generate.js', [], WP_MFA_VERSION, true)`
 - `wp_localize_script('mfa-bulk-generate', 'mfaBulkGenerate', ['nonce' => wp_create_nonce('mfa_generate_batch'), 'ajaxurl' => admin_url('admin-ajax.php')])`
 
 ---
