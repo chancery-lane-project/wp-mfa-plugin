@@ -137,6 +137,64 @@ class Admin {
 	}
 
 	/**
+	 * Handle the AJAX batch-generate request.
+	 *
+	 * Processes one paginated slice (offset + limit) for a post type and
+	 * returns JSON with total found, processed count, and any per-post errors.
+	 *
+	 * Hooked to `wp_ajax_mfa_generate_batch`.
+	 *
+	 * @since  1.1.0
+	 */
+	public function handle_generate_batch_ajax(): void {
+		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
+			return;
+		}
+
+		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$offset    = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$limit     = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
+
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Enqueue the bulk-generate JS on the plugin settings page.
+	 *
+	 * Hooked to `admin_enqueue_scripts`.
+	 *
+	 * @since  1.1.0
+	 * @param  string $hook The current admin page hook suffix.
+	 */
+	public function enqueue_scripts( string $hook ): void {
+		if ( 'settings_page_wp-markdown-for-agents' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'mfa-bulk-generate',
+			WP_MFA_PLUGIN_URL . 'assets/js/bulk-generate.js',
+			array(),
+			WP_MFA_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'mfa-bulk-generate',
+			'mfaBulkGenerate',
+			array(
+				'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
+				'ajaxurl' => admin_url( 'admin-ajax.php' ),
+			)
+		);
+	}
+
+	/**
 	 * Display transient-based admin notices.
 	 *
 	 * Hooked to `admin_notices`.
