@@ -40,6 +40,11 @@ $GLOBALS['_mock_filters'] = [];
 /** @var array<string, mixed> */
 $GLOBALS['_mock_options'] = [];
 
+$GLOBALS['_mock_json_response']      = null;
+$GLOBALS['_mock_enqueued_scripts']   = [];
+$GLOBALS['_mock_localized_scripts']  = [];
+$GLOBALS['_mock_wp_query']           = null;
+
 function reset_mock_hooks(): void {
     $GLOBALS['_mock_actions'] = [];
     $GLOBALS['_mock_filters'] = [];
@@ -492,13 +497,16 @@ if (!function_exists('check_admin_referer')) {
 
 if (!function_exists('check_ajax_referer')) {
     /**
-     * Verifies AJAX nonce. Calls wp_die(-1) if nonce is invalid.
+     * Verifies AJAX nonce. Calls wp_die(-1) if nonce is invalid (and $die is true).
      * Tests control validity via $GLOBALS['_mock_verify_nonce'] (truthy = valid, falsy = invalid).
      */
-    function check_ajax_referer(string $action = '-1', string $query_arg = 'nonce'): int|false {
+    function check_ajax_referer(string $action = '-1', string $query_arg = 'nonce', bool $die = true): int|false {
         $valid = $GLOBALS['_mock_verify_nonce'] ?? 1;
         if (!$valid) {
-            wp_die(-1);
+            if ($die) {
+                wp_die(-1);
+            }
+            return false;
         }
         return 1;
     }
@@ -529,6 +537,8 @@ if (!function_exists('wp_die')) {
     }
 }
 
+// Note: unlike real WordPress, these stubs do NOT call wp_die() after sending.
+// Handlers must explicitly return after calling these, or the test will continue executing.
 if (!function_exists('wp_send_json_success')) {
     /**
      * Captures response in $GLOBALS['_mock_json_response'].
