@@ -147,20 +147,26 @@ class Admin {
 	 * @since  1.1.0
 	 */
 	public function handle_generate_batch_ajax(): void {
-		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
 			return;
 		}
 
+		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+
 		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$offset    = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$limit     = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
+		if ( '' === $post_type ) {
+			wp_send_json_error( array( 'message' => 'post_type is required.' ), 400 );
+			return;
+		}
+
 		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
 
 		wp_send_json_success( $result );
+		return;
 	}
 
 	/**

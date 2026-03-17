@@ -39,6 +39,7 @@ class AdminAjaxTest extends TestCase {
     protected function tearDown(): void {
         $_POST = [];
         unset( $GLOBALS['_mock_verify_nonce'] );
+        $GLOBALS['_mock_current_user_can'] = true;
     }
 
     // -----------------------------------------------------------------------
@@ -86,6 +87,20 @@ class AdminAjaxTest extends TestCase {
         $response = $GLOBALS['_mock_json_response'];
         $this->assertFalse( $response['success'] );
         $this->assertSame( 403, $response['status'] );
+    }
+
+    public function test_missing_post_type_returns_400(): void {
+        $_POST = [
+            'nonce'  => 'test',
+            'offset' => '0',
+            'limit'  => '10',
+        ];
+
+        $this->admin->handle_generate_batch_ajax();
+
+        $response = $GLOBALS['_mock_json_response'];
+        $this->assertFalse( $response['success'] );
+        $this->assertSame( 400, $response['status'] );
     }
 
     public function test_post_type_is_sanitised(): void {
