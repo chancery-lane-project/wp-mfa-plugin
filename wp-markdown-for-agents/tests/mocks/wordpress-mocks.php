@@ -693,6 +693,26 @@ if (!function_exists('get_the_title')) {
 }
 
 // ---------------------------------------------------------------------------
+// Form helper stubs for SettingsPage
+// ---------------------------------------------------------------------------
+
+if (!function_exists('checked')) {
+    function checked(mixed $helper, mixed $current, bool $echo = true): string {
+        $result = $helper === $current ? ' checked="checked"' : '';
+        if ($echo) {
+            echo $result;
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('esc_textarea')) {
+    function esc_textarea(string $text): string {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Form helper stubs for StatsPage
 // ---------------------------------------------------------------------------
 

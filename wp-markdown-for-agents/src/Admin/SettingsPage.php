@@ -359,20 +359,3 @@ class SettingsPage {
 		echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'wp-markdown-for-agents' ) . '</p>';
 	}
 }
-
-// WordPress helper stub — defined here to avoid redefining if WP is loaded.
-if ( ! function_exists( 'checked' ) ) {
-	function checked( mixed $helper, mixed $current, bool $echo = true ): string {
-		$result = $helper === $current ? ' checked="checked"' : '';
-		if ( $echo ) {
-			echo $result;
-		}
-		return $result;
-	}
-}
-
-if ( ! function_exists( 'esc_textarea' ) ) {
-	function esc_textarea( string $text ): string {
-		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
-	}
-}
