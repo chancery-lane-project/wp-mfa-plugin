@@ -79,7 +79,7 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_generator( array $options ): void {
-		$export_base       = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
+		$export_base       = Options::get_export_base( $options );
 		$this->file_writer = new FileWriter( $export_base );
 
 		$generator = new Generator(

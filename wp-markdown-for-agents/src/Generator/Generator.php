@@ -168,7 +168,7 @@ class Generator {
 			$post = get_post( $post );
 		}
 
-		$base      = rtrim( trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $this->options['export_dir'] ?? '' ), '/\\' );
+		$base      = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 		$post_type = sanitize_file_name( $post->post_type );
 		$slug      = sanitize_file_name( $post->post_name );
 		$path      = $base . DIRECTORY_SEPARATOR . $post_type . DIRECTORY_SEPARATOR . $slug . '.md';

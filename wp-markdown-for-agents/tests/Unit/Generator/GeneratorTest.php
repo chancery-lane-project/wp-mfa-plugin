@@ -37,9 +37,19 @@ class GeneratorTest extends TestCase {
 
     private Generator $generator;
 
+    private string $export_subdir;
+
     protected function setUp(): void {
-        $this->base_dir = sys_get_temp_dir() . '/wp-mfa-gen-' . uniqid();
+        $this->export_subdir = 'wp-mfa-gen-' . uniqid();
+        $this->base_dir      = sys_get_temp_dir() . '/' . $this->export_subdir;
         mkdir( $this->base_dir, 0755, true );
+
+        // Point wp_upload_dir() basedir to sys_get_temp_dir() so
+        // Options::get_export_base() resolves to $this->base_dir.
+        $GLOBALS['_mock_upload_dir'] = [
+            'basedir' => sys_get_temp_dir(),
+            'baseurl' => 'https://example.com/wp-content/uploads',
+        ];
 
         $this->frontmatter_builder = $this->createMock( FrontmatterBuilder::class );
         $this->content_filter      = $this->createMock( ContentFilter::class );
@@ -56,12 +66,13 @@ class GeneratorTest extends TestCase {
 
     protected function tearDown(): void {
         $this->remove_dir( $this->base_dir );
+        unset( $GLOBALS['_mock_upload_dir'] );
     }
 
     private function make_generator( array $options = [] ): Generator {
         $defaults = [
             'post_types' => [ 'post', 'page' ],
-            'export_dir' => $this->base_dir,
+            'export_dir' => $this->export_subdir,
         ];
         return new Generator(
             array_merge( $defaults, $options ),

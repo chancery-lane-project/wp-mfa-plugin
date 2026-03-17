@@ -176,9 +176,7 @@ class Negotiator {
 	 * @return bool
 	 */
 	private function is_safe_filepath( string $filepath ): bool {
-		$export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name(
-			(string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' )
-		);
+		$export_dir = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
 		$real_base = realpath( $export_dir );
 		$real_file = realpath( $filepath );

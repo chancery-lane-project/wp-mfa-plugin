@@ -189,8 +189,8 @@ if (!function_exists('wp_mkdir_p')) {
 if (!function_exists('wp_upload_dir')) {
     /** @return array<string, string> */
     function wp_upload_dir(): array {
-        return [
-            'basedir' => '/var/www/wp-content/uploads',
+        return $GLOBALS['_mock_upload_dir'] ?? [
+            'basedir' => sys_get_temp_dir(),
             'baseurl' => 'https://example.com/wp-content/uploads',
         ];
     }

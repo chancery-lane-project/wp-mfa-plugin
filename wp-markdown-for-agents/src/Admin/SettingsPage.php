@@ -271,7 +271,7 @@ class SettingsPage {
 	public function field_export_dir(): void {
 		$val = esc_attr( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
 		echo '<input type="text" name="' . esc_attr( Options::OPTION_KEY ) . '[export_dir]" value="' . $val . '" class="regular-text">';
-		echo '<p class="description">' . esc_html__( 'Subdirectory within wp-content/ to store exported .md files.', 'wp-markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Subdirectory within wp-content/uploads/ to store exported .md files.', 'wp-markdown-for-agents' ) . '</p>';
 	}
 
 	/** @since 1.0.0 */

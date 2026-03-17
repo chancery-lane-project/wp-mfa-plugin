@@ -24,7 +24,7 @@ class Activator {
 	 */
 	public static function activate(): void {
 		$options    = Options::get();
-		$export_dir = trailingslashit( WP_CONTENT_DIR ) . sanitize_file_name( $options['export_dir'] );
+		$export_dir = Options::get_export_base( $options );
 
 		if ( wp_mkdir_p( $export_dir ) ) {
 			$htaccess = $export_dir . '/.htaccess';

@@ -87,7 +87,7 @@ class Commands {
 			? array( $post_type )
 			: (array) ( $this->options['post_types'] ?? array() );
 
-		$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
 		if ( $incremental && $this->file_writer ) {
 			$this->generate_incremental( $export_base, $types, $dry_run );
@@ -125,7 +125,7 @@ class Commands {
 	 */
 	public function status( array $args, array $assoc_args ): void {
 		$post_types  = (array) ( $this->options['post_types'] ?? array() );
-		$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
 		$rows = array();
 
@@ -414,7 +414,7 @@ class Commands {
 	 * @since  1.0.0
 	 */
 	private function delete_type( string $post_type ): void {
-		$export_base = WP_CONTENT_DIR . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 		$type_dir    = $export_base . '/' . $post_type;
 
 		if ( ! is_dir( $type_dir ) ) {

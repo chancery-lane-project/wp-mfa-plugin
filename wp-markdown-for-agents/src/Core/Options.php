@@ -73,4 +73,22 @@ class Options {
 
 		return array_merge( static::get_defaults(), $saved );
 	}
+
+	/**
+	 * Return the absolute filesystem path to the export base directory.
+	 *
+	 * Files are stored under the WordPress uploads directory:
+	 * `wp-content/uploads/{export_dir}/`
+	 *
+	 * @since  1.2.0
+	 * @param  array<string, mixed>|null $options Resolved options array, or null to fetch.
+	 * @return string Absolute path without trailing slash.
+	 */
+	public static function get_export_base( ?array $options = null ): string {
+		$options    = $options ?? static::get();
+		$upload_dir = wp_upload_dir();
+		$base       = $upload_dir['basedir'];
+
+		return rtrim( $base . '/' . sanitize_file_name( (string) ( $options['export_dir'] ?? 'wp-mfa-exports' ) ), '/\\' );
+	}
 }
