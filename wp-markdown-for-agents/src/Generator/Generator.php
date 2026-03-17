@@ -139,6 +139,10 @@ class Generator {
 	 * @return array{total: int, processed: int, errors: list<array{post_id: int, message: string}>}
 	 */
 	public function generate_batch( string $post_type, int $offset, int $limit ): array {
+		if ( $limit <= 0 ) {
+			return array( 'total' => 0, 'processed' => 0, 'errors' => array() );
+		}
+
 		$query = new \WP_Query(
 			array(
 				'post_type'      => $post_type,
@@ -158,6 +162,10 @@ class Generator {
 			$post = get_post( $post_id );
 
 			if ( ! $post instanceof \WP_Post ) {
+				$errors[] = array(
+					'post_id' => $post_id,
+					'message' => 'Post object not found; may have been deleted concurrently.',
+				);
 				continue;
 			}
 

@@ -61,6 +61,8 @@ class GeneratorTest extends TestCase {
         $GLOBALS['_mock_posts']        = [];
         $GLOBALS['_mock_post_meta']    = [];
         $GLOBALS['_mock_permalink']    = 'https://example.com/test/';
+        $GLOBALS['_mock_post_objects'] = [];
+        $GLOBALS['_mock_wp_query']     = null;
 
         $this->generator = $this->make_generator();
     }
@@ -350,6 +352,8 @@ class GeneratorTest extends TestCase {
 
         $GLOBALS['_mock_wp_query']     = fn( array $args ): array => [ [ 30 ], 1 ];
         $GLOBALS['_mock_post_objects'] = [ 30 => $post ];
+
+        $this->file_writer->expects( $this->never() )->method( 'write' );
 
         $result = $this->generator->generate_batch( 'event', 0, 10 );
 
