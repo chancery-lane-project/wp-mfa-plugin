@@ -38,7 +38,8 @@ class FieldResolver {
 
 				if ( is_array( $root_value ) ) {
 					$value = $root_value;
-					for ( $i = 1; $i < count( $segments ); $i++ ) { // phpcs:ignore Generic.CodeAnalysis.ForLoopWithTestFunctionCall.NotAllowed
+					$segment_count = count( $segments );
+					for ( $i = 1; $i < $segment_count; $i++ ) {
 						if ( ! is_array( $value ) || ! isset( $value[ $segments[ $i ] ] ) ) {
 							return null;
 						}
