@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
+
 /**
  * Orchestrates Markdown file generation for WordPress posts.
  *
@@ -24,6 +26,7 @@ class Generator {
 	 * @param  Converter            $converter           Converts HTML to Markdown.
 	 * @param  YamlFormatter        $yaml_formatter      Serialises frontmatter to YAML.
 	 * @param  FileWriter           $file_writer         Handles filesystem I/O.
+	 * @param  FieldResolver        $field_resolver      Resolves custom field values.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -31,7 +34,8 @@ class Generator {
 		private readonly ContentFilter $content_filter,
 		private readonly Converter $converter,
 		private readonly YamlFormatter $yaml_formatter,
-		private readonly FileWriter $file_writer
+		private readonly FileWriter $file_writer,
+		private readonly FieldResolver $field_resolver
 	) {}
 
 	/**
@@ -241,7 +245,7 @@ class Generator {
 		$parts = array();
 
 		foreach ( $content_fields as $field_path ) {
-			$value = FrontmatterBuilder::resolve_field_value( $post->ID, $field_path );
+			$value = $this->field_resolver->resolve( $post->ID, $field_path );
 
 			if ( null === $value || '' === $value ) {
 				continue;

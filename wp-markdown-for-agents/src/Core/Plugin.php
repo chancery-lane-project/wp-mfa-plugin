@@ -8,6 +8,7 @@ use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\CLI\Commands;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
+use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
@@ -82,13 +83,16 @@ class Plugin {
 		$export_base       = Options::get_export_base( $options );
 		$this->file_writer = new FileWriter( $export_base );
 
+		$field_resolver = new FieldResolver();
+
 		$generator = new Generator(
 			$options,
-			new FrontmatterBuilder( new TaxonomyCollector(), $options ),
+			new FrontmatterBuilder( $field_resolver, new TaxonomyCollector(), $options ),
 			new ContentFilter(),
 			new Converter(),
 			new YamlFormatter(),
-			$this->file_writer
+			$this->file_writer,
+			$field_resolver
 		);
 
 		// Store on object so other methods can access it.

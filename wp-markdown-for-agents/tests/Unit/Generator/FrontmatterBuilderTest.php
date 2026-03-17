@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Tests\Unit\Generator;
 
 use PHPUnit\Framework\TestCase;
+use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 
@@ -42,6 +43,7 @@ class FrontmatterBuilderTest extends TestCase {
             'meta_keys'          => [],
         ];
         return new FrontmatterBuilder(
+            new FieldResolver(),
             new TaxonomyCollector(),
             array_merge( $defaults, $options )
         );

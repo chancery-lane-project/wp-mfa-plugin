@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
+use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
@@ -80,7 +81,8 @@ class GeneratorTest extends TestCase {
             $this->content_filter,
             $this->converter,
             $this->yaml_formatter,
-            $this->file_writer
+            $this->file_writer,
+            new FieldResolver()
         );
     }
 
