@@ -7,7 +7,7 @@ Current state: v1.0.0, production-ready with PSR-4 structure, full test suite, a
 ## Serving layer
 
 - [x] **Export path moved to uploads** — Now uses `wp-content/uploads/{export_dir}/{post_type}/{slug}.md` via centralised `Options::get_export_base()` helper. All path construction goes through one method.
-- [ ] **Taxonomy archive support** — Currently singular posts only. Taxonomy archive pages (category, tag, custom taxonomies) are a key navigation surface for AI agents exploring site structure.
+- [x] **Taxonomy archive support** — Pre-generated Markdown files for all public taxonomy term archives, served via content negotiation. Auto-regenerated on save/delete.
 
 ## Frontmatter & content
 
@@ -23,7 +23,7 @@ Current state: v1.0.0, production-ready with PSR-4 structure, full test suite, a
 
 ## Admin UX
 
-- [ ] **AJAX bulk generation** — Current "Generate all" buttons use synchronous form POST which can timeout on large sites. Switch to AJAX with progress feedback.
+- [x] **AJAX bulk generation** — Current "Generate all" buttons use synchronous form POST which can timeout on large sites. Switch to AJAX with progress feedback.
 - [ ] **Export preview** — Show a preview of the generated Markdown before writing to disk (useful for debugging frontmatter field mappings).
 
 ## Documentation
