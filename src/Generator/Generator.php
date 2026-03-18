@@ -397,6 +397,12 @@ class Generator {
 				$value = '<p>' . $value . '</p>';
 			}
 
+			// Prepend the ACF field label as an H2 heading when available.
+			$label = $this->field_resolver->resolve_label( $post->ID, $field_path );
+			if ( $label ) {
+				$value = '<h2>' . esc_html( $label ) . '</h2>' . "\n\n" . $value;
+			}
+
 			$parts[] = $value;
 		}
 
