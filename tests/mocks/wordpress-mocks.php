@@ -850,3 +850,81 @@ if (!function_exists('wp_localize_script')) {
         return true;
     }
 }
+
+// ---------------------------------------------------------------------------
+// WP_Term stub
+// ---------------------------------------------------------------------------
+
+if (!class_exists('WP_Term')) {
+    class WP_Term {
+        public int    $term_id     = 0;
+        public string $name        = '';
+        public string $slug        = '';
+        public string $taxonomy    = '';
+        public string $description = '';
+        public int    $count       = 0;
+
+        public function __construct(array $props = []) {
+            foreach ($props as $key => $value) {
+                $this->$key = $value;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy function stubs
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_is_tax']         = false;
+$GLOBALS['_mock_taxonomies']     = ['category' => 'category', 'post_tag' => 'post_tag'];
+$GLOBALS['_mock_post_terms']     = [];
+$GLOBALS['_mock_taxonomy_terms'] = [];
+$GLOBALS['_mock_term_link']      = [];
+
+if (!function_exists('is_tax')) {
+    function is_tax(string $taxonomy = '', int|string|array $term = ''): bool {
+        return $GLOBALS['_mock_is_tax'] ?? false;
+    }
+}
+
+if (!function_exists('is_category')) {
+    function is_category(int|string|array $category = ''): bool {
+        return $GLOBALS['_mock_is_tax'] ?? false;
+    }
+}
+
+if (!function_exists('is_tag')) {
+    function is_tag(int|string|array $tag = ''): bool {
+        return $GLOBALS['_mock_is_tax'] ?? false;
+    }
+}
+
+if (!function_exists('get_taxonomies')) {
+    function get_taxonomies(array $args = [], string $output = 'names'): array {
+        return $GLOBALS['_mock_taxonomies'] ?? ['category' => 'category', 'post_tag' => 'post_tag'];
+    }
+}
+
+if (!function_exists('wp_get_post_terms')) {
+    function wp_get_post_terms(int $post_id, string $taxonomy, array $args = []): array|\WP_Error {
+        return $GLOBALS['_mock_post_terms'][$post_id][$taxonomy] ?? [];
+    }
+}
+
+if (!function_exists('get_terms')) {
+    function get_terms(array|string $args = []): array|\WP_Error {
+        $taxonomy = is_array($args) ? ($args['taxonomy'] ?? '') : $args;
+        return $GLOBALS['_mock_taxonomy_terms'][$taxonomy] ?? [];
+    }
+}
+
+if (!function_exists('get_term_link')) {
+    function get_term_link(\WP_Term|int|string $term, string $taxonomy = ''): string|\WP_Error {
+        if ($term instanceof \WP_Term) {
+            return $GLOBALS['_mock_term_link'][$term->term_id]
+                ?? 'https://example.com/' . $term->taxonomy . '/' . $term->slug . '/';
+        }
+        return 'https://example.com/term/' . (int) $term . '/';
+    }
+}
