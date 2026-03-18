@@ -3,7 +3,7 @@ Contributors: tclp
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 6.7
-Stable tag: 1.0.0
+Stable tag: 1.2.0
 Requires PHP: 8.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -18,26 +18,30 @@ to AI agents and language model tools that request it via HTTP content negotiati
 
 **How it works:**
 
-1. Posts are converted to Markdown and saved as static files on disk.
-2. When a visitor (or AI agent) requests a post with `Accept: text/markdown` in
-   the HTTP headers, WordPress serves the pre-generated `.md` file directly.
-3. A `<link rel="alternate" type="text/markdown">` tag is added to each post's
+1. Posts and taxonomy archive pages are converted to Markdown and saved as static
+   files on disk inside `wp-content/uploads/`.
+2. When a visitor (or AI agent) requests a page with `Accept: text/markdown` in
+   the HTTP headers, WordPress serves the pre-generated `.md` file directly —
+   no page render required.
+3. A `<link rel="alternate" type="text/markdown">` tag is added to each page's
    `<head>` so agents can discover Markdown versions automatically.
 4. An `llms.txt` index file can be generated to help LLM tools navigate your site.
 
 **Features:**
 
-* Automatic Markdown generation on post save (configurable)
-* Manual bulk generation via Settings page or WP-CLI
+* Content negotiation (`Accept: text/markdown`, `?output_format=md`, or known AI User-Agents)
+* **Taxonomy archive support** — category, tag, and custom taxonomy term pages served as Markdown post listings
+* Automatic Markdown generation on post save; taxonomy archives auto-update when any post in the term changes
+* AJAX bulk generation with live progress counter — no page timeouts on large sites
 * Per-post-type field configuration — choose which meta/ACF fields go in frontmatter or body
 * ACF support with dot notation for nested group fields (e.g. `group.subfield`)
 * Content fields option — use ACF fields as the body content instead of post_content
-* Content negotiation (`Vary: Accept` header, proper `Content-Type`)
 * `llms.txt` index generation following the llmstxt.org specification
 * Manifest generation with content hashes and change tracking per post type
 * Incremental export — only re-export changed documents (`--incremental`)
 * Delta file (`changes.json`) for RAG system sync
-* WP-CLI commands: `wp markdown-agents generate`, `status`, `delete`
+* Access statistics — logs AI agent requests with a dedicated stats admin page
+* WP-CLI commands: `generate`, `generate-taxonomies`, `status`, `delete`
 * Fully unit-tested
 
 == Installation ==
@@ -51,15 +55,24 @@ to AI agents and language model tools that request it via HTTP content negotiati
 
 = Where are the Markdown files stored? =
 
-By default in `wp-content/markdown-for-agents/`. This is configurable in the
-plugin settings. The directory is protected from direct browser access via
-`.htaccess`, but files are served by WordPress when content negotiation is triggered.
+Inside `wp-content/uploads/{export_dir}/` (configurable in Settings). Post files
+live under `{export_dir}/{post-type}/{slug}.md`. Taxonomy archive files live under
+`{export_dir}/taxonomy/{taxonomy}/{term-slug}.md`. The directory is served by
+WordPress when content negotiation is triggered.
 
 = Will this slow down my site? =
 
 No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
+
+= What are taxonomy archive files? =
+
+For every public taxonomy term (categories, tags, custom taxonomies) the plugin
+generates a Markdown file listing all published posts in that term with links and
+excerpts. These are served automatically when an AI agent requests a taxonomy
+archive URL. This lets agents navigate your site structure by exploring term listings,
+not just individual posts.
 
 = What is the manifest.json file? =
 
@@ -93,18 +106,41 @@ are automatically converted to a list of post titles.
 = Can I customise the Markdown output? =
 
 Yes. Several filters are available:
+
 * `wp_mfa_pre_convert` — filter HTML before conversion
 * `wp_mfa_post_convert` — filter Markdown after conversion
-* `wp_mfa_file_generated` — fired after a file is written
-* `wp_mfa_file_deleted` — fired after a file is deleted
+* `wp_mfa_frontmatter` — modify frontmatter fields for a post
+* `wp_mfa_taxonomy_frontmatter` — modify frontmatter fields for a taxonomy archive
+* `wp_mfa_serve_enabled` — enable/disable serving for a specific post
+* `wp_mfa_serve_taxonomies` — enable/disable serving for taxonomy archive pages
+* `wp_mfa_file_generated` — action fired after a file is written
+* `wp_mfa_file_deleted` — action fired after a file is deleted
+
+= How do I generate taxonomy archives via WP-CLI? =
+
+```
+wp markdown-agents generate-taxonomies
+wp markdown-agents generate-taxonomies --taxonomy=category
+wp markdown-agents generate-taxonomies --dry-run
+```
 
 == Screenshots ==
 
-1. Settings page with export options.
+1. Settings page with export options and bulk generation.
 2. Post meta box showing file status and regenerate button.
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.2.0 =
+* Taxonomy archive support — generates Markdown index files for all public taxonomy terms (categories, tags, custom taxonomies), served via content negotiation.
+* Taxonomy archives auto-regenerate when any post in the term is saved or deleted.
+* AJAX bulk generation for taxonomy archives on the Settings page with live progress counter.
+* New WP-CLI command: `wp markdown-agents generate-taxonomies [--taxonomy=<slug>] [--dry-run]`.
+* `<link rel="alternate" type="text/markdown">` tag now emitted on taxonomy archive pages.
+* New filter: `wp_mfa_serve_taxonomies` to enable/disable taxonomy archive serving globally.
+* New filter: `wp_mfa_taxonomy_frontmatter` to modify taxonomy archive frontmatter before serialisation.
+* Bulk generation buttons converted to AJAX with live counter — no more page timeouts on large sites.
 
 = 1.1.0 =
 * Per-post-type field configuration for frontmatter and content fields.
@@ -116,11 +152,16 @@ Yes. Several filters are available:
 * Manifest is generated per post-type folder for independent change tracking.
 * Incremental export via `--incremental` — skips unchanged documents.
 * Delta file (`changes.json`) generated for RAG system integration.
+* Access statistics — logs AI agent requests; dedicated stats admin page.
+* UA detection — configurable User-Agent strings force Markdown serving.
 
 = 1.0.0 =
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.2.0 =
+Adds taxonomy archive support and AJAX bulk generation. No breaking changes. Taxonomy archive files will be generated on the next post save or via Settings → Generate All Taxonomy Archives.
 
 = 1.1.0 =
 Per-post-type field configuration, ACF support, and manifest-based change tracking.

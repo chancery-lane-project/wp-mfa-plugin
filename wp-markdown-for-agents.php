@@ -4,7 +4,7 @@
  * Plugin Name:       WP Markdown for Agents
  * Plugin URI:        https://github.com/tclp/wp-markdown-for-agents
  * Description:       Serve pre-generated Markdown files to AI agents via HTTP content negotiation.
- * Version:           1.0.0
+ * Version:           1.2.0
  * Requires at least: 6.3
  * Requires PHP:      8.0
  * Author:            The Chancery Lane Project
