@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
 /**
  * Admin coordinator — wires SettingsPage and MetaBox and handles POST actions.
@@ -25,7 +26,8 @@ class Admin {
 	 */
 	public function __construct(
 		private readonly array $options,
-		private readonly Generator $generator
+		private readonly Generator $generator,
+		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 	) {
 		$this->settings_page = new SettingsPage( $options, $generator );
 		$this->meta_box      = new MetaBox( $options, $generator );
@@ -164,6 +166,30 @@ class Admin {
 		}
 
 		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
+
+		wp_send_json_success( $result );
+		return;
+	}
+
+	/**
+	 * Handle the AJAX taxonomy-batch-generate request.
+	 *
+	 * Hooked to `wp_ajax_mfa_generate_taxonomy_batch`.
+	 *
+	 * @since  1.1.0
+	 */
+	public function handle_generate_taxonomy_batch_ajax(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
+			return;
+		}
+
+		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+
+		$offset = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$limit  = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$result = $this->taxonomy_generator->generate_batch( $offset, $limit );
 
 		wp_send_json_success( $result );
 		return;

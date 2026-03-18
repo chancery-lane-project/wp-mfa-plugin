@@ -240,6 +240,14 @@ class SettingsPage {
 				</button>
 			</p>
 		<?php endforeach; ?>
+		<hr>
+		<h2><?php esc_html_e( 'Taxonomy Archives', 'wp-markdown-for-agents' ); ?></h2>
+		<p><?php esc_html_e( 'Generate Markdown archive files for all public taxonomy terms.', 'wp-markdown-for-agents' ); ?></p>
+		<p>
+			<button type="button" class="button button-secondary" data-action="mfa_generate_taxonomy_batch">
+				<?php esc_html_e( 'Generate All Taxonomy Archives', 'wp-markdown-for-agents' ); ?>
+			</button>
+		</p>
 		<?php
 	}
 

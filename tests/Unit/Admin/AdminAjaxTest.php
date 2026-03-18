@@ -9,6 +9,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::handle_generate_batch_ajax
@@ -19,11 +20,15 @@ class AdminAjaxTest extends TestCase {
     /** @var Generator&MockObject */
     private Generator $generator;
 
+    /** @var TaxonomyArchiveGenerator&MockObject */
+    private TaxonomyArchiveGenerator $taxonomy_generator;
+
     private Admin $admin;
 
     protected function setUp(): void {
-        $this->generator = $this->createMock( Generator::class );
-        $this->admin     = new Admin( Options::get_defaults(), $this->generator );
+        $this->generator          = $this->createMock( Generator::class );
+        $this->taxonomy_generator = $this->createMock( TaxonomyArchiveGenerator::class );
+        $this->admin              = new Admin( Options::get_defaults(), $this->generator, $this->taxonomy_generator );
 
         // Reset globals before each test.
         unset(
@@ -146,6 +151,23 @@ class AdminAjaxTest extends TestCase {
         $this->admin->handle_generate_batch_ajax();
 
         $this->assertSame( 50, $captured_limit );
+    }
+
+    public function test_handle_generate_taxonomy_batch_ajax_returns_batch_result(): void {
+        $this->taxonomy_generator->expects( $this->once() )
+            ->method( 'generate_batch' )
+            ->with( 2, 10 )
+            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
+
+        $_POST['offset'] = '2';
+        $_POST['limit']  = '10';
+
+        $this->admin->handle_generate_taxonomy_batch_ajax();
+
+        $response = $GLOBALS['_mock_json_response'];
+        $this->assertTrue( $response['success'] );
+        $this->assertSame( 50, $response['data']['total'] );
+        $this->assertSame( 10, $response['data']['processed'] );
     }
 
     // -----------------------------------------------------------------------
