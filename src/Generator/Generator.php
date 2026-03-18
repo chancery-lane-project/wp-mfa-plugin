@@ -18,13 +18,14 @@ class Generator {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed> $options            Plugin options.
-	 * @param  FrontmatterBuilder   $frontmatter_builder Builds the frontmatter array.
-	 * @param  ContentFilter        $content_filter      Cleans HTML before conversion.
-	 * @param  Converter            $converter           Converts HTML to Markdown.
-	 * @param  YamlFormatter        $yaml_formatter      Serialises frontmatter to YAML.
-	 * @param  FileWriter           $file_writer         Handles filesystem I/O.
-	 * @param  FieldResolver        $field_resolver      Resolves custom field values.
+	 * @param  array<string, mixed>           $options              Plugin options.
+	 * @param  FrontmatterBuilder             $frontmatter_builder  Builds the frontmatter array.
+	 * @param  ContentFilter                  $content_filter       Cleans HTML before conversion.
+	 * @param  Converter                      $converter            Converts HTML to Markdown.
+	 * @param  YamlFormatter                  $yaml_formatter       Serialises frontmatter to YAML.
+	 * @param  FileWriter                     $file_writer          Handles filesystem I/O.
+	 * @param  FieldResolver                  $field_resolver       Resolves custom field values.
+	 * @param  TaxonomyArchiveGenerator|null  $taxonomy_generator   Optional taxonomy archive generator.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -33,7 +34,8 @@ class Generator {
 		private readonly Converter $converter,
 		private readonly YamlFormatter $yaml_formatter,
 		private readonly FileWriter $file_writer,
-		private readonly FieldResolver $field_resolver
+		private readonly FieldResolver $field_resolver,
+		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
 	) {}
 
 	/**
@@ -281,7 +283,65 @@ class Generator {
 		}
 
 		delete_post_meta( $post_id, '_wp_mfa_generating' );
+
+		// Regenerate taxonomy archives for all terms on this post (outside guard block).
+		if ( ! empty( $this->options['auto_generate'] ) && null !== $this->taxonomy_generator ) {
+			$this->regenerate_term_archives( $post_id );
+		}
 	}
+
+	/**
+	 * Cache the taxonomy terms for a post before it is deleted.
+	 *
+	 * Call this from a before_delete_post hook, then call
+	 * regenerate_term_archives_after_delete() from after_delete_post.
+	 *
+	 * @since  1.1.0
+	 * @param  int $post_id The post ID about to be deleted.
+	 */
+	public function cache_post_terms( int $post_id ): void {
+		if ( empty( $this->options['auto_generate'] ) || null === $this->taxonomy_generator ) {
+			return;
+		}
+
+		$taxonomies = array_keys( get_taxonomies( array( 'public' => true ) ) );
+		$cached     = array();
+
+		foreach ( $taxonomies as $taxonomy ) {
+			$terms = wp_get_post_terms( $post_id, $taxonomy );
+
+			if ( is_array( $terms ) && ! is_wp_error( $terms ) ) {
+				$cached = array_merge( $cached, $terms );
+			}
+		}
+
+		$this->pending_deletion_terms[ $post_id ] = $cached;
+	}
+
+	/**
+	 * Regenerate term archives for a post that has just been deleted.
+	 *
+	 * Must be preceded by a call to cache_post_terms() for the same post ID.
+	 *
+	 * @since  1.1.0
+	 * @param  int      $post_id The post ID that was deleted.
+	 * @param  \WP_Post $post    The post object (already deleted from DB).
+	 */
+	public function regenerate_term_archives_after_delete( int $post_id, \WP_Post $post ): void {
+		if ( empty( $this->options['auto_generate'] ) || null === $this->taxonomy_generator ) {
+			return;
+		}
+
+		$terms = $this->pending_deletion_terms[ $post_id ] ?? array();
+		unset( $this->pending_deletion_terms[ $post_id ] );
+
+		foreach ( $terms as $term ) {
+			$this->taxonomy_generator->generate_term( $term );
+		}
+	}
+
+	/** @var array<int, \WP_Term[]> */
+	private array $pending_deletion_terms = array();
 
 	/**
 	 * Get the HTML content for a post.
@@ -330,6 +390,28 @@ class Generator {
 		$html = implode( "\n\n", $parts );
 
 		return apply_filters( 'the_content', $html );
+	}
+
+	/**
+	 * Regenerate archives for every public taxonomy term the post belongs to.
+	 *
+	 * @since  1.1.0
+	 * @param  int $post_id The post ID.
+	 */
+	private function regenerate_term_archives( int $post_id ): void {
+		$taxonomies = array_keys( get_taxonomies( array( 'public' => true ) ) );
+
+		foreach ( $taxonomies as $taxonomy ) {
+			$terms = wp_get_post_terms( $post_id, $taxonomy );
+
+			if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+				continue;
+			}
+
+			foreach ( $terms as $term ) {
+				$this->taxonomy_generator->generate_term( $term );
+			}
+		}
 	}
 
 	/**

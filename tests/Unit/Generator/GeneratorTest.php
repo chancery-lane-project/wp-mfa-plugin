@@ -12,6 +12,7 @@ use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
 
 /**
@@ -35,6 +36,9 @@ class GeneratorTest extends TestCase {
 
     /** @var FileWriter&MockObject */
     private FileWriter $file_writer;
+
+    /** @var TaxonomyArchiveGenerator&MockObject */
+    private TaxonomyArchiveGenerator $taxonomy_generator;
 
     private Generator $generator;
 
@@ -64,6 +68,9 @@ class GeneratorTest extends TestCase {
         $GLOBALS['_mock_post_objects'] = [];
         $GLOBALS['_mock_wp_query']     = null;
 
+        $this->taxonomy_generator    = $this->createMock( TaxonomyArchiveGenerator::class );
+        $GLOBALS['_mock_post_terms'] = [];
+
         $this->generator = $this->make_generator();
     }
 
@@ -85,6 +92,24 @@ class GeneratorTest extends TestCase {
             $this->yaml_formatter,
             $this->file_writer,
             new FieldResolver()
+        );
+    }
+
+    private function make_generator_with_taxonomy( array $options = [] ): Generator {
+        $defaults = [
+            'post_types'    => [ 'post', 'page' ],
+            'export_dir'    => $this->export_subdir,
+            'auto_generate' => true,
+        ];
+        return new Generator(
+            array_merge( $defaults, $options ),
+            $this->frontmatter_builder,
+            $this->content_filter,
+            $this->converter,
+            $this->yaml_formatter,
+            $this->file_writer,
+            $this->createMock( FieldResolver::class ),
+            $this->taxonomy_generator,
         );
     }
 
@@ -242,6 +267,85 @@ class GeneratorTest extends TestCase {
         $this->file_writer->expects( $this->never() )->method( 'write' );
 
         $this->generator->on_save_post( 1, $post );
+    }
+
+    // -----------------------------------------------------------------------
+    // on_save_post — taxonomy archive regeneration
+    // -----------------------------------------------------------------------
+
+    public function test_on_save_post_regenerates_term_archives_for_published_post(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][1]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $post = new \WP_Post( ['ID' => 1, 'post_type' => 'post', 'post_status' => 'publish'] );
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturnArgument( 0 );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $this->taxonomy_generator->expects( $this->once() )
+            ->method( 'generate_term' )
+            ->with( $term );
+
+        $gen = $this->make_generator_with_taxonomy();
+        $gen->on_save_post( 1, $post );
+    }
+
+    public function test_on_save_post_does_not_regenerate_terms_when_auto_generate_disabled(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][1]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $post = new \WP_Post( ['ID' => 1, 'post_type' => 'post', 'post_status' => 'publish'] );
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturnArgument( 0 );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $this->taxonomy_generator->expects( $this->never() )->method( 'generate_term' );
+
+        // auto_generate = false
+        $gen = $this->make_generator_with_taxonomy( ['auto_generate' => false] );
+        $gen->on_save_post( 1, $post );
+    }
+
+    // -----------------------------------------------------------------------
+    // cache_post_terms / regenerate_term_archives_after_delete
+    // -----------------------------------------------------------------------
+
+    public function test_cache_and_regen_after_delete_regenerates_cached_terms(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][5]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $this->taxonomy_generator->expects( $this->once() )
+            ->method( 'generate_term' )
+            ->with( $term );
+
+        $gen  = $this->make_generator_with_taxonomy();
+        $post = new \WP_Post( ['ID' => 5, 'post_type' => 'post', 'post_status' => 'publish'] );
+
+        $gen->cache_post_terms( 5 );
+        $gen->regenerate_term_archives_after_delete( 5, $post );
+    }
+
+    public function test_cache_does_nothing_when_auto_generate_disabled(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][5]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $this->taxonomy_generator->expects( $this->never() )->method( 'generate_term' );
+
+        $gen  = $this->make_generator_with_taxonomy( ['auto_generate' => false] );
+        $post = new \WP_Post( ['ID' => 5, 'post_type' => 'post'] );
+
+        $gen->cache_post_terms( 5 );
+        $gen->regenerate_term_archives_after_delete( 5, $post );
     }
 
     public function test_on_save_post_does_not_run_during_autosave(): void {
