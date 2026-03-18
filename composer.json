@@ -2,7 +2,7 @@
     "name": "tclp/wp-markdown-for-agents",
     "description": "Serve Markdown content to AI agents via HTTP content negotiation",
     "type": "wordpress-plugin",
-    "license": "GPL-2.0-or-later",
+    "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.0",
         "league/html-to-markdown": "^5.1"

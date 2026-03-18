@@ -9,8 +9,8 @@
  * Requires PHP:      8.0
  * Author:            The Chancery Lane Project
  * Author URI:        https://chancerylane.uk
- * License:           GPL-2.0-or-later
- * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * License:           GPL-3.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:       wp-markdown-for-agents
  * Domain Path:       /languages
  *

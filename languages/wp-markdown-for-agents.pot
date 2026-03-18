@@ -1,5 +1,5 @@
 # Copyright (C) 2024 The Chancery Lane Project
-# This file is distributed under the GPL-2.0-or-later.
+# This file is distributed under the GPL-3.0-or-later.
 msgid ""
 msgstr ""
 "Project-Id-Version: WP Markdown for Agents 1.0.0\n"

@@ -5,8 +5,8 @@ Requires at least: 6.3
 Tested up to: 6.7
 Stable tag: 1.2.0
 Requires PHP: 8.0
-License: GPL-2.0-or-later
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPL-3.0-or-later
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
 Serve pre-generated Markdown files to AI agents via HTTP content negotiation.
 

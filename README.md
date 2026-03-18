@@ -4,7 +4,7 @@
 
 [![PHP 8.0+](https://img.shields.io/badge/PHP-8.0%2B-blue)](https://www.php.net/)
 [![WordPress 6.3+](https://img.shields.io/badge/WordPress-6.3%2B-blue)](https://wordpress.org/)
-[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that converts post content to Markdown and serves it to AI agents and LLM tools via standard HTTP content negotiation.
 
@@ -211,4 +211,4 @@ Tests use PHPUnit 9.6 with namespace-scoped function mocks (no extensions requir
 
 ## Licence
 
-GPL-2.0-or-later. See [LICENSE](LICENSE) for details.
+GPL-3.0-or-later. See [LICENSE](LICENSE) for details.
