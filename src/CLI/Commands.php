@@ -476,9 +476,14 @@ class Commands {
 			return;
 		}
 
-		$files = glob( $type_dir . '/*.md' ) ?: array();
+		$files     = glob( $type_dir . '/*.md' ) ?: array();
+		$real_base = realpath( $type_dir );
 		foreach ( $files as $file ) {
-			unlink( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			$real_file = realpath( $file );
+			if ( false === $real_base || false === $real_file || ! str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR ) ) {
+				continue;
+			}
+			unlink( $real_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 		}
 
 		\WP_CLI::log( sprintf( 'Deleted %d files for %s.', count( $files ), $post_type ) );

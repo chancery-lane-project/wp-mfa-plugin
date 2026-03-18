@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WP_MFA_VERSION', '1.0.0' );
+define( 'WP_MFA_VERSION', '1.2.0' );
 define( 'WP_MFA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WP_MFA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

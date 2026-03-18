@@ -228,8 +228,8 @@ class Negotiator {
 		 * @since 1.1.0
 		 * @param string $signal The default signal value.
 		 */
-		$content_signal = str_replace(
-			array( "\r", "\n" ),
+		$content_signal = preg_replace(
+			'/[^\w=,\-\. ]/',
 			'',
 			(string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' )
 		);

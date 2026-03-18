@@ -86,7 +86,7 @@ class LlmsTxtGenerator {
 		$content   = implode( "\n", $output );
 		$llms_path = rtrim( $export_base, '/' ) . '/llms.txt';
 
-		return false !== file_put_contents( $llms_path, $content ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		return ( new FileWriter( $export_base ) )->write( $llms_path, $content );
 	}
 
 	/**

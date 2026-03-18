@@ -7,6 +7,7 @@
     'use strict';
 
     var BATCH_SIZE = 10;
+    var ALLOWED_ACTIONS = ['mfa_generate_batch', 'mfa_generate_taxonomy_batch'];
 
     /**
      * Send one batch request and recurse until all items are processed.
@@ -45,12 +46,13 @@
             }
 
             var data = response.data;
-            accumulated.processed += data.processed;
+            accumulated.processed += parseInt(data.processed, 10);
             accumulated.errors    = accumulated.errors.concat(data.errors);
 
-            button.textContent = accumulated.processed + ' / ' + data.total;
+            var total = parseInt(data.total, 10);
+            button.textContent = accumulated.processed + ' / ' + total;
 
-            if (accumulated.processed < data.total) {
+            if (accumulated.processed < total) {
                 sendBatch(action, postType, offset + BATCH_SIZE, accumulated, button);
             } else {
                 var errorSummary = accumulated.errors.length
@@ -85,6 +87,10 @@
         var button   = /** @type {HTMLButtonElement} */ (event.currentTarget);
         var postType = button.dataset.postType || null;
         var action   = button.dataset.action || 'mfa_generate_batch';
+
+        if (ALLOWED_ACTIONS.indexOf(action) === -1) {
+            return;
+        }
 
         button.disabled    = true;
         button.textContent = '0 / …';

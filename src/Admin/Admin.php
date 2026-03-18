@@ -74,11 +74,11 @@ class Admin {
 	 * @since  1.0.0
 	 */
 	public function handle_generate_action(): void {
-		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification
-
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
 		}
+
+		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
 
 		check_admin_referer( 'wp_mfa_generate_' . $post_type );
 
@@ -110,7 +110,8 @@ class Admin {
 	 * @since  1.0.0
 	 */
 	public function handle_regenerate_post_action(): void {
-		$post_id = (int) ( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification
+		// post_id is needed for both capability and nonce checks; (int) cast sanitises the value.
+		$post_id = (int) ( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );

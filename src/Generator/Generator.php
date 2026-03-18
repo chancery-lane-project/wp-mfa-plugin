@@ -247,7 +247,20 @@ class Generator {
 		 * @param  string    $path The default export path.
 		 * @param  \WP_Post  $post The post.
 		 */
-		return apply_filters( 'wp_mfa_export_path', $path, $post );
+		$filtered = (string) apply_filters( 'wp_mfa_export_path', $path, $post );
+
+		// Reject any filtered path that escapes the export base directory.
+		$real_base     = realpath( $base );
+		$filtered_dir  = realpath( dirname( $filtered ) );
+		if (
+			false !== $real_base &&
+			false !== $filtered_dir &&
+			str_starts_with( $filtered_dir . DIRECTORY_SEPARATOR, $real_base . DIRECTORY_SEPARATOR )
+		) {
+			return $filtered;
+		}
+
+		return $path;
 	}
 
 	/**

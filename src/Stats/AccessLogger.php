@@ -33,6 +33,6 @@ class AccessLogger {
 			return;
 		}
 
-		$this->repository->record_access( $post_id, $agent );
+		$this->repository->record_access( $post_id, mb_substr( $agent, 0, 100 ) );
 	}
 }
