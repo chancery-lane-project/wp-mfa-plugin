@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Negotiate;
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 
@@ -22,14 +23,16 @@ class Negotiator {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed> $options       Plugin options.
-	 * @param  Generator            $generator     Generator instance (provides get_export_path).
-	 * @param  AgentDetector        $agent_detector Detects known AI agent user-agents.
-	 * @param  AccessLogger         $access_logger  Records agent access events for statistics.
+	 * @param  array<string, mixed>    $options           Plugin options.
+	 * @param  Generator               $generator         Generator instance (provides get_export_path).
+	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
+	 * @param  AgentDetector           $agent_detector     Detects known AI agent user-agents.
+	 * @param  AccessLogger            $access_logger      Records agent access events for statistics.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
+		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly AgentDetector $agent_detector,
 		private readonly AccessLogger $access_logger
 	) {}
@@ -42,10 +45,6 @@ class Negotiator {
 	 * @since  1.0.0
 	 */
 	public function maybe_serve_markdown(): void {
-		if ( ! $this->is_eligible_singular() ) {
-			return;
-		}
-
 		$accept    = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		$ua        = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -58,65 +57,64 @@ class Negotiator {
 			return;
 		}
 
-		$post = get_queried_object();
-		if ( ! $post instanceof \WP_Post ) {
-			return;
-		}
-
-		/**
-		 * Whether to serve Markdown for this specific post.
-		 *
-		 * Only fires when the request has already been identified as a Markdown
-		 * request (Accept header, query param, or known UA). Return false to
-		 * prevent serving for this post without affecting others.
-		 *
-		 * @since 1.1.0
-		 * @param bool     $enabled Whether serving is enabled. Default true.
-		 * @param \WP_Post $post    The queried post.
-		 */
-		if ( ! apply_filters( 'wp_mfa_serve_enabled', true, $post ) ) {
-			return;
-		}
-
-		$filepath = $this->generator->get_export_path( $post );
-
-		if ( ! file_exists( $filepath ) ) {
-			return;
-		}
-
-		// Validate path stays within export base before serving.
-		if ( ! $this->is_safe_filepath( $filepath ) ) {
-			return;
-		}
-
 		$agent_label = $matched_agent ?? ( $via_accept ? 'accept-header' : 'query-param' );
-		$this->access_logger->log_access( $post->ID, $agent_label );
 
-		header( 'Content-Type: text/markdown; charset=utf-8' );
+		if ( $this->is_eligible_singular() ) {
+			$post = get_queried_object();
+			if ( ! $post instanceof \WP_Post ) {
+				return;
+			}
 
-		// Vary: Accept only when the request was Accept-header negotiated —
-		// not for UA-matched or query-param requests.
-		if ( $via_accept ) {
-			header( 'Vary: Accept' );
+			/**
+			 * Whether to serve Markdown for this specific post.
+			 *
+			 * Only fires when the request has already been identified as a Markdown
+			 * request (Accept header, query param, or known UA). Return false to
+			 * prevent serving for this post without affecting others.
+			 *
+			 * @since 1.1.0
+			 * @param bool     $enabled Whether serving is enabled. Default true.
+			 * @param \WP_Post $post    The queried post.
+			 */
+			if ( ! apply_filters( 'wp_mfa_serve_enabled', true, $post ) ) {
+				return;
+			}
+
+			$filepath = $this->generator->get_export_path( $post );
+
+			if ( ! file_exists( $filepath ) || ! $this->is_safe_filepath( $filepath ) ) {
+				return;
+			}
+
+			$this->access_logger->log_access( $post->ID, $agent_label );
+			$this->send_markdown_file( $filepath, $via_accept );
+			return;
 		}
 
-		header( 'X-Markdown-Source: wp-markdown-for-agents' );
+		if ( is_tax() || is_category() || is_tag() ) {
+			/**
+			 * Whether to serve Markdown for taxonomy archive pages.
+			 *
+			 * @since 1.1.0
+			 * @param bool $enabled Whether serving is enabled. Default true.
+			 */
+			if ( ! apply_filters( 'wp_mfa_serve_taxonomies', true ) ) {
+				return;
+			}
 
-		/**
-		 * Filter the Content-Signal header value.
-		 *
-		 * Return an empty string to suppress the header entirely.
-		 *
-		 * @since 1.1.0
-		 * @param string $signal The default signal value.
-		 */
-		$content_signal = str_replace( array( "\r", "\n" ), '', (string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' ) );
-		if ( $content_signal ) {
-			header( 'Content-Signal: ' . $content_signal );
+			$term = get_queried_object();
+			if ( ! $term instanceof \WP_Term ) {
+				return;
+			}
+
+			$filepath = $this->taxonomy_generator->get_export_path( $term );
+
+			if ( ! file_exists( $filepath ) || ! $this->is_safe_filepath( $filepath ) ) {
+				return;
+			}
+
+			$this->send_markdown_file( $filepath, $via_accept );
 		}
-
-		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
-		exit;
 	}
 
 	/**
@@ -127,23 +125,41 @@ class Negotiator {
 	 * @since  1.0.0
 	 */
 	public function output_link_tag(): void {
-		if ( ! $this->is_eligible_singular() ) {
+		if ( $this->is_eligible_singular() ) {
+			$post = get_queried_object();
+			if ( ! $post instanceof \WP_Post ) {
+				return;
+			}
+
+			$filepath = $this->generator->get_export_path( $post );
+			if ( ! file_exists( $filepath ) ) {
+				return;
+			}
+
+			$url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
+			echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			return;
 		}
 
-		$post = get_queried_object();
-		if ( ! $post instanceof \WP_Post ) {
-			return;
+		if ( is_tax() || is_category() || is_tag() ) {
+			$term = get_queried_object();
+			if ( ! $term instanceof \WP_Term ) {
+				return;
+			}
+
+			$filepath = $this->taxonomy_generator->get_export_path( $term );
+			if ( ! file_exists( $filepath ) ) {
+				return;
+			}
+
+			$term_link = get_term_link( $term );
+			if ( is_wp_error( $term_link ) ) {
+				return;
+			}
+
+			$url = esc_url( add_query_arg( 'output_format', 'md', $term_link ) );
+			echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		}
-
-		$filepath = $this->generator->get_export_path( $post );
-
-		if ( ! file_exists( $filepath ) ) {
-			return;
-		}
-
-		$url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
-		echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	/**
@@ -186,5 +202,43 @@ class Negotiator {
 		}
 
 		return str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR );
+	}
+
+	/**
+	 * Send HTTP headers and stream the Markdown file to the client.
+	 *
+	 * @since  1.1.0
+	 * @param  string $filepath   Absolute path to the .md file.
+	 * @param  bool   $via_accept True when negotiated via Accept header (adds Vary).
+	 */
+	private function send_markdown_file( string $filepath, bool $via_accept ): void {
+		header( 'Content-Type: text/markdown; charset=utf-8' );
+
+		if ( $via_accept ) {
+			header( 'Vary: Accept' );
+		}
+
+		header( 'X-Markdown-Source: wp-markdown-for-agents' );
+
+		/**
+		 * Filter the Content-Signal header value.
+		 *
+		 * Return an empty string to suppress the header entirely.
+		 *
+		 * @since 1.1.0
+		 * @param string $signal The default signal value.
+		 */
+		$content_signal = str_replace(
+			array( "\r", "\n" ),
+			'',
+			(string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' )
+		);
+
+		if ( $content_signal ) {
+			header( 'Content-Signal: ' . $content_signal );
+		}
+
+		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+		exit;
 	}
 }

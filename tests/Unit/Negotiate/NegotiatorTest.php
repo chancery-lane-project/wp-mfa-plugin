@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Negotiate;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
@@ -21,6 +22,9 @@ class NegotiatorTest extends TestCase {
     /** @var Generator&MockObject */
     private Generator $generator;
 
+    /** @var TaxonomyArchiveGenerator&MockObject */
+    private TaxonomyArchiveGenerator $taxonomy_generator;
+
     /** @var AccessLogger&MockObject */
     private AccessLogger $logger;
 
@@ -31,10 +35,12 @@ class NegotiatorTest extends TestCase {
         $this->tmp_dir = $export_base . '/' . uniqid( 'wp-mfa-neg-', true );
         mkdir( $this->tmp_dir, 0755, true );
 
-        $this->generator = $this->createMock( Generator::class );
-        $this->logger    = $this->createMock( AccessLogger::class );
+        $this->generator          = $this->createMock( Generator::class );
+        $this->taxonomy_generator = $this->createMock( TaxonomyArchiveGenerator::class );
+        $this->logger             = $this->createMock( AccessLogger::class );
 
-        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_singular'] = false;
+        $GLOBALS['_mock_is_tax']      = false;
         $GLOBALS['_mock_queried_object'] = null;
         $GLOBALS['_mock_sent_headers']   = [];
         $_SERVER['HTTP_ACCEPT']          = '';
@@ -44,7 +50,8 @@ class NegotiatorTest extends TestCase {
         $this->remove_dir( $this->tmp_dir );
         unset( $_SERVER['HTTP_ACCEPT'] );
         unset( $_SERVER['HTTP_USER_AGENT'] );
-        unset( $_GET['output_format'] );    // ADD this line
+        unset( $_GET['output_format'] );
+        unset( $GLOBALS['_mock_is_tax'] );
     }
 
     private function make_negotiator( array $options = [] ): Negotiator {
@@ -54,7 +61,13 @@ class NegotiatorTest extends TestCase {
             'ua_force_enabled' => false,
             'ua_agent_strings' => [],
         ], $options );
-        return new Negotiator( $merged, $this->generator, new AgentDetector( $merged ), $this->logger );
+        return new Negotiator(
+            $merged,
+            $this->generator,
+            $this->taxonomy_generator,
+            new AgentDetector( $merged ),
+            $this->logger
+        );
     }
 
     private function make_post(): \WP_Post {
@@ -490,6 +503,115 @@ class NegotiatorTest extends TestCase {
         $this->make_negotiator( [ 'post_types' => [ 'post' ] ] )->maybe_serve_markdown();
 
         unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — taxonomy archive branch
+    // -----------------------------------------------------------------------
+
+    public function test_does_nothing_for_taxonomy_when_no_markdown_signal(): void {
+        $GLOBALS['_mock_is_singular'] = false;
+        $GLOBALS['_mock_is_tax']      = true;
+        $_SERVER['HTTP_ACCEPT']       = 'text/html';
+
+        $this->taxonomy_generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+    }
+
+    public function test_taxonomy_branch_does_nothing_when_serve_taxonomies_filter_returns_false(): void {
+        $GLOBALS['_mock_is_singular'] = false;
+        $GLOBALS['_mock_is_tax']      = true;
+        $_SERVER['HTTP_ACCEPT']       = 'text/markdown';
+
+        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_taxonomies'] = fn( bool $v ): bool => false;
+        $this->taxonomy_generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+
+        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_taxonomies'] );
+    }
+
+    public function test_taxonomy_branch_does_nothing_when_queried_object_is_not_wp_term(): void {
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = (object) ['ID' => 1]; // WP_Post, not WP_Term
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->taxonomy_generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+    }
+
+    public function test_taxonomy_branch_does_nothing_when_md_file_missing(): void {
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( '/nonexistent/news.md' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+        $this->addToAssertionCount( 1 );
+    }
+
+    public function test_taxonomy_branch_serves_file_when_exists(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \RuntimeException $e ) {
+            // readfile() throws in tests — expected
+        }
+
+        $this->assertContains( 'Content-Type: text/markdown; charset=utf-8', $GLOBALS['_mock_sent_headers'] );
+        $this->assertSame( $md_file, $GLOBALS['_mock_readfile_path'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // output_link_tag — taxonomy branch
+    // -----------------------------------------------------------------------
+
+    public function test_taxonomy_link_tag_not_output_when_no_md_file(): void {
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( '/nonexistent/news.md' );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertSame( '', $output );
+    }
+
+    public function test_taxonomy_link_tag_output_when_md_file_exists(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'rel="alternate"', $output );
+        $this->assertStringContainsString( 'type="text/markdown"', $output );
+        $this->assertStringContainsString( 'output_format=md', $output );
     }
 
     // -----------------------------------------------------------------------
