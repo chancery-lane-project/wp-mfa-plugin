@@ -8,6 +8,7 @@ use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
 /**
  * WP-CLI commands for WP Markdown for Agents.
@@ -32,7 +33,8 @@ class Commands {
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly ?LlmsTxtGenerator $llms_txt = null,
-		private readonly ?FileWriter $file_writer = null
+		private readonly ?FileWriter $file_writer = null,
+		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
 	) {}
 
 	/**
@@ -203,6 +205,58 @@ class Commands {
 		}
 
 		\WP_CLI::error( 'Specify --post-type, --post-id, or --all.' );
+	}
+
+	/**
+	 * Generate Markdown archive files for taxonomy terms.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--taxonomy=<slug>]
+	 * : Generate only terms in this taxonomy. Omit to generate all public taxonomies.
+	 *
+	 * [--dry-run]
+	 * : Report what would be generated without writing files.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents generate-taxonomies
+	 *   wp markdown-agents generate-taxonomies --taxonomy=category
+	 *   wp markdown-agents generate-taxonomies --dry-run
+	 *
+	 * @since  1.1.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function generate_taxonomies( array $args, array $assoc_args ): void {
+		if ( null === $this->taxonomy_generator ) {
+			\WP_CLI::error( 'TaxonomyArchiveGenerator is not available.' );
+			return;
+		}
+
+		$taxonomy = $assoc_args['taxonomy'] ?? '';
+		$dry_run  = isset( $assoc_args['dry-run'] );
+
+		$taxonomies = $taxonomy
+			? array( $taxonomy )
+			: array_keys( get_taxonomies( array( 'public' => true ) ) );
+
+		if ( $dry_run ) {
+			foreach ( $taxonomies as $tax ) {
+				\WP_CLI::log( "[dry-run] Would generate all terms in taxonomy: {$tax}" );
+			}
+			return;
+		}
+
+		$results = $this->taxonomy_generator->generate_all( $taxonomy );
+
+		\WP_CLI::success(
+			sprintf(
+				'Taxonomy archives: %d generated, %d failed.',
+				$results['success'],
+				$results['failed']
+			)
+		);
 	}
 
 	// -----------------------------------------------------------------------
