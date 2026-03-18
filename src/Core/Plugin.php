@@ -13,6 +13,7 @@ use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
+use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
@@ -85,6 +86,15 @@ class Plugin {
 
 		$field_resolver = new FieldResolver();
 
+		$taxonomy_generator = new TaxonomyArchiveGenerator(
+			$options,
+			new YamlFormatter(),
+			$this->file_writer
+		);
+
+		// Store for use by other methods.
+		$this->taxonomy_generator = $taxonomy_generator;
+
 		$generator = new Generator(
 			$options,
 			new FrontmatterBuilder( $field_resolver, new TaxonomyCollector(), $options ),
@@ -92,14 +102,19 @@ class Plugin {
 			new Converter(),
 			new YamlFormatter(),
 			$this->file_writer,
-			$field_resolver
+			$field_resolver,
+			$taxonomy_generator,
 		);
 
 		// Store on object so other methods can access it.
 		$this->generator = $generator;
 
+		$this->loader->add_action( 'delete_term', $taxonomy_generator, 'on_delete_term', 10, 4 );
+
 		if ( ! empty( $options['auto_generate'] ) ) {
 			$this->loader->add_action( 'save_post', $generator, 'on_save_post', 10, 2 );
+			$this->loader->add_action( 'before_delete_post', $generator, 'cache_post_terms', 10, 1 );
+			$this->loader->add_action( 'after_delete_post',  $generator, 'regenerate_term_archives_after_delete', 10, 2 );
 		}
 	}
 
@@ -118,7 +133,7 @@ class Plugin {
 		$agent_detector = new AgentDetector( $options );
 		$stats_repo     = new StatsRepository( $wpdb );
 		$access_logger  = new AccessLogger( $stats_repo );
-		$negotiator     = new Negotiator( $options, $this->generator, $agent_detector, $access_logger );
+		$negotiator     = new Negotiator( $options, $this->generator, $this->taxonomy_generator, $agent_detector, $access_logger );
 		$this->loader->add_action( 'template_redirect', $negotiator, 'maybe_serve_markdown', 1 );
 		$this->loader->add_action( 'wp_head', $negotiator, 'output_link_tag', 1 );
 	}
@@ -134,7 +149,7 @@ class Plugin {
 			return;
 		}
 
-		$admin = new Admin( $options, $this->generator );
+		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator );
 		$this->loader->add_action( 'admin_menu', $admin, 'add_settings_page' );
 		$this->loader->add_action( 'admin_init', $admin, 'register_settings' );
 		$this->loader->add_action( 'add_meta_boxes', $admin, 'add_meta_boxes' );
@@ -162,7 +177,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer )
+			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator )
 		);
 	}
 
@@ -177,6 +192,9 @@ class Plugin {
 
 	/** @var Generator */
 	private Generator $generator;
+
+	/** @var TaxonomyArchiveGenerator */
+	private TaxonomyArchiveGenerator $taxonomy_generator;
 
 	/** @var FileWriter */
 	private FileWriter $file_writer;
