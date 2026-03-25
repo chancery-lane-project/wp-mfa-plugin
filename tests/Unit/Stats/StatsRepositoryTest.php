@@ -145,4 +145,22 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( 'access_date >=', $last['query'] );
         $this->assertStringContainsString( 'access_date <=', $last['query'] );
     }
+
+    public function test_get_agent_summary_builds_grouped_query(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_agent_summary();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'GROUP BY', $last['query'] );
+        $this->assertStringContainsString( 'SUM', $last['query'] );
+        $this->assertStringContainsString( 'COUNT(DISTINCT', $last['query'] );
+    }
+
+    public function test_get_agent_summary_with_date_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_agent_summary( [ 'date_from' => '2026-03-01' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_date >=', $last['query'] );
+    }
 }

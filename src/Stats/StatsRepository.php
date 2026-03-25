@@ -177,6 +177,29 @@ class StatsRepository {
 	}
 
 	/**
+	 * Return per-agent totals for the given filters.
+	 *
+	 * @since  1.3.0
+	 * @param  array<string, mixed> $filters  Supports post_id, agent, date_from, date_to.
+	 * @return array<int, object>             Each object has agent (string), total (int), unique_posts (int).
+	 */
+	public function get_agent_summary( array $filters = array() ): array {
+		$table  = self::get_table_name( $this->wpdb );
+		$clause = $this->build_where( $filters );
+
+		$where_sql = $clause['sql'];
+		$values    = $clause['values'];
+
+		$sql = "SELECT agent, SUM(count) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent ORDER BY total DESC";
+
+		if ( ! empty( $values ) ) {
+			$sql = $this->wpdb->prepare( $sql, ...$values );
+		}
+
+		return $this->wpdb->get_results( $sql );
+	}
+
+	/**
 	 * Return post IDs and titles for posts that have at least one stat row.
 	 *
 	 * @since  1.1.0
