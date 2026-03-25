@@ -190,7 +190,7 @@ class StatsRepository {
 		$where_sql = $clause['sql'];
 		$values    = $clause['values'];
 
-		$sql = "SELECT agent, SUM(count) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent ORDER BY total DESC";
+		$sql = "SELECT agent, SUM(`count`) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent ORDER BY total DESC";
 
 		if ( ! empty( $values ) ) {
 			$sql = $this->wpdb->prepare( $sql, ...$values );
