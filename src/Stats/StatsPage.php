@@ -57,14 +57,16 @@ class StatsPage {
 		$date_from = '';
 		if ( isset( $_GET['date_from'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$raw = sanitize_text_field( (string) $_GET['date_from'] ); // phpcs:ignore WordPress.Security.NonceVerification
-			if ( false !== \DateTime::createFromFormat( 'Y-m-d', $raw ) ) {
+			$dt = \DateTime::createFromFormat( 'Y-m-d', $raw );
+			if ( false !== $dt && $dt->format( 'Y-m-d' ) === $raw ) {
 				$date_from = $raw;
 			}
 		}
 		$date_to = '';
 		if ( isset( $_GET['date_to'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
 			$raw = sanitize_text_field( (string) $_GET['date_to'] ); // phpcs:ignore WordPress.Security.NonceVerification
-			if ( false !== \DateTime::createFromFormat( 'Y-m-d', $raw ) ) {
+			$dt = \DateTime::createFromFormat( 'Y-m-d', $raw );
+			if ( false !== $dt && $dt->format( 'Y-m-d' ) === $raw ) {
 				$date_to = $raw;
 			}
 		}
