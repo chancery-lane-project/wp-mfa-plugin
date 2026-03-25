@@ -126,4 +126,39 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'This month', $output );
         $this->assertStringContainsString( 'All time', $output );
     }
+
+    public function test_render_page_shows_headline_table_when_date_set(): void {
+        $_GET['date_from'] = '2026-03-01';
+
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_agent_summary' )
+            ->willReturn( [
+                (object) [ 'agent' => 'GPTBot', 'total' => 10, 'unique_posts' => 3 ],
+            ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'Total accesses', $output );
+        $this->assertStringContainsString( 'GPTBot', $output );
+    }
+
+    public function test_render_page_hides_headline_table_without_date(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $this->repository->expects( $this->never() )->method( 'get_agent_summary' );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'Total accesses', $output );
+    }
 }

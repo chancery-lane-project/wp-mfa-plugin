@@ -153,6 +153,38 @@ class StatsPage {
 				<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'All time', 'wp-markdown-for-agents' ); ?></a>
 			</p>
 
+			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
+				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
+				<h2><?php esc_html_e( 'Summary', 'wp-markdown-for-agents' ); ?></h2>
+				<table class="widefat striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Agent', 'wp-markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Total accesses', 'wp-markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Unique posts', 'wp-markdown-for-agents' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php if ( empty( $summary ) ) : ?>
+							<tr><td colspan="3"><?php esc_html_e( 'No data for this period.', 'wp-markdown-for-agents' ); ?></td></tr>
+						<?php else : ?>
+							<?php foreach ( $summary as $row ) : ?>
+								<tr>
+									<td><?php echo esc_html( $row->agent ); ?></td>
+									<td><?php echo esc_html( number_format_i18n( (int) $row->total ) ); ?></td>
+									<td><?php echo esc_html( (string) $row->unique_posts ); ?></td>
+								</tr>
+							<?php endforeach; ?>
+							<tr>
+								<td><strong><?php esc_html_e( 'Total', 'wp-markdown-for-agents' ); ?></strong></td>
+								<td><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
+								<td>&mdash;</td>
+							</tr>
+						<?php endif; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
 			<?php if ( empty( $rows ) ) : ?>
 				<p><?php esc_html_e( 'No access data recorded yet.', 'wp-markdown-for-agents' ); ?></p>
 			<?php else : ?>

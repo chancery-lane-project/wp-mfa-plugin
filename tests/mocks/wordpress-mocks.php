@@ -253,6 +253,12 @@ if (!function_exists('sanitize_key')) {
     }
 }
 
+if (!function_exists('sanitize_text_field')) {
+    function sanitize_text_field(string $str): string {
+        return trim(strip_tags($str));
+    }
+}
+
 if (!function_exists('trailingslashit')) {
     function trailingslashit(string $string): string {
         return rtrim($string, '/\\') . '/';
