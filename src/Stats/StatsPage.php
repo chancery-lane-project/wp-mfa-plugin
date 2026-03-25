@@ -54,6 +54,21 @@ class StatsPage {
 		$filter_agent   = isset( $_GET['agent'] ) ? sanitize_text_field( (string) $_GET['agent'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
 
+		$date_from = '';
+		if ( isset( $_GET['date_from'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$raw = sanitize_text_field( (string) $_GET['date_from'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			if ( false !== \DateTime::createFromFormat( 'Y-m-d', $raw ) ) {
+				$date_from = $raw;
+			}
+		}
+		$date_to = '';
+		if ( isset( $_GET['date_to'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+			$raw = sanitize_text_field( (string) $_GET['date_to'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			if ( false !== \DateTime::createFromFormat( 'Y-m-d', $raw ) ) {
+				$date_to = $raw;
+			}
+		}
+
 		$count_filters = array();
 		if ( $filter_post_id > 0 ) {
 			$count_filters['post_id'] = $filter_post_id;
@@ -61,10 +76,33 @@ class StatsPage {
 		if ( '' !== $filter_agent ) {
 			$count_filters['agent'] = $filter_agent;
 		}
+		if ( '' !== $date_from ) {
+			$count_filters['date_from'] = $date_from;
+		}
+		if ( '' !== $date_to ) {
+			$count_filters['date_to'] = $date_to;
+		}
 
 		$filters           = $count_filters;
 		$filters['limit']  = self::PER_PAGE;
 		$filters['offset'] = ( $paged - 1 ) * self::PER_PAGE;
+
+		// Preset link computation.
+		$today       = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
+		$seven_ago   = ( clone $today )->modify( '-6 days' );
+		$thirty_ago  = ( clone $today )->modify( '-29 days' );
+		$month_start = ( clone $today )->modify( 'first day of this month' );
+		$today_str   = $today->format( 'Y-m-d' );
+
+		$preset_7d    = add_query_arg( array( 'date_from' => $seven_ago->format( 'Y-m-d' ), 'date_to' => $today_str, 'paged' => 1 ) );
+		$preset_30d   = add_query_arg( array( 'date_from' => $thirty_ago->format( 'Y-m-d' ), 'date_to' => $today_str, 'paged' => 1 ) );
+		$preset_month = add_query_arg( array( 'date_from' => $month_start->format( 'Y-m-d' ), 'date_to' => $today_str, 'paged' => 1 ) );
+		$preset_all   = add_query_arg( array( 'paged' => 1 ), remove_query_arg( array( 'date_from', 'date_to' ) ) );
+
+		$active_7d    = ( $date_from === $seven_ago->format( 'Y-m-d' ) && $date_to === $today_str );
+		$active_30d   = ( $date_from === $thirty_ago->format( 'Y-m-d' ) && $date_to === $today_str );
+		$active_month = ( $date_from === $month_start->format( 'Y-m-d' ) && $date_to === $today_str );
+		$active_all   = ( $date_from === '' && $date_to === '' );
 
 		$rows        = $this->repository->get_stats( $filters );
 		$total       = $this->repository->get_total_count( $count_filters );
@@ -95,9 +133,23 @@ class StatsPage {
 							</option>
 						<?php endforeach; ?>
 					</select>
+					<label><?php esc_html_e( 'From', 'wp-markdown-for-agents' ); ?></label>
+					<input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
+					<label><?php esc_html_e( 'To', 'wp-markdown-for-agents' ); ?></label>
+					<input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
 					<?php submit_button( __( 'Filter', 'wp-markdown-for-agents' ), 'secondary', 'filter', false ); ?>
 				</div>
 			</form>
+
+			<p>
+				<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'wp-markdown-for-agents' ); ?></a>
+				|
+				<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'wp-markdown-for-agents' ); ?></a>
+				|
+				<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'This month', 'wp-markdown-for-agents' ); ?></a>
+				|
+				<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'All time', 'wp-markdown-for-agents' ); ?></a>
+			</p>
 
 			<?php if ( empty( $rows ) ) : ?>
 				<p><?php esc_html_e( 'No access data recorded yet.', 'wp-markdown-for-agents' ); ?></p>
