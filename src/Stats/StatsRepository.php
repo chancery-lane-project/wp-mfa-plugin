@@ -80,7 +80,7 @@ class StatsRepository {
 	 * Query stats rows with optional filters.
 	 *
 	 * @since  1.1.0
-	 * @param  array<string, mixed> $filters Optional: post_id, agent, limit, offset.
+	 * @param  array<string, mixed> $filters Optional: post_id, agent, date_from, date_to, limit, offset.
 	 * @return array<int, object>
 	 */
 	public function get_stats( array $filters = array() ): array {
@@ -105,7 +105,7 @@ class StatsRepository {
 	 * Count total rows matching the given filters (for pagination).
 	 *
 	 * @since  1.1.0
-	 * @param  array<string, mixed> $filters Optional: post_id, agent.
+	 * @param  array<string, mixed> $filters Optional: post_id, agent, date_from, date_to.
 	 * @return int
 	 */
 	public function get_total_count( array $filters = array() ): int {
@@ -126,9 +126,10 @@ class StatsRepository {
 	/**
 	 * Build a WHERE clause and prepared values from a filters array.
 	 *
-	 * Supports 'post_id' (int) and 'agent' (string) keys.
+	 * Supports 'post_id' (int), 'agent' (string), 'date_from' (string Y-m-d),
+	 * and 'date_to' (string Y-m-d) keys.
 	 *
-	 * @since  1.2.0
+	 * @since  1.3.0
 	 * @param  array<string, mixed> $filters
 	 * @return array{sql: string, values: list<mixed>}
 	 */
@@ -144,6 +145,16 @@ class StatsRepository {
 		if ( ! empty( $filters['agent'] ) ) {
 			$where[]  = 'agent = %s';
 			$values[] = (string) $filters['agent'];
+		}
+
+		if ( ! empty( $filters['date_from'] ) ) {
+			$where[]  = 'access_date >= %s';
+			$values[] = (string) $filters['date_from'];
+		}
+
+		if ( ! empty( $filters['date_to'] ) ) {
+			$where[]  = 'access_date <= %s';
+			$values[] = (string) $filters['date_to'];
 		}
 
 		return array(

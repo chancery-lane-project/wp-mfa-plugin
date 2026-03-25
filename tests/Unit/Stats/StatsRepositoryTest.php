@@ -120,4 +120,29 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( '42', $last['query'] );
         $this->assertStringContainsString( 'GPTBot', $last['query'] );
     }
+
+    public function test_get_stats_with_date_from_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'date_from' => '2026-03-01' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_date >=', $last['query'] );
+    }
+
+    public function test_get_stats_with_date_to_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'date_to' => '2026-03-25' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_date <=', $last['query'] );
+    }
+
+    public function test_get_stats_with_full_date_range(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'date_from' => '2026-03-01', 'date_to' => '2026-03-25' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_date >=', $last['query'] );
+        $this->assertStringContainsString( 'access_date <=', $last['query'] );
+    }
 }
