@@ -831,6 +831,18 @@ if (!function_exists('add_query_arg')) {
     }
 }
 
+if (!function_exists('number_format_i18n')) {
+    function number_format_i18n(float $number, int $decimals = 0): string {
+        return number_format($number, $decimals);
+    }
+}
+
+if (!function_exists('remove_query_arg')) {
+    function remove_query_arg(string|array $key, string $query = ''): string {
+        return $query;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Script enqueue stubs for Admin::enqueue_scripts()
 // ---------------------------------------------------------------------------
