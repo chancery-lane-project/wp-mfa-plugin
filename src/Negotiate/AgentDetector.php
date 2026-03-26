@@ -22,17 +22,15 @@ class AgentDetector {
 	public function __construct( private readonly array $options ) {}
 
 	/**
-	 * Return the first matching UA substring, or null if none matches.
+	 * Return the first matching UA substring regardless of ua_force_enabled.
 	 *
-	 * @since  1.1.0
+	 * Use this for stats labelling. For the serving gate, use get_matched_agent().
+	 *
+	 * @since  1.2.0
 	 * @param  string $ua The HTTP User-Agent header value.
 	 * @return string|null The matched substring, or null.
 	 */
-	public function get_matched_agent( string $ua ): ?string {
-		if ( empty( $this->options['ua_force_enabled'] ) ) {
-			return null;
-		}
-
+	public function detect_agent( string $ua ): ?string {
 		if ( '' === $ua ) {
 			return null;
 		}
@@ -46,6 +44,24 @@ class AgentDetector {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Return the first matching UA substring, or null if none matches.
+	 *
+	 * Returns null when ua_force_enabled is off — this controls whether a UA
+	 * match alone triggers serving. For stats, use detect_agent() instead.
+	 *
+	 * @since  1.1.0
+	 * @param  string $ua The HTTP User-Agent header value.
+	 * @return string|null The matched substring, or null.
+	 */
+	public function get_matched_agent( string $ua ): ?string {
+		if ( empty( $this->options['ua_force_enabled'] ) ) {
+			return null;
+		}
+
+		return $this->detect_agent( $ua );
 	}
 
 	/**

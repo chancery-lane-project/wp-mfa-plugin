@@ -80,4 +80,26 @@ class AgentDetectorTest extends TestCase {
     public function test_get_matched_agent_returns_null_for_empty_ua(): void {
         $this->assertNull( $this->make_detector()->get_matched_agent( '' ) );
     }
+
+    public function test_detect_agent_returns_match_when_ua_force_disabled(): void {
+        $detector = $this->make_detector( [ 'ua_force_enabled' => false ] );
+        $this->assertSame( 'GPTBot', $detector->detect_agent( 'GPTBot/1.0' ) );
+    }
+
+    public function test_detect_agent_returns_match_when_ua_force_enabled(): void {
+        $this->assertSame( 'GPTBot', $this->make_detector()->detect_agent( 'GPTBot/1.0' ) );
+    }
+
+    public function test_detect_agent_returns_null_for_unknown_ua(): void {
+        $this->assertNull( $this->make_detector()->detect_agent( 'Mozilla/5.0 Chrome/120' ) );
+    }
+
+    public function test_detect_agent_returns_null_for_empty_ua(): void {
+        $this->assertNull( $this->make_detector()->detect_agent( '' ) );
+    }
+
+    public function test_get_matched_agent_still_returns_null_when_disabled(): void {
+        $detector = $this->make_detector( [ 'ua_force_enabled' => false ] );
+        $this->assertNull( $detector->get_matched_agent( 'GPTBot/1.0' ) );
+    }
 }
