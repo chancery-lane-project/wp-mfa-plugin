@@ -132,8 +132,8 @@ class StatsRepository {
 	/**
 	 * Build a WHERE clause and prepared values from a filters array.
 	 *
-	 * Supports 'post_id' (int), 'agent' (string), 'date_from' (string Y-m-d),
-	 * and 'date_to' (string Y-m-d) keys.
+	 * Supports 'post_id' (int), 'agent' (string), 'access_method' (string),
+	 * 'date_from' (string Y-m-d), and 'date_to' (string Y-m-d) keys.
 	 *
 	 * @since  1.3.0
 	 * @param  array<string, mixed> $filters
@@ -183,7 +183,8 @@ class StatsRepository {
 	public function get_distinct_agents(): array {
 		$table = self::get_table_name( $this->wpdb );
 		$sql   = $this->wpdb->prepare(
-			"SELECT DISTINCT agent FROM {$table} WHERE agent NOT IN ('', %s, %s) ORDER BY agent ASC",
+			"SELECT DISTINCT agent FROM {$table} WHERE agent NOT IN (%s, %s, %s) ORDER BY agent ASC",
+			'',
 			'accept-header',
 			'query-param'
 		);
@@ -195,7 +196,8 @@ class StatsRepository {
 	/**
 	 * Return per-agent-per-method totals for the given filters.
 	 *
-	 * @since  1.1.0
+	 * @since  1.3.0
+	 * @since  1.2.0 Groups by access_method in addition to agent; adds access_method to return objects.
 	 * @param  array<string, mixed> $filters  Supports post_id, agent, access_method, date_from, date_to.
 	 * @return array<int, object>             Each object has agent (string), access_method (string),
 	 *                                        total (int), unique_posts (int).

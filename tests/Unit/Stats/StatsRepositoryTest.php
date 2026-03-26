@@ -219,6 +219,6 @@ class StatsRepositoryTest extends TestCase {
     }
 
     public function test_db_version_constant_is_defined(): void {
-        $this->assertNotEmpty( StatsRepository::DB_VERSION );
+        $this->assertSame( '1.1', StatsRepository::DB_VERSION );
     }
 }
