@@ -191,6 +191,7 @@ class StatsPage {
 							<?php endforeach; ?>
 							<tr>
 								<td><strong><?php esc_html_e( 'Total', 'wp-markdown-for-agents' ); ?></strong></td>
+								<td>&mdash;</td>
 								<td><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
 								<td>&mdash;</td>
 							</tr>

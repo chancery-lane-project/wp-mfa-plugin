@@ -220,6 +220,29 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( '(unknown)', $output );
     }
 
+    public function test_render_page_displays_unknown_in_summary_for_empty_agent(): void {
+        $_GET['date_from'] = '2026-03-01';
+
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $this->repository->method( 'get_agent_summary' )->willReturn( [
+            (object) [
+                'agent'         => '',
+                'access_method' => 'query-param',
+                'total'         => 5,
+                'unique_posts'  => 2,
+            ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '(unknown)', $output );
+    }
+
     public function test_render_page_shows_method_column_in_summary(): void {
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
