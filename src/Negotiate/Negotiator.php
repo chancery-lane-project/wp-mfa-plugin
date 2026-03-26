@@ -49,7 +49,7 @@ class Negotiator {
 		$ua        = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		$matched_agent = $this->agent_detector->get_matched_agent( $ua );  // serving gate
+		$matched_agent = $this->agent_detector->get_matched_agent( $ua );  // serving gate.
 		$via_accept    = str_contains( $accept, 'text/markdown' );
 		$via_query     = in_array( $format_qp, array( 'md', 'markdown' ), true );
 
@@ -84,7 +84,7 @@ class Negotiator {
 				return;
 			}
 
-			// Method precedence: query-param > accept-header > ua
+			// Method precedence: query-param > accept-header > ua.
 			if ( $via_query ) {
 				$access_method = 'query-param';
 			} elseif ( $via_accept ) {
@@ -93,7 +93,7 @@ class Negotiator {
 				$access_method = 'ua';
 			}
 
-			// Agent detection for stats: always tries UA match, ignores ua_force_enabled
+			// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
 			$agent = $this->agent_detector->detect_agent( $ua ) ?? '';
 
 			$this->access_logger->log_access( $post->ID, $agent, $access_method );

@@ -141,7 +141,7 @@ class StatsPage {
 					</select>
 					<select name="access_method">
 						<option value=""><?php esc_html_e( 'All methods', 'wp-markdown-for-agents' ); ?></option>
-						<?php foreach ( [ 'ua', 'accept-header', 'query-param' ] as $method ) : ?>
+						<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
 							<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
 								<?php echo esc_html( $method ); ?>
 							</option>
