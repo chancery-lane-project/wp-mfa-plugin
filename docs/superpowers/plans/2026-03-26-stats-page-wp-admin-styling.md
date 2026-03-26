@@ -338,7 +338,7 @@ public function test_summary_table_numeric_columns_have_num_class(): void {
 composer test -- --filter="test_main_table_has_wp|test_column_headers|test_count_column|test_count_cell|test_summary_table"
 ```
 
-Expected: 4 failures.
+Expected: 5 failures.
 
 - [ ] **Step 3: Implement — update table and column markup**
 
