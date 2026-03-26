@@ -21,6 +21,7 @@ use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsPage;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
+use Tclp\WpMarkdownForAgents\Core\Migrator;
 
 /**
  * Main plugin orchestrator.
@@ -64,6 +65,15 @@ class Plugin {
 		);
 
 		$this->define_generator( $options );
+
+		// DB migration — must run unconditionally regardless of 'enabled' state.
+		add_action(
+			'plugins_loaded',
+			static function (): void {
+				global $wpdb;
+				Migrator::maybe_migrate( $wpdb );
+			}
+		);
 
 		if ( empty( $options['enabled'] ) ) {
 			return;

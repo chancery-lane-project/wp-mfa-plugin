@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Core;
 
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
+use Tclp\WpMarkdownForAgents\Core\Migrator;
 
 /**
  * Handles plugin activation tasks.
@@ -38,9 +39,8 @@ class Activator {
 
 		add_option( Options::OPTION_KEY, Options::get_defaults() );
 
-		// Create the access stats table.
+		// Create / migrate the access stats table.
 		global $wpdb;
-		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-		dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
+		Migrator::maybe_migrate( $wpdb );
 	}
 }
