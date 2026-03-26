@@ -220,7 +220,9 @@ class StatsPage {
 				</thead>
 				<tbody>
 					<?php if ( empty( $rows ) ) : ?>
-						<tr><td colspan="5"><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></td></tr>
+						<tr>
+						<td colspan="5"><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></td>
+					</tr>
 					<?php else : ?>
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
