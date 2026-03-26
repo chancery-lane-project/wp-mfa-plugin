@@ -25,14 +25,15 @@ class AccessLogger {
 	 * Record a Markdown access event.
 	 *
 	 * @since  1.1.0
-	 * @param  int    $post_id The accessed post ID.
-	 * @param  string $agent   The matched UA substring or "accept-header".
+	 * @param  int    $post_id       The accessed post ID.
+	 * @param  string $agent         Agent identity substring, or '' for unknown.
+	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
 	 */
-	public function log_access( int $post_id, string $agent ): void {
+	public function log_access( int $post_id, string $agent, string $access_method ): void {
 		if ( $post_id <= 0 ) {
 			return;
 		}
 
-		$this->repository->record_access( $post_id, mb_substr( $agent, 0, 100 ) );
+		$this->repository->record_access( $post_id, mb_substr( $agent, 0, 100 ), $access_method );
 	}
 }
