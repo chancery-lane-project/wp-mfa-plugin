@@ -138,7 +138,7 @@ class StatsPage {
 			<form method="get" action="">
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
-				<div class="alignleft actions">
+					<div class="alignleft actions">
 					<select name="post_id">
 						<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
 						<?php foreach ( $posts as $id => $title ) : ?>
