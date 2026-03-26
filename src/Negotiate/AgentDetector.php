@@ -67,6 +67,10 @@ class AgentDetector {
 	/**
 	 * Return true if the given UA string contains a known agent substring.
 	 *
+	 * Note: this method inherits the ua_force_enabled guard from get_matched_agent()
+	 * and will return false when ua_force_enabled is off. For stats labelling, use
+	 * detect_agent() instead.
+	 *
 	 * @since  1.1.0
 	 * @param  string $ua The HTTP User-Agent header value.
 	 * @return bool

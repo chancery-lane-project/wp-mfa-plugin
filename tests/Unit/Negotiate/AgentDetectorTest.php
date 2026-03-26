@@ -71,6 +71,8 @@ class AgentDetectorTest extends TestCase {
         $this->assertSame( 'GPTBot', $result );
     }
 
+    // Validates that the ua_force_enabled guard is preserved after the get_matched_agent()
+    // refactor to delegate to detect_agent().
     public function test_get_matched_agent_returns_null_when_disabled(): void {
         $detector = $this->make_detector( [ 'ua_force_enabled' => false ] );
         $result   = $detector->get_matched_agent( 'GPTBot/1.0' );
@@ -98,8 +100,8 @@ class AgentDetectorTest extends TestCase {
         $this->assertNull( $this->make_detector()->detect_agent( '' ) );
     }
 
-    public function test_get_matched_agent_still_returns_null_when_disabled(): void {
-        $detector = $this->make_detector( [ 'ua_force_enabled' => false ] );
-        $this->assertNull( $detector->get_matched_agent( 'GPTBot/1.0' ) );
+    public function test_detect_agent_matching_is_case_insensitive(): void {
+        $this->assertSame( 'GPTBot', $this->make_detector()->detect_agent( 'gptbot/1.0' ) );
+        $this->assertSame( 'GPTBot', $this->make_detector()->detect_agent( 'GPTBOT/1.0' ) );
     }
 }
