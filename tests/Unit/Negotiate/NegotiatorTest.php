@@ -293,7 +293,7 @@ class NegotiatorTest extends TestCase {
         $this->generator->method( 'get_export_path' )->willReturn( $md_file );
         $this->logger->expects( $this->once() )
             ->method( 'log_access' )
-            ->with( 1, 'query-param' );
+            ->with( 1, '', 'query-param' );
 
         $neg = $this->make_negotiator();
         try {
@@ -314,7 +314,7 @@ class NegotiatorTest extends TestCase {
         $this->generator->method( 'get_export_path' )->willReturn( $md_file );
         $this->logger->expects( $this->once() )
             ->method( 'log_access' )
-            ->with( 1, 'query-param' );
+            ->with( 1, '', 'query-param' );
 
         $neg = $this->make_negotiator();
         try {
@@ -330,6 +330,100 @@ class NegotiatorTest extends TestCase {
 
         $this->generator->expects( $this->never() )->method( 'get_export_path' );
         $this->make_negotiator()->maybe_serve_markdown();
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_serve_markdown — access_method and agent label
+    // -----------------------------------------------------------------------
+
+    public function test_log_access_called_with_ua_method_when_ua_only(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'GPTBot', 'ua' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
+    }
+
+    public function test_log_access_called_with_accept_header_method_even_when_ua_matches(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'GPTBot', 'accept-header' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
+    }
+
+    public function test_log_access_called_with_query_param_method_even_when_ua_matches(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'GPTBot', 'query-param' );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
+    }
+
+    public function test_log_access_detects_agent_even_when_ua_force_disabled(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'GPTBot', 'accept-header' );
+
+        // ua_force_enabled is off — serving triggered by Accept header, not UA
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => false,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
     }
 
     // -----------------------------------------------------------------------
@@ -374,7 +468,7 @@ class NegotiatorTest extends TestCase {
         $this->generator->method( 'get_export_path' )->willReturn( $md_file );
         $this->logger->expects( $this->once() )
             ->method( 'log_access' )
-            ->with( 1, 'query-param' ); // NOT 'accept-header' — Vary: Accept must not be sent
+            ->with( 1, '', 'query-param' ); // NOT 'accept-header' — Vary: Accept must not be sent
 
         $neg = $this->make_negotiator();
         try {
