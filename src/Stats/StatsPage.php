@@ -238,13 +238,30 @@ class StatsPage {
 			<?php if ( $total_pages > 1 ) : ?>
 				<div class="tablenav bottom">
 					<div class="tablenav-pages">
-						<?php for ( $i = 1; $i <= $total_pages; $i++ ) : ?>
-							<?php if ( $i === $paged ) : ?>
-								<span class="tablenav-pages-navspan button disabled"><?php echo esc_html( (string) $i ); ?></span>
+						<span class="displaying-num">
+							<?php echo esc_html( sprintf( _n( '%s item', '%s items', $total, 'markdown-for-agents' ), number_format_i18n( $total ) ) ); ?>
+						</span>
+						<span class="pagination-links">
+							<?php if ( $paged <= 1 ) : ?>
+								<span class="tablenav-pages-navspan button disabled" aria-hidden="true">&laquo;</span>
+								<span class="tablenav-pages-navspan button disabled" aria-hidden="true">&lsaquo;</span>
 							<?php else : ?>
-								<a class="button" href="<?php echo esc_url( add_query_arg( 'paged', $i ) ); ?>"><?php echo esc_html( (string) $i ); ?></a>
+								<a class="first-page button" href="<?php echo esc_url( add_query_arg( 'paged', 1 ) ); ?>">&laquo;</a>
+								<a class="prev-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged - 1 ) ); ?>">&lsaquo;</a>
 							<?php endif; ?>
-						<?php endfor; ?>
+							<span class="paging-input">
+								<span class="tablenav-paging-text">
+									<?php echo esc_html( sprintf( '%s of %s', number_format_i18n( $paged ), number_format_i18n( $total_pages ) ) ); ?>
+								</span>
+							</span>
+							<?php if ( $paged >= $total_pages ) : ?>
+								<span class="tablenav-pages-navspan button disabled" aria-hidden="true">&rsaquo;</span>
+								<span class="tablenav-pages-navspan button disabled" aria-hidden="true">&raquo;</span>
+							<?php else : ?>
+								<a class="next-page button" href="<?php echo esc_url( add_query_arg( 'paged', $paged + 1 ) ); ?>">&rsaquo;</a>
+								<a class="last-page button" href="<?php echo esc_url( add_query_arg( 'paged', $total_pages ) ); ?>">&raquo;</a>
+							<?php endif; ?>
+						</span>
 					</div>
 				</div>
 			<?php endif; ?>

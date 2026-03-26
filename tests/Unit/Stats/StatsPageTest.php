@@ -435,6 +435,89 @@ class StatsPageTest extends TestCase {
         $this->assertStringNotContainsString( '<p>No access data recorded yet', $output );
     }
 
+    public function test_pagination_shows_displaying_num(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        // 51 total rows → 2 pages → pagination renders
+        $this->repository->method( 'get_total_count' )->willReturn( 51 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'displaying-num', $output );
+        $this->assertStringContainsString( '51 items', $output );
+    }
+
+    public function test_pagination_shows_pagination_links(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 51 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'pagination-links', $output );
+        $this->assertStringContainsString( 'tablenav-pages', $output );
+    }
+
+    public function test_pagination_first_prev_disabled_on_page_one(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 51 );
+        // No $_GET['paged'] set → defaults to page 1. Disabled spans have no first-page class —
+        // that class only appears on the active <a> element on pages 2+.
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'tablenav-pages-navspan button disabled', $output );
+        $this->assertStringNotContainsString( 'class="prev-page button"', $output );
+    }
+
+    public function test_pagination_first_prev_active_on_page_two(): void {
+        $_GET['paged'] = '2';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 101 ); // 3 pages
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="first-page button"', $output );
+        $this->assertStringContainsString( 'class="prev-page button"', $output );
+    }
+
+    public function test_pagination_shows_x_of_y_label(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 51 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '1 of 2', $output );
+    }
+
+    public function test_pagination_not_shown_for_single_page(): void {
+        $this->stub_empty_repository(); // 0 total → 1 page (ceil(0/50)=0, but logic uses >1)
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'pagination-links', $output );
+    }
+
     private function stub_empty_repository(): void {
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );

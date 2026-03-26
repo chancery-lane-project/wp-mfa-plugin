@@ -623,6 +623,12 @@ if (!function_exists('__')) {
     }
 }
 
+if (!function_exists('_n')) {
+    function _n(string $single, string $plural, $count, string $domain = 'default'): string {
+        return (int) $count === 1 ? $single : $plural;
+    }
+}
+
 if (!function_exists('_e')) {
     function _e(string $text, string $domain = 'default'): void {
         echo $text;
