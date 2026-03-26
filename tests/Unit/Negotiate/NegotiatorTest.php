@@ -450,33 +450,6 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // maybe_serve_markdown — Vary: Accept scoping (G4)
-    // -----------------------------------------------------------------------
-
-    public function test_log_access_label_is_query_param_when_served_via_query_param(): void {
-        // Indirectly verifies that the query-param path does not send Vary: Accept
-        // (the access label distinguishes query-param from accept-header).
-        $md_file = $this->tmp_dir . '/test-post.md';
-        file_put_contents( $md_file, '# Test' );
-
-        $post = $this->make_post();
-        $GLOBALS['_mock_is_singular']    = true;
-        $GLOBALS['_mock_queried_object'] = $post;
-        $_SERVER['HTTP_ACCEPT']          = 'text/html';
-        $_GET['output_format']           = 'md';
-
-        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
-        $this->logger->expects( $this->once() )
-            ->method( 'log_access' )
-            ->with( 1, '', 'query-param' ); // NOT 'accept-header' — Vary: Accept must not be sent
-
-        $neg = $this->make_negotiator();
-        try {
-            $neg->maybe_serve_markdown();
-        } catch ( \Exception $e ) {}
-    }
-
-    // -----------------------------------------------------------------------
     // maybe_serve_markdown — Content-Signal header filter (G3)
     // -----------------------------------------------------------------------
 

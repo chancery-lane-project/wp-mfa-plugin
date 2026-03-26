@@ -57,18 +57,6 @@ class Negotiator {
 			return;
 		}
 
-		// Method precedence: query-param > accept-header > ua
-		if ( $via_query ) {
-			$access_method = 'query-param';
-		} elseif ( $via_accept ) {
-			$access_method = 'accept-header';
-		} else {
-			$access_method = 'ua';
-		}
-
-		// Agent detection for stats: always tries UA match, ignores ua_force_enabled
-		$agent = $this->agent_detector->detect_agent( $ua ) ?? '';
-
 		if ( $this->is_eligible_singular() ) {
 			$post = get_queried_object();
 			if ( ! $post instanceof \WP_Post ) {
@@ -95,6 +83,18 @@ class Negotiator {
 			if ( ! file_exists( $filepath ) || ! $this->is_safe_filepath( $filepath ) ) {
 				return;
 			}
+
+			// Method precedence: query-param > accept-header > ua
+			if ( $via_query ) {
+				$access_method = 'query-param';
+			} elseif ( $via_accept ) {
+				$access_method = 'accept-header';
+			} else {
+				$access_method = 'ua';
+			}
+
+			// Agent detection for stats: always tries UA match, ignores ua_force_enabled
+			$agent = $this->agent_detector->detect_agent( $ua ) ?? '';
 
 			$this->access_logger->log_access( $post->ID, $agent, $access_method );
 			$this->send_markdown_file( $filepath, $via_accept );
