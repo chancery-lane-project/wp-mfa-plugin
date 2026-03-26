@@ -17,6 +17,9 @@ class StatsRepository {
 
 	private const TABLE_SUFFIX = 'mfa_access_stats';
 
+	/** DB schema version. Increment when the table structure changes. */
+	public const DB_VERSION = '1.1';
+
 	/**
 	 * @since  1.1.0
 	 * @param  \wpdb $wpdb WordPress database abstraction.
@@ -42,34 +45,37 @@ class StatsRepository {
 		$charset = $wpdb->get_charset_collate();
 
 		return "CREATE TABLE {$table} (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            post_id bigint(20) unsigned NOT NULL,
-            agent varchar(100) NOT NULL,
-            access_date date NOT NULL,
-            count int unsigned NOT NULL DEFAULT 1,
-            PRIMARY KEY  (id),
-            UNIQUE KEY post_agent_date (post_id, agent, access_date),
-            KEY access_date (access_date)
-        ) {$charset};";
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        post_id bigint(20) unsigned NOT NULL,
+        agent varchar(100) NOT NULL DEFAULT '',
+        access_method varchar(20) NOT NULL DEFAULT '',
+        access_date date NOT NULL,
+        count int unsigned NOT NULL DEFAULT 1,
+        PRIMARY KEY  (id),
+        UNIQUE KEY post_agent_date (post_id, agent, access_method, access_date),
+        KEY access_date (access_date)
+    ) {$charset};";
 	}
 
 	/**
 	 * Record a single access — upserts the daily counter.
 	 *
 	 * @since  1.1.0
-	 * @param  int    $post_id The accessed post ID.
-	 * @param  string $agent   The matched UA substring or "accept-header".
+	 * @param  int    $post_id       The accessed post ID.
+	 * @param  string $agent         Agent identity substring, or '' for unknown.
+	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
 	 */
-	public function record_access( int $post_id, string $agent ): void {
+	public function record_access( int $post_id, string $agent, string $access_method ): void {
 		$table = self::get_table_name( $this->wpdb );
 		$date  = gmdate( 'Y-m-d' );
 
 		$sql = $this->wpdb->prepare(
-			"INSERT INTO {$table} (post_id, agent, access_date, count)
-             VALUES (%d, %s, %s, 1)
-             ON DUPLICATE KEY UPDATE count = count + 1",
+			"INSERT INTO {$table} (post_id, agent, access_method, access_date, count)
+         VALUES (%d, %s, %s, %s, 1)
+         ON DUPLICATE KEY UPDATE count = count + 1",
 			$post_id,
 			$agent,
+			$access_method,
 			$date
 		);
 
@@ -92,7 +98,7 @@ class StatsRepository {
 		$limit     = max( 1, (int) ( $filters['limit'] ?? 50 ) );
 		$offset    = max( 0, (int) ( $filters['offset'] ?? 0 ) );
 
-		$sql = "SELECT post_id, agent, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT {$limit} OFFSET {$offset}";
+		$sql = "SELECT post_id, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT {$limit} OFFSET {$offset}";
 
 		if ( ! empty( $values ) ) {
 			$sql = $this->wpdb->prepare( $sql, ...$values );
@@ -147,6 +153,11 @@ class StatsRepository {
 			$values[] = (string) $filters['agent'];
 		}
 
+		if ( ! empty( $filters['access_method'] ) ) {
+			$where[]  = 'access_method = %s';
+			$values[] = (string) $filters['access_method'];
+		}
+
 		if ( ! empty( $filters['date_from'] ) ) {
 			$where[]  = 'access_date >= %s';
 			$values[] = (string) $filters['date_from'];
@@ -171,17 +182,23 @@ class StatsRepository {
 	 */
 	public function get_distinct_agents(): array {
 		$table = self::get_table_name( $this->wpdb );
-		$rows  = $this->wpdb->get_results( "SELECT DISTINCT agent FROM {$table} ORDER BY agent ASC" );
+		$sql   = $this->wpdb->prepare(
+			"SELECT DISTINCT agent FROM {$table} WHERE agent NOT IN ('', %s, %s) ORDER BY agent ASC",
+			'accept-header',
+			'query-param'
+		);
+		$rows  = $this->wpdb->get_results( $sql );
 
 		return array_map( fn( object $row ) => $row->agent, $rows );
 	}
 
 	/**
-	 * Return per-agent totals for the given filters.
+	 * Return per-agent-per-method totals for the given filters.
 	 *
-	 * @since  1.3.0
-	 * @param  array<string, mixed> $filters  Supports post_id, agent, date_from, date_to.
-	 * @return array<int, object>             Each object has agent (string), total (int), unique_posts (int).
+	 * @since  1.1.0
+	 * @param  array<string, mixed> $filters  Supports post_id, agent, access_method, date_from, date_to.
+	 * @return array<int, object>             Each object has agent (string), access_method (string),
+	 *                                        total (int), unique_posts (int).
 	 */
 	public function get_agent_summary( array $filters = array() ): array {
 		$table  = self::get_table_name( $this->wpdb );
@@ -190,7 +207,7 @@ class StatsRepository {
 		$where_sql = $clause['sql'];
 		$values    = $clause['values'];
 
-		$sql = "SELECT agent, SUM(`count`) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent ORDER BY total DESC";
+		$sql = "SELECT agent, access_method, SUM(`count`) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent, access_method ORDER BY total DESC";
 
 		if ( ! empty( $values ) ) {
 			$sql = $this->wpdb->prepare( $sql, ...$values );

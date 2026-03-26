@@ -34,8 +34,18 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( 'UNIQUE KEY', $sql );
     }
 
+    public function test_get_create_table_sql_contains_access_method_column(): void {
+        $sql = StatsRepository::get_create_table_sql( $this->wpdb );
+        $this->assertStringContainsString( 'access_method', $sql );
+    }
+
+    public function test_get_create_table_sql_unique_index_includes_access_method(): void {
+        $sql = StatsRepository::get_create_table_sql( $this->wpdb );
+        $this->assertMatchesRegularExpression( '/UNIQUE KEY post_agent_date \(post_id, agent, access_method, access_date\)/', $sql );
+    }
+
     public function test_record_access_builds_upsert_query(): void {
-        $this->repo->record_access( 42, 'GPTBot' );
+        $this->repo->record_access( 42, 'GPTBot', 'ua' );
 
         $last = end( $this->wpdb->queries );
         $this->assertStringContainsString( 'INSERT INTO', $last['query'] );
@@ -43,11 +53,19 @@ class StatsRepositoryTest extends TestCase {
     }
 
     public function test_record_access_includes_post_id_and_agent(): void {
-        $this->repo->record_access( 99, 'ClaudeBot' );
+        $this->repo->record_access( 99, 'ClaudeBot', 'accept-header' );
 
         $queries_str = implode( ' ', array_column( $this->wpdb->queries, 'query' ) );
         $this->assertStringContainsString( '99', $queries_str );
         $this->assertStringContainsString( 'ClaudeBot', $queries_str );
+    }
+
+    public function test_record_access_includes_access_method_in_query(): void {
+        $this->repo->record_access( 42, 'GPTBot', 'ua' );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_method', $last['query'] );
+        $this->assertStringContainsString( 'ua', $last['query'] );
     }
 
     public function test_get_stats_returns_mock_results(): void {
@@ -99,6 +117,16 @@ class StatsRepositoryTest extends TestCase {
 
         $agents = $this->repo->get_distinct_agents();
         $this->assertSame( [ 'GPTBot', 'ClaudeBot' ], $agents );
+    }
+
+    public function test_get_distinct_agents_excludes_empty_string_and_old_method_labels(): void {
+        $this->repo->get_distinct_agents();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'NOT IN', $last['query'] );
+        $this->assertStringContainsString( "''", $last['query'] );
+        $this->assertStringContainsString( 'accept-header', $last['query'] );
+        $this->assertStringContainsString( 'query-param', $last['query'] );
     }
 
     public function test_get_posts_with_stats_returns_id_title_pairs(): void {
@@ -156,11 +184,41 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( 'COUNT(DISTINCT', $last['query'] );
     }
 
+    public function test_get_agent_summary_groups_by_agent_and_access_method(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_agent_summary();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'GROUP BY agent, access_method', $last['query'] );
+        $this->assertStringContainsString( 'access_method', $last['query'] );
+    }
+
     public function test_get_agent_summary_with_date_filter(): void {
         $this->wpdb->mock_get_results = [];
         $this->repo->get_agent_summary( [ 'date_from' => '2026-03-01' ] );
 
         $last = end( $this->wpdb->queries );
         $this->assertStringContainsString( 'access_date >=', $last['query'] );
+    }
+
+    public function test_get_stats_with_access_method_filter(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats( [ 'access_method' => 'ua' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_method', $last['query'] );
+        $this->assertStringContainsString( 'ua', $last['query'] );
+    }
+
+    public function test_get_stats_selects_access_method_column(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_stats();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_method', $last['query'] );
+    }
+
+    public function test_db_version_constant_is_defined(): void {
+        $this->assertNotEmpty( StatsRepository::DB_VERSION );
     }
 }
