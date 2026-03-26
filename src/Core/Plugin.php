@@ -21,7 +21,6 @@ use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsPage;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
-use Tclp\WpMarkdownForAgents\Core\Migrator;
 
 /**
  * Main plugin orchestrator.
