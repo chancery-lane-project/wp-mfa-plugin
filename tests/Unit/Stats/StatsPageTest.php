@@ -266,4 +266,55 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'Access Method', $output );
         $this->assertStringContainsString( 'ua', $output );
     }
+
+    public function test_preset_links_rendered_as_subsubsub(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="subsubsub"', $output );
+    }
+
+    public function test_preset_links_order_all_time_first(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $pos_all  = strpos( $output, 'All time' );
+        $pos_7d   = strpos( $output, 'Last 7 days' );
+        $this->assertLessThan( $pos_7d, $pos_all, 'All time should appear before Last 7 days' );
+    }
+
+    public function test_active_preset_link_has_current_class(): void {
+        $_GET['date_from'] = date( 'Y-m-d', strtotime( '-6 days' ) );
+        $_GET['date_to']   = date( 'Y-m-d' );
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="current"', $output );
+    }
+
+    public function test_preset_links_have_no_inline_styles(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'font-weight:bold', $output );
+    }
+
+    private function stub_empty_repository(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+    }
 }

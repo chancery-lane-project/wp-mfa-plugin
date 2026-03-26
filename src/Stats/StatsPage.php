@@ -120,6 +120,21 @@ class StatsPage {
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Agent Access Statistics', 'markdown-for-agents' ); ?></h1>
 
+			<ul class="subsubsub">
+				<li>
+					<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' class="current"' : ''; ?>><?php esc_html_e( 'All time', 'markdown-for-agents' ); ?></a> |
+				</li>
+				<li>
+					<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'markdown-for-agents' ); ?></a> |
+				</li>
+				<li>
+					<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'markdown-for-agents' ); ?></a> |
+				</li>
+				<li>
+					<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' class="current"' : ''; ?>><?php esc_html_e( 'This month', 'markdown-for-agents' ); ?></a>
+				</li>
+			</ul>
+
 			<form method="get" action="">
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
@@ -154,16 +169,6 @@ class StatsPage {
 					<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
 				</div>
 			</form>
-
-			<p>
-				<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'markdown-for-agents' ); ?></a>
-				|
-				<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'markdown-for-agents' ); ?></a>
-				|
-				<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'This month', 'markdown-for-agents' ); ?></a>
-				|
-				<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'All time', 'markdown-for-agents' ); ?></a>
-			</p>
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
