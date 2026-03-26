@@ -139,38 +139,38 @@ class StatsPage {
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
 					<div class="alignleft actions">
-					<select name="post_id">
-						<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
-						<?php foreach ( $posts as $id => $title ) : ?>
-							<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
-								<?php echo esc_html( $title ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-					<select name="agent">
-						<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents' ); ?></option>
-						<?php foreach ( $agents as $agent ) : ?>
-							<option value="<?php echo esc_attr( $agent ); ?>" <?php selected( $filter_agent, $agent ); ?>>
-								<?php echo esc_html( $agent ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-					<select name="access_method">
-						<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents' ); ?></option>
-						<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
-							<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
-								<?php echo esc_html( $method ); ?>
-							</option>
-						<?php endforeach; ?>
-					</select>
-					<label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
-					<input type="date" id="date_from" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
-					<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
-					<input type="date" id="date_to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
-					<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
+						<select name="post_id">
+							<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
+							<?php foreach ( $posts as $id => $title ) : ?>
+								<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
+									<?php echo esc_html( $title ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<select name="agent">
+							<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents' ); ?></option>
+							<?php foreach ( $agents as $agent ) : ?>
+								<option value="<?php echo esc_attr( $agent ); ?>" <?php selected( $filter_agent, $agent ); ?>>
+									<?php echo esc_html( $agent ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<select name="access_method">
+							<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents' ); ?></option>
+							<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
+								<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
+									<?php echo esc_html( $method ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
+						<input type="date" id="date_from" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
+						<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
+						<input type="date" id="date_to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
+						<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
+					</div>
+					<br class="clear">
 				</div>
-				<br class="clear">
-			</div>
 			</form>
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
