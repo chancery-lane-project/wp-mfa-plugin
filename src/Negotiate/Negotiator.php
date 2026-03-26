@@ -6,7 +6,6 @@ namespace Tclp\WpMarkdownForAgents\Negotiate;
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
-use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 
 /**

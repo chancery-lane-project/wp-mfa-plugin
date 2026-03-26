@@ -3,7 +3,7 @@
     <description>PHPCS rules for WP Markdown for Agents plugin.</description>
 
     <file>src</file>
-    <file>wp-markdown-for-agents.php</file>
+    <file>markdown-for-agents.php</file>
     <file>uninstall.php</file>
 
     <arg name="basepath" value="."/>
@@ -20,7 +20,7 @@
 
     <rule ref="WordPress.WP.I18n">
         <properties>
-            <property name="text_domain" type="array" value="wp-markdown-for-agents"/>
+            <property name="text_domain" type="array" value="markdown-for-agents"/>
         </properties>
     </rule>
 

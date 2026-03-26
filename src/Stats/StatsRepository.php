@@ -197,7 +197,7 @@ class StatsRepository {
 	 * Return per-agent-per-method totals for the given filters.
 	 *
 	 * @since  1.3.0
-	 * @since  1.3.0 Groups by access_method in addition to agent; adds access_method to return objects.
+	 * @note   Groups by access_method in addition to agent; adds access_method to return objects.
 	 * @param  array<string, mixed> $filters  Supports post_id, agent, access_method, date_from, date_to.
 	 * @return array<int, object>             Each object has agent (string), access_method (string),
 	 *                                        total (int), unique_posts (int).

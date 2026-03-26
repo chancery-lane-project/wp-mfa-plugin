@@ -188,12 +188,7 @@ class Plugin {
 		$this->loader->run();
 	}
 
-	/** @var Generator */
 	private Generator $generator;
-
-	/** @var TaxonomyArchiveGenerator */
 	private TaxonomyArchiveGenerator $taxonomy_generator;
-
-	/** @var FileWriter */
 	private FileWriter $file_writer;
 }

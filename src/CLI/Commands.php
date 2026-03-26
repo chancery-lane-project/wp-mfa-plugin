@@ -132,7 +132,7 @@ class Commands {
 		$rows = array();
 
 		foreach ( $post_types as $type ) {
-            $total = (int) wp_count_posts( $type )->publish; // phpcs:ignore
+			$total = (int) wp_count_posts( $type )->publish; // phpcs:ignore WordPress.WP.PostsPerPage
 
 			// Count .md files in the export directory.
 			$type_dir  = $export_base . '/' . $type;

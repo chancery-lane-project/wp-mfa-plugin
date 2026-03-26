@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Core;
 
-use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
-
 /**
  * Handles plugin activation tasks.
  *

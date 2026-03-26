@@ -98,13 +98,15 @@ wp-content/uploads/{export_dir}/
 ```markdown
 ---
 title: "Post Title"
-type: post
-slug: post-slug
+date: 2025-01-15T00:00:00Z
+modified: 2025-03-10T00:00:00Z
 permalink: "https://example.com/post-slug/"
-date: "2025-01-15"
-modified: "2025-03-10"
+type: post
+status: publish
+excerpt: ""
+wpid: 42
 featured_image: "https://example.com/wp-content/uploads/image.jpg"
-# ... additional configured fields
+# ... taxonomy terms and any configured custom fields
 ---
 
 Post content converted to Markdown.
@@ -165,7 +167,7 @@ wp markdown-agents generate-taxonomies --dry-run
 wp markdown-agents status
 
 # Delete all generated files
-wp markdown-agents delete
+wp markdown-agents delete --all --yes
 
 # Generate llms.txt
 wp markdown-agents generate-llms-txt
