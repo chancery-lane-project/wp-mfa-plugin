@@ -1,4 +1,4 @@
-# WP Markdown for Agents
+# Markdown for Agents and Statistics
 
 > Serve pre-generated Markdown files to AI agents via HTTP content negotiation.
 
@@ -29,7 +29,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **ACF support** — dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
 - **Manifest + incremental export** — content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
 - **llms.txt generation** — follows the [llmstxt.org](https://llmstxt.org) specification
-- **Access statistics** — logs AI agent requests; dedicated stats page in the admin
+- **Access statistics** — logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
 - **WP-CLI commands** — `generate`, `status`, `delete`, `generate-taxonomies`, `generate-llms-txt`
 - **Filterable** — numerous WordPress filters to customise output, frontmatter, and serving behaviour
 - **Fully unit-tested** — PHPUnit 9.6 test suite
@@ -48,16 +48,16 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 ### From source
 
 ```bash
-git clone https://github.com/chancery-lane-project/wp-mfa-plugin.git wp-markdown-for-agents
-cd wp-markdown-for-agents
+git clone https://github.com/chancery-lane-project/wp-mfa-plugin.git markdown-for-agents
+cd markdown-for-agents
 composer install --no-dev
 ```
 
-Upload to `wp-content/plugins/wp-markdown-for-agents/` and activate through the WordPress Plugins screen.
+Upload to `wp-content/plugins/markdown-for-agents/` and activate through the WordPress Plugins screen.
 
 ### WordPress.org
 
-Search for **WP Markdown for Agents** in the WordPress plugin directory, or install directly from **Plugins → Add New**.
+Search for **Markdown for Agents and Statistics** in the WordPress plugin directory, or install directly from **Plugins → Add New**.
 
 ---
 
