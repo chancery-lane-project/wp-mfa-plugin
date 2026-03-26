@@ -410,6 +410,31 @@ class StatsPageTest extends TestCase {
         $this->assertMatchesRegularExpression( '/<td class="num">\s*3\s*<\/td>/', $output );
     }
 
+    public function test_main_table_thead_always_rendered(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // Even with no rows, the column headers must be present
+        $this->assertStringContainsString( 'column-date', $output );
+        $this->assertStringContainsString( 'column-count', $output );
+    }
+
+    public function test_empty_state_rendered_inside_table(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'colspan="5"', $output );
+        $this->assertStringContainsString( 'No access data recorded yet', $output );
+        // Should NOT be a bare <p> outside a table
+        $this->assertStringNotContainsString( '<p>No access data recorded yet', $output );
+    }
+
     private function stub_empty_repository(): void {
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
