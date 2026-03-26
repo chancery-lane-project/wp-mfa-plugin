@@ -311,6 +311,38 @@ class StatsPageTest extends TestCase {
         $this->assertStringNotContainsString( 'font-weight:bold', $output );
     }
 
+    public function test_filter_controls_wrapped_in_alignleft_actions(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="alignleft actions"', $output );
+    }
+
+    public function test_date_inputs_have_ids(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'id="date_from"', $output );
+        $this->assertStringContainsString( 'id="date_to"', $output );
+    }
+
+    public function test_date_labels_have_for_attributes(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'for="date_from"', $output );
+        $this->assertStringContainsString( 'for="date_to"', $output );
+    }
+
     private function stub_empty_repository(): void {
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );

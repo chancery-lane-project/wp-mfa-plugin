@@ -138,6 +138,7 @@ class StatsPage {
 			<form method="get" action="">
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
+				<div class="alignleft actions">
 					<select name="post_id">
 						<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
 						<?php foreach ( $posts as $id => $title ) : ?>
@@ -162,12 +163,14 @@ class StatsPage {
 							</option>
 						<?php endforeach; ?>
 					</select>
-					<label><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
-					<input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
-					<label><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
-					<input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
+					<label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
+					<input type="date" id="date_from" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
+					<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
+					<input type="date" id="date_to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
 					<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
 				</div>
+				<br class="clear">
+			</div>
 			</form>
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
