@@ -343,6 +343,73 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'for="date_to"', $output );
     }
 
+    public function test_main_table_has_wp_list_table_classes(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'wp-list-table widefat fixed striped', $output );
+    }
+
+    public function test_column_headers_have_scope_col(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'scope="col"', $output );
+    }
+
+    public function test_count_column_header_has_num_class(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'column-count num', $output );
+    }
+
+    public function test_count_cell_has_num_class(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 1 );
+        $this->repository->method( 'get_stats' )->willReturn( [
+            (object) [ 'post_id' => 1, 'agent' => 'GPTBot', 'access_method' => 'ua', 'access_date' => '2026-03-26', 'count' => 5 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // The count <td> should carry class="num"
+        $this->assertMatchesRegularExpression( '/<td class="num">\s*5\s*<\/td>/', $output );
+    }
+
+    public function test_summary_table_numeric_columns_have_num_class(): void {
+        $_GET['date_from'] = '2026-03-01';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $this->repository->method( 'get_agent_summary' )->willReturn( [
+            (object) [ 'agent' => 'GPTBot', 'access_method' => 'ua', 'total' => 42, 'unique_posts' => 3 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // Summary table header for Total accesses should carry num class
+        $this->assertStringContainsString( 'column-total num', $output );
+        // Summary table data cells for total and unique_posts should carry class="num"
+        $this->assertMatchesRegularExpression( '/<td class="num">\s*42\s*<\/td>/', $output );
+        $this->assertMatchesRegularExpression( '/<td class="num">\s*3\s*<\/td>/', $output );
+    }
+
     private function stub_empty_repository(): void {
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );

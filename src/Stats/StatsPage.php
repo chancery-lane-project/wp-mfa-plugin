@@ -176,13 +176,13 @@ class StatsPage {
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
 				<h2><?php esc_html_e( 'Summary', 'markdown-for-agents' ); ?></h2>
-				<table class="widefat striped">
+				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Total accesses', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Unique posts', 'markdown-for-agents' ); ?></th>
+							<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
+							<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
+							<th scope="col" class="manage-column column-total num"><?php esc_html_e( 'Total accesses', 'markdown-for-agents' ); ?></th>
+							<th scope="col" class="manage-column column-unique num"><?php esc_html_e( 'Unique posts', 'markdown-for-agents' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -193,14 +193,14 @@ class StatsPage {
 								<tr>
 									<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
 									<td><?php echo esc_html( $row->access_method ); ?></td>
-									<td><?php echo esc_html( number_format_i18n( (int) $row->total ) ); ?></td>
-									<td><?php echo esc_html( (string) $row->unique_posts ); ?></td>
+									<td class="num"><?php echo esc_html( number_format_i18n( (int) $row->total ) ); ?></td>
+									<td class="num"><?php echo esc_html( (string) $row->unique_posts ); ?></td>
 								</tr>
 							<?php endforeach; ?>
 							<tr>
 								<td><strong><?php esc_html_e( 'Total', 'markdown-for-agents' ); ?></strong></td>
 								<td>&mdash;</td>
-								<td><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
+								<td class="num"><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
 								<td>&mdash;</td>
 							</tr>
 						<?php endif; ?>
@@ -208,45 +208,45 @@ class StatsPage {
 				</table>
 			<?php endif; ?>
 
-			<?php if ( empty( $rows ) ) : ?>
-				<p><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></p>
-			<?php else : ?>
-				<table class="widefat striped">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Post', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Date', 'markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Count', 'markdown-for-agents' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
+			<table class="wp-list-table widefat fixed striped">
+				<thead>
+					<tr>
+						<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Post', 'markdown-for-agents' ); ?></th>
+						<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
+						<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
+						<th scope="col" class="manage-column column-date"><?php esc_html_e( 'Date', 'markdown-for-agents' ); ?></th>
+						<th scope="col" class="manage-column column-count num"><?php esc_html_e( 'Count', 'markdown-for-agents' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php if ( empty( $rows ) ) : ?>
+						<tr><td colspan="5"><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></td></tr>
+					<?php else : ?>
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
 								<td><?php echo esc_html( get_the_title( (int) $row->post_id ) ); ?></td>
 								<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
 								<td><?php echo esc_html( $row->access_method ); ?></td>
 								<td><?php echo esc_html( $row->access_date ); ?></td>
-								<td><?php echo esc_html( (string) $row->count ); ?></td>
+								<td class="num"><?php echo esc_html( (string) $row->count ); ?></td>
 							</tr>
 						<?php endforeach; ?>
-					</tbody>
-				</table>
+					<?php endif; ?>
+				</tbody>
+			</table>
 
-				<?php if ( $total_pages > 1 ) : ?>
-					<div class="tablenav bottom">
-						<div class="tablenav-pages">
-							<?php for ( $i = 1; $i <= $total_pages; $i++ ) : ?>
-								<?php if ( $i === $paged ) : ?>
-									<span class="tablenav-pages-navspan button disabled"><?php echo esc_html( (string) $i ); ?></span>
-								<?php else : ?>
-									<a class="button" href="<?php echo esc_url( add_query_arg( 'paged', $i ) ); ?>"><?php echo esc_html( (string) $i ); ?></a>
-								<?php endif; ?>
-							<?php endfor; ?>
-						</div>
+			<?php if ( $total_pages > 1 ) : ?>
+				<div class="tablenav bottom">
+					<div class="tablenav-pages">
+						<?php for ( $i = 1; $i <= $total_pages; $i++ ) : ?>
+							<?php if ( $i === $paged ) : ?>
+								<span class="tablenav-pages-navspan button disabled"><?php echo esc_html( (string) $i ); ?></span>
+							<?php else : ?>
+								<a class="button" href="<?php echo esc_url( add_query_arg( 'paged', $i ) ); ?>"><?php echo esc_html( (string) $i ); ?></a>
+							<?php endif; ?>
+						<?php endfor; ?>
 					</div>
-				<?php endif; ?>
+				</div>
 			<?php endif; ?>
 		</div>
 		<?php
