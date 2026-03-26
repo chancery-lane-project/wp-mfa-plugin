@@ -178,7 +178,7 @@ class AdminAjaxTest extends TestCase {
         $GLOBALS['_mock_enqueued_scripts']  = [];
         $GLOBALS['_mock_localized_scripts'] = [];
 
-        $this->admin->enqueue_scripts( 'settings_page_wp-markdown-for-agents' );
+        $this->admin->enqueue_scripts( 'settings_page_markdown-for-agents' );
 
         $this->assertArrayHasKey( 'mfa-bulk-generate', $GLOBALS['_mock_enqueued_scripts'] );
         $this->assertStringContainsString( 'bulk-generate.js', $GLOBALS['_mock_enqueued_scripts']['mfa-bulk-generate'] );

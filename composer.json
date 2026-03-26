@@ -1,5 +1,5 @@
 {
-    "name": "tclp/wp-markdown-for-agents",
+    "name": "tclp/markdown-for-agents",
     "description": "Serve Markdown content to AI agents via HTTP content negotiation",
     "type": "wordpress-plugin",
     "license": "GPL-3.0-or-later",

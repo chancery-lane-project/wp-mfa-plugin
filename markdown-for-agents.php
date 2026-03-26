@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Plugin Name:       WP Markdown for Agents
- * Plugin URI:        https://github.com/tclp/wp-markdown-for-agents
- * Description:       Serve pre-generated Markdown files to AI agents via HTTP content negotiation.
+ * Plugin Name:       Markdown for Agents and Statistics
+ * Plugin URI:        https://github.com/tclp/markdown-for-agents
+ * Description:       Serve pre-generated Markdown files to AI agents via HTTP content negotiation, with access statistics.
  * Version:           1.2.0
  * Requires at least: 6.3
  * Requires PHP:      8.0
@@ -11,7 +11,7 @@
  * Author URI:        https://chancerylane.uk
  * License:           GPL-3.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
- * Text Domain:       wp-markdown-for-agents
+ * Text Domain:       markdown-for-agents
  * Domain Path:       /languages
  *
  * @package Tclp\WpMarkdownForAgents

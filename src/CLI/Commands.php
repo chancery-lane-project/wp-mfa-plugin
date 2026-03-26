@@ -11,7 +11,7 @@ use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
 /**
- * WP-CLI commands for WP Markdown for Agents.
+ * WP-CLI commands for Markdown for Agents and Statistics.
  *
  * Register under the `markdown-agents` parent:
  *

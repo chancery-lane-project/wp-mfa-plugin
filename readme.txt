@@ -1,4 +1,4 @@
-===  WP Markdown for Agents ===
+===  Markdown for Agents and Statistics ===
 Contributors: tclp
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
@@ -12,7 +12,7 @@ Serve pre-generated Markdown files to AI agents via HTTP content negotiation.
 
 == Description ==
 
-WP Markdown for Agents converts your WordPress content to Markdown and serves it
+Markdown for Agents and Statistics converts your WordPress content to Markdown and serves it
 to AI agents and language model tools that request it via HTTP content negotiation
 (`Accept: text/markdown`).
 
@@ -46,7 +46,7 @@ to AI agents and language model tools that request it via HTTP content negotiati
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/wp-markdown-for-agents` directory,
+1. Upload the plugin files to the `/wp-content/plugins/markdown-for-agents` directory,
    or install the plugin through the WordPress Plugins screen directly.
 2. Activate the plugin through the Plugins screen in WordPress.
 3. Configure the plugin via **Settings → Markdown for Agents**.

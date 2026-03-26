@@ -478,7 +478,7 @@ class NegotiatorTest extends TestCase {
 
         $this->assertSame( 'ai-input=yes, search=yes', $filter_received );
         $this->assertContains( 'Content-Signal: ai-input=yes, search=yes', $GLOBALS['_mock_sent_headers'] );
-        $this->assertContains( 'X-Markdown-Source: wp-markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-Markdown-Source: markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
         unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
     }
 

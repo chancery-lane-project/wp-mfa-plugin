@@ -22,7 +22,7 @@ if (!defined('WP_CONTENT_DIR')) {
 }
 
 if (!defined('WP_MFA_PLUGIN_URL')) {
-    define('WP_MFA_PLUGIN_URL', 'https://example.com/wp-content/plugins/wp-markdown-for-agents/');
+    define('WP_MFA_PLUGIN_URL', 'https://example.com/wp-content/plugins/markdown-for-agents/');
 }
 
 if (!defined('WP_MFA_VERSION')) {
@@ -256,6 +256,12 @@ if (!function_exists('sanitize_key')) {
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $str): string {
         return trim(strip_tags($str));
+    }
+}
+
+if (!function_exists('wp_unslash')) {
+    function wp_unslash(string $value): string {
+        return stripslashes($value);
     }
 }
 

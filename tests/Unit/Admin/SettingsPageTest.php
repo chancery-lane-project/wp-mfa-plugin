@@ -40,13 +40,13 @@ class SettingsPageTest extends TestCase {
 
     public function test_register_adds_settings_section(): void {
         $this->make_page()->register();
-        $sections = $GLOBALS['_mock_settings_sections']['wp-markdown-for-agents'] ?? [];
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
         $this->assertContains( 'wp_mfa_general', $sections );
     }
 
     public function test_register_adds_all_fields(): void {
         $this->make_page()->register();
-        $fields = $GLOBALS['_mock_settings_fields']['wp-markdown-for-agents'] ?? [];
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
         foreach ( [ 'wp_mfa_enabled', 'wp_mfa_post_types', 'wp_mfa_export_dir',
                     'wp_mfa_auto_generate', 'wp_mfa_include_taxonomies' ] as $field ) {
             $this->assertContains( $field, $fields );
@@ -94,13 +94,13 @@ class SettingsPageTest extends TestCase {
 
     public function test_register_adds_ua_detection_section(): void {
         $this->make_page()->register();
-        $sections = $GLOBALS['_mock_settings_sections']['wp-markdown-for-agents'] ?? [];
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
         $this->assertContains( 'wp_mfa_ua_detection', $sections );
     }
 
     public function test_register_adds_ua_detection_fields(): void {
         $this->make_page()->register();
-        $fields = $GLOBALS['_mock_settings_fields']['wp-markdown-for-agents'] ?? [];
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
         $this->assertContains( 'wp_mfa_ua_force_enabled', $fields );
         $this->assertContains( 'wp_mfa_ua_agent_strings', $fields );
     }

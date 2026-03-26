@@ -51,18 +51,6 @@ class Plugin {
 	private function define_hooks(): void {
 		$options = Options::get();
 
-		// i18n.
-		add_action(
-			'plugins_loaded',
-			function (): void {
-				load_plugin_textdomain(
-					'wp-markdown-for-agents',
-					false,
-					dirname( plugin_basename( WP_MFA_PLUGIN_DIR . 'wp-markdown-for-agents.php' ) ) . '/languages/'
-				);
-			}
-		);
-
 		$this->define_generator( $options );
 
 		// DB migration — must run unconditionally regardless of 'enabled' state.

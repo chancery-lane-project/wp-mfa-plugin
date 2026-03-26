@@ -228,7 +228,7 @@ class Negotiator {
 			header( 'Vary: Accept' );
 		}
 
-		header( 'X-Markdown-Source: wp-markdown-for-agents' );
+		header( 'X-Markdown-Source: markdown-for-agents' );
 
 		/**
 		 * Filter the Content-Signal header value.

@@ -31,8 +31,8 @@ class StatsPage {
 	 */
 	public function add_page(): void {
 		add_menu_page(
-			__( 'Agent Access Statistics', 'wp-markdown-for-agents' ),
-			__( 'Agent Stats', 'wp-markdown-for-agents' ),
+			__( 'Agent Access Statistics', 'markdown-for-agents' ),
+			__( 'Agent Stats', 'markdown-for-agents' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' ),
@@ -51,13 +51,13 @@ class StatsPage {
 		}
 
 		$filter_post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;    // phpcs:ignore WordPress.Security.NonceVerification
-		$filter_agent         = isset( $_GET['agent'] ) ? sanitize_text_field( (string) $_GET['agent'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		$filter_agent         = isset( $_GET['agent'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['agent'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_access_method = isset( $_GET['access_method'] ) ? sanitize_key( (string) $_GET['access_method'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
 
 		$date_from = '';
 		if ( isset( $_GET['date_from'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			$raw = sanitize_text_field( (string) $_GET['date_from'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			$raw = sanitize_text_field( wp_unslash( (string) $_GET['date_from'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 			$dt = \DateTime::createFromFormat( 'Y-m-d', $raw );
 			if ( false !== $dt && $dt->format( 'Y-m-d' ) === $raw ) {
 				$date_from = $raw;
@@ -65,7 +65,7 @@ class StatsPage {
 		}
 		$date_to = '';
 		if ( isset( $_GET['date_to'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
-			$raw = sanitize_text_field( (string) $_GET['date_to'] ); // phpcs:ignore WordPress.Security.NonceVerification
+			$raw = sanitize_text_field( wp_unslash( (string) $_GET['date_to'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
 			$dt = \DateTime::createFromFormat( 'Y-m-d', $raw );
 			if ( false !== $dt && $dt->format( 'Y-m-d' ) === $raw ) {
 				$date_to = $raw;
@@ -118,13 +118,13 @@ class StatsPage {
 
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Agent Access Statistics', 'wp-markdown-for-agents' ); ?></h1>
+			<h1><?php esc_html_e( 'Agent Access Statistics', 'markdown-for-agents' ); ?></h1>
 
 			<form method="get" action="">
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
 					<select name="post_id">
-						<option value=""><?php esc_html_e( 'All posts', 'wp-markdown-for-agents' ); ?></option>
+						<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
 						<?php foreach ( $posts as $id => $title ) : ?>
 							<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
 								<?php echo esc_html( $title ); ?>
@@ -132,7 +132,7 @@ class StatsPage {
 						<?php endforeach; ?>
 					</select>
 					<select name="agent">
-						<option value=""><?php esc_html_e( 'All agents', 'wp-markdown-for-agents' ); ?></option>
+						<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents' ); ?></option>
 						<?php foreach ( $agents as $agent ) : ?>
 							<option value="<?php echo esc_attr( $agent ); ?>" <?php selected( $filter_agent, $agent ); ?>>
 								<?php echo esc_html( $agent ); ?>
@@ -140,46 +140,46 @@ class StatsPage {
 						<?php endforeach; ?>
 					</select>
 					<select name="access_method">
-						<option value=""><?php esc_html_e( 'All methods', 'wp-markdown-for-agents' ); ?></option>
+						<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents' ); ?></option>
 						<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
 							<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
 								<?php echo esc_html( $method ); ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
-					<label><?php esc_html_e( 'From', 'wp-markdown-for-agents' ); ?></label>
+					<label><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
 					<input type="date" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
-					<label><?php esc_html_e( 'To', 'wp-markdown-for-agents' ); ?></label>
+					<label><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
 					<input type="date" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
-					<?php submit_button( __( 'Filter', 'wp-markdown-for-agents' ), 'secondary', 'filter', false ); ?>
+					<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
 				</div>
 			</form>
 
 			<p>
-				<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'wp-markdown-for-agents' ); ?></a>
+				<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'markdown-for-agents' ); ?></a>
 				|
-				<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'wp-markdown-for-agents' ); ?></a>
+				<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'markdown-for-agents' ); ?></a>
 				|
-				<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'This month', 'wp-markdown-for-agents' ); ?></a>
+				<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'This month', 'markdown-for-agents' ); ?></a>
 				|
-				<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'All time', 'wp-markdown-for-agents' ); ?></a>
+				<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' style="font-weight:bold;text-decoration:underline"' : ''; ?>><?php esc_html_e( 'All time', 'markdown-for-agents' ); ?></a>
 			</p>
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
-				<h2><?php esc_html_e( 'Summary', 'wp-markdown-for-agents' ); ?></h2>
+				<h2><?php esc_html_e( 'Summary', 'markdown-for-agents' ); ?></h2>
 				<table class="widefat striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Agent', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Access Method', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Total accesses', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Unique posts', 'wp-markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Total accesses', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Unique posts', 'markdown-for-agents' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
 						<?php if ( empty( $summary ) ) : ?>
-							<tr><td colspan="4"><?php esc_html_e( 'No data for this period.', 'wp-markdown-for-agents' ); ?></td></tr>
+							<tr><td colspan="4"><?php esc_html_e( 'No data for this period.', 'markdown-for-agents' ); ?></td></tr>
 						<?php else : ?>
 							<?php foreach ( $summary as $row ) : ?>
 								<tr>
@@ -190,7 +190,7 @@ class StatsPage {
 								</tr>
 							<?php endforeach; ?>
 							<tr>
-								<td><strong><?php esc_html_e( 'Total', 'wp-markdown-for-agents' ); ?></strong></td>
+								<td><strong><?php esc_html_e( 'Total', 'markdown-for-agents' ); ?></strong></td>
 								<td>&mdash;</td>
 								<td><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
 								<td>&mdash;</td>
@@ -201,16 +201,16 @@ class StatsPage {
 			<?php endif; ?>
 
 			<?php if ( empty( $rows ) ) : ?>
-				<p><?php esc_html_e( 'No access data recorded yet.', 'wp-markdown-for-agents' ); ?></p>
+				<p><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></p>
 			<?php else : ?>
 				<table class="widefat striped">
 					<thead>
 						<tr>
-							<th><?php esc_html_e( 'Post', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Agent', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Access Method', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Date', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Count', 'wp-markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Post', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Date', 'markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Count', 'markdown-for-agents' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>

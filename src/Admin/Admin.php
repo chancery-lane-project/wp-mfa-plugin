@@ -75,7 +75,7 @@ class Admin {
 	 */
 	public function handle_generate_action(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents' ) );
 		}
 
 		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
@@ -90,7 +90,7 @@ class Admin {
 				'type'    => 'success',
 				'message' => sprintf(
 					/* translators: 1: success count, 2: failed count */
-					__( 'Generated %1$d files. Failed: %2$d.', 'wp-markdown-for-agents' ),
+					__( 'Generated %1$d files. Failed: %2$d.', 'markdown-for-agents' ),
 					$results['success'],
 					$results['failed']
 				),
@@ -98,7 +98,7 @@ class Admin {
 			60
 		);
 
-		wp_safe_redirect( admin_url( 'options-general.php?page=wp-markdown-for-agents' ) );
+		wp_safe_redirect( admin_url( 'options-general.php?page=markdown-for-agents' ) );
 		exit;
 	}
 
@@ -114,7 +114,7 @@ class Admin {
 		$post_id = (int) ( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			wp_die( esc_html__( 'Insufficient permissions.', 'wp-markdown-for-agents' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents' ) );
 		}
 
 		check_admin_referer( 'wp_mfa_regenerate_' . $post_id );
@@ -128,8 +128,8 @@ class Admin {
 				array(
 					'type'    => $ok ? 'success' : 'error',
 					'message' => $ok
-						? __( 'Markdown file regenerated.', 'wp-markdown-for-agents' )
-						: __( 'Failed to regenerate Markdown file.', 'wp-markdown-for-agents' ),
+						? __( 'Markdown file regenerated.', 'markdown-for-agents' )
+						: __( 'Failed to regenerate Markdown file.', 'markdown-for-agents' ),
 				),
 				60
 			);
@@ -205,7 +205,7 @@ class Admin {
 	 * @param  string $hook The current admin page hook suffix.
 	 */
 	public function enqueue_scripts( string $hook ): void {
-		if ( 'settings_page_wp-markdown-for-agents' !== $hook ) {
+		if ( 'settings_page_markdown-for-agents' !== $hook ) {
 			return;
 		}
 
