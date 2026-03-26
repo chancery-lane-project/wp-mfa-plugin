@@ -1,5 +1,6 @@
 # ignore all files that start with ~
 ~*
+docs
 
 # ignore OS generated files
 ehthumbs.db
