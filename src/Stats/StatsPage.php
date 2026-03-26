@@ -172,7 +172,7 @@ class StatsPage {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Agent', 'wp-markdown-for-agents' ); ?></th>
-							<th><?php esc_html_e( 'Method', 'wp-markdown-for-agents' ); ?></th>
+							<th><?php esc_html_e( 'Access Method', 'wp-markdown-for-agents' ); ?></th>
 							<th><?php esc_html_e( 'Total accesses', 'wp-markdown-for-agents' ); ?></th>
 							<th><?php esc_html_e( 'Unique posts', 'wp-markdown-for-agents' ); ?></th>
 						</tr>

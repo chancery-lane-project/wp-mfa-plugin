@@ -244,6 +244,8 @@ class StatsPageTest extends TestCase {
     }
 
     public function test_render_page_shows_method_column_in_summary(): void {
+        $_GET['date_from'] = '2026-03-01';
+
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
         $this->repository->method( 'get_stats' )->willReturn( [] );
@@ -257,13 +259,11 @@ class StatsPageTest extends TestCase {
             ],
         ] );
 
-        $_GET['date_from'] = '2026-03-01';
-
         ob_start();
         $this->page->render_page();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString( 'Method', $output );
+        $this->assertStringContainsString( 'Access Method', $output );
         $this->assertStringContainsString( 'ua', $output );
     }
 }
