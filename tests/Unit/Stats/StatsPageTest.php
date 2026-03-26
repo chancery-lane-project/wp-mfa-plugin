@@ -60,7 +60,7 @@ class StatsPageTest extends TestCase {
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [ 1 => 'Hello' ] );
         $this->repository->method( 'get_total_count' )->willReturn( 1 );
         $this->repository->method( 'get_stats' )->willReturn( [
-            (object) [ 'post_id' => 1, 'agent' => 'GPTBot', 'access_date' => '2026-03-05', 'count' => 10 ],
+            (object) [ 'post_id' => 1, 'agent' => 'GPTBot', 'access_method' => 'ua', 'access_date' => '2026-03-05', 'count' => 10 ],
         ] );
 
         $GLOBALS['_mock_post_titles'] = [ 1 => 'Hello' ];
@@ -137,7 +137,7 @@ class StatsPageTest extends TestCase {
         $this->repository->expects( $this->once() )
             ->method( 'get_agent_summary' )
             ->willReturn( [
-                (object) [ 'agent' => 'GPTBot', 'total' => 10, 'unique_posts' => 3 ],
+                (object) [ 'agent' => 'GPTBot', 'access_method' => 'ua', 'total' => 10, 'unique_posts' => 3 ],
             ] );
 
         ob_start();
@@ -160,5 +160,87 @@ class StatsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringNotContainsString( 'Total accesses', $output );
+    }
+
+    public function test_render_page_shows_method_filter_dropdown(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'name="access_method"', $output );
+        $this->assertStringContainsString( 'accept-header', $output );
+        $this->assertStringContainsString( 'query-param', $output );
+    }
+
+    public function test_render_page_shows_access_method_column_in_results(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [
+            (object) [
+                'post_id'       => 1,
+                'agent'         => 'GPTBot',
+                'access_method' => 'ua',
+                'access_date'   => '2026-03-26',
+                'count'         => 5,
+            ],
+        ] );
+        $this->repository->method( 'get_total_count' )->willReturn( 1 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'Access Method', $output );
+        $this->assertStringContainsString( 'ua', $output );
+    }
+
+    public function test_render_page_displays_unknown_for_empty_agent(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [
+            (object) [
+                'post_id'       => 1,
+                'agent'         => '',
+                'access_method' => 'query-param',
+                'access_date'   => '2026-03-26',
+                'count'         => 3,
+            ],
+        ] );
+        $this->repository->method( 'get_total_count' )->willReturn( 1 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '(unknown)', $output );
+    }
+
+    public function test_render_page_shows_method_column_in_summary(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $this->repository->method( 'get_agent_summary' )->willReturn( [
+            (object) [
+                'agent'         => 'GPTBot',
+                'access_method' => 'ua',
+                'total'         => 42,
+                'unique_posts'  => 3,
+            ],
+        ] );
+
+        $_GET['date_from'] = '2026-03-01';
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'Method', $output );
+        $this->assertStringContainsString( 'ua', $output );
     }
 }
