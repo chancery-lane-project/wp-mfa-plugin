@@ -16,10 +16,12 @@ Make the Agent Access Statistics admin page look and behave exactly like a nativ
 
 ### Preset date links → `.subsubsub`
 
-Move the date preset links **above** the filter form. Render as `<ul class="subsubsub">` in the order: All time | Last 7 days | Last 30 days | This month.
+Move the date preset links **above** the filter form (they currently appear after it, wrapped in a `<p>` tag — remove the `<p>` entirely). Render as `<ul class="subsubsub">`.
+
+**Order change:** The existing code renders Last 7 days | Last 30 days | This month | All time. The new order is **All time | Last 7 days | Last 30 days | This month** — broadest scope first, matching the WP convention (e.g. All | Published | Draft | Trash).
 
 - Active link gets `class="current"` — no inline styles.
-- Pipe separators live **inside** each `<li>` (before the closing tag), matching the WP convention. The final `<li>` has no pipe.
+- Pipe separators live **inside** each `<li>` (after the `<a>` tag, before `</li>`), matching the WP convention. The final `<li>` has no pipe.
 
 ```html
 <ul class="subsubsub">
@@ -32,9 +34,9 @@ Move the date preset links **above** the filter form. Render as `<ul class="subs
 
 ### Filter form → `alignleft actions`
 
-The filter `<form>` wraps a `<div class="tablenav top">`. Inside, all selects and date inputs move into `<div class="alignleft actions">`. A `<br class="clear">` follows.
+The filter `<form>` wraps a `<div class="tablenav top">`. Inside, all selects and date inputs move into `<div class="alignleft actions">`. A `<br class="clear">` follows. Note: `actions` is included here because this div contains interactive filter controls (selects + button), not a count display.
 
-Date inputs get `id="date_from"` / `id="date_to"` paired with their `<label for="…">`.
+Date inputs get `id="date_from"` / `id="date_to"` paired with their `<label for="…">`. All i18n calls remain unchanged — `__( 'Filter', 'markdown-for-agents' )` is passed to `submit_button()`.
 
 ```html
 <form method="get" action="">
@@ -44,11 +46,11 @@ Date inputs get `id="date_from"` / `id="date_to"` paired with their `<label for=
             <select name="post_id">…</select>
             <select name="agent">…</select>
             <select name="access_method">…</select>
-            <label for="date_from">From</label>
+            <label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
             <input type="date" id="date_from" name="date_from" value="…">
-            <label for="date_to">To</label>
+            <label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
             <input type="date" id="date_to" name="date_to" value="…">
-            <?php submit_button( 'Filter', 'secondary', 'filter', false ); ?>
+            <?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
         </div>
         <br class="clear">
     </div>
@@ -98,31 +100,71 @@ Every `<th>` gets `scope="col"` and `class="manage-column column-{name}"`.
 
 The summary table's totals row `<td>` cells also receive `class="num"` on the numeric cells.
 
+No `<tfoot>` is added — it is optional in WP list tables and omitted here for simplicity.
+
 ---
 
 ## Section 3: Pagination
 
 Replace the numbered button loop with the standard WP list-table pagination pattern.
 
-The `<div class="tablenav bottom">` contains:
+The `<div class="tablenav bottom">` contains a `<div class="tablenav-pages">` which holds both the item count and the navigation links:
 
-- **Left:** `<span class="displaying-num">X items</span>` inside `<div class="alignleft">`.
-- **Right:** `<span class="pagination-links">` containing, in order:
-  - First-page button (`«`) — `class="first-page button"`, disabled on page 1
-  - Prev-page button (`‹`) — `class="prev-page button"`, disabled on page 1
-  - Current page label — `<span class="paging-input"><span class="tablenav-paging-text">X of Y</span></span>`
-  - Next-page button (`›`) — `class="next-page button"`, disabled on last page
-  - Last-page button (`»`) — `class="last-page button"`, disabled on last page
+```html
+<div class="tablenav bottom">
+    <div class="tablenav-pages">
+        <span class="displaying-num">X items</span>
+        <span class="pagination-links">
+            <!-- first-page / prev-page / label / next-page / last-page -->
+        </span>
+    </div>
+</div>
+```
 
-Disabled buttons use `aria-disabled="true"` and add `disabled` to their class list (replacing the `tablenav-pages-navspan` span approach).
+Note: `displaying-num` sits directly inside `tablenav-pages` (not inside an `alignleft` div) — this matches WP core's `WP_List_Table` output.
 
-The pagination block only renders when `$total_pages > 1`.
+### Active vs. disabled buttons
+
+- **Active buttons** are `<a>` elements with an `href` pointing to the relevant page.
+- **Disabled buttons** (first/prev on page 1; next/last on the final page) are `<span>` elements with no `href`. Using `<span>` rather than `<a aria-disabled="true" href="…">` matches WP core and avoids clickable-but-inert links.
+
+**Page 1 of 5** (first-page and prev-page disabled):
+
+```html
+<span class="pagination-links">
+    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">«</span>
+    <span class="tablenav-pages-navspan button disabled" aria-hidden="true">‹</span>
+    <span class="paging-input">
+        <span class="tablenav-paging-text">1 of 5</span>
+    </span>
+    <a class="next-page button" href="…">›</a>
+    <a class="last-page button" href="…">»</a>
+</span>
+```
+
+**Page 3 of 5** (all four buttons active):
+
+```html
+<span class="pagination-links">
+    <a class="first-page button" href="…">«</a>
+    <a class="prev-page button" href="…">‹</a>
+    <span class="paging-input">
+        <span class="tablenav-paging-text">3 of 5</span>
+    </span>
+    <a class="next-page button" href="…">›</a>
+    <a class="last-page button" href="…">»</a>
+</span>
+```
+
+The active state for each button uses the same class name as the disabled span, but as an `<a>` element with an `href` and without `aria-hidden`. The `displaying-num` item count uses `_n()` for correct singular/plural: `_n( '%s item', '%s items', $total, 'markdown-for-agents' )` formatted with `number_format_i18n()`.
+
+The pagination block only renders when `$total_pages > 1`. The existing `$total` and `$total_pages` variables are reused — no new logic required.
 
 ---
 
 ## Section 4: Empty state
 
-The main table is always rendered with its full `<thead>`. When there are no rows, `<tbody>` contains a single spanning row:
+The current code skips rendering the main table entirely when `$rows` is empty, outputting a bare `<p>` instead. This changes: the main table is **always rendered** with its full `<thead>`. When there are no rows, `<tbody>` contains a single spanning row — the existing `if ( empty( $rows ) )` branch must be restructured accordingly.
 
 ```html
 <tbody>
@@ -132,13 +174,13 @@ The main table is always rendered with its full `<thead>`. When there are no row
 </tbody>
 ```
 
-The summary table already uses this pattern; confirm `colspan="4"` is correct (it is — four columns: Agent, Access Method, Total accesses, Unique posts).
+The summary table already uses this pattern. Its colspan is 4 (Agent, Access Method, Total accesses, Unique posts) — correct as-is.
 
 ---
 
 ## What does NOT change
 
 - All PHP logic (filter parsing, query calls, pagination maths) — untouched.
-- Text strings and i18n calls — untouched.
+- All text strings and i18n calls — untouched (the code examples above show i18n calls in full).
 - `StatsRepository`, `StatsPage::add_page()`, or any other method — untouched.
 - No custom CSS file added; all styling comes from WP core admin stylesheets.
