@@ -3,7 +3,7 @@
         'name' => 'tclp/markdown-for-agents',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => '50af09348d5b90adfe08c5226efb6f9b4a20c18c',
+        'reference' => 'c9b4ad4dd94786d443cba283cb0cf069b195ccc0',
         'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -22,7 +22,7 @@
         'tclp/markdown-for-agents' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '50af09348d5b90adfe08c5226efb6f9b4a20c18c',
+            'reference' => 'c9b4ad4dd94786d443cba283cb0cf069b195ccc0',
             'type' => 'wordpress-plugin',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
