@@ -287,19 +287,31 @@ class Generator {
 			return;
 		}
 
-		update_post_meta( $post_id, '_wp_mfa_generating', '1' );
+		try {
+			update_post_meta( $post_id, '_wp_mfa_generating', '1' );
 
-		if ( 'publish' === $post->post_status ) {
-			$this->generate_post( $post );
-		} elseif ( in_array( $post->post_status, array( 'trash', 'draft', 'pending', 'private' ), true ) ) {
-			$this->delete_post( $post_id );
+			if ( 'publish' === $post->post_status ) {
+				$this->generate_post( $post );
+			} elseif ( in_array( $post->post_status, array( 'trash', 'draft', 'pending', 'private' ), true ) ) {
+				$this->delete_post( $post_id );
+			}
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WP Markdown for Agents: on_save_post failed for post ' . $post_id . ': ' . $e->getMessage() );
+			}
+		} finally {
+			delete_post_meta( $post_id, '_wp_mfa_generating' );
 		}
 
-		delete_post_meta( $post_id, '_wp_mfa_generating' );
-
 		// Regenerate taxonomy archives for all terms on this post (outside guard block).
-		if ( ! empty( $this->options['auto_generate'] ) && null !== $this->taxonomy_generator ) {
-			$this->regenerate_term_archives( $post_id );
+		try {
+			if ( ! empty( $this->options['auto_generate'] ) && null !== $this->taxonomy_generator ) {
+				$this->regenerate_term_archives( $post_id );
+			}
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				error_log( 'WP Markdown for Agents: term archive regeneration failed for post ' . $post_id . ': ' . $e->getMessage() );
+			}
 		}
 	}
 
