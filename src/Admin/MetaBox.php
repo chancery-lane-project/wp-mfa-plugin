@@ -53,6 +53,10 @@ class MetaBox {
 	public function render( \WP_Post $post ): void {
 		$filepath = $this->generator->get_export_path( $post );
 		$exists   = file_exists( $filepath );
+		$regen_url = wp_nonce_url(
+			admin_url( 'admin-post.php?action=wp_mfa_regenerate_post&post_id=' . $post->ID ),
+			'wp_mfa_regenerate_' . $post->ID
+		);
 		?>
 		<p>
 			<?php if ( $exists ) : ?>
@@ -63,14 +67,9 @@ class MetaBox {
 				<?php esc_html_e( 'No Markdown file generated yet.', 'markdown-for-agents' ); ?>
 			<?php endif; ?>
 		</p>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" value="wp_mfa_regenerate_post">
-			<input type="hidden" name="post_id" value="<?php echo esc_attr( (string) $post->ID ); ?>">
-			<?php wp_nonce_field( 'wp_mfa_regenerate_' . $post->ID ); ?>
-			<button type="submit" class="button button-secondary button-small">
-				<?php esc_html_e( 'Regenerate', 'markdown-for-agents' ); ?>
-			</button>
-		</form>
+		<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
+			<?php esc_html_e( 'Regenerate', 'markdown-for-agents' ); ?>
+		</a>
 		<?php
 	}
 }
