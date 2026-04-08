@@ -536,6 +536,12 @@ if (!function_exists('wp_create_nonce')) {
     }
 }
 
+if (!function_exists('wp_nonce_url')) {
+    function wp_nonce_url(string $actionurl, string $action = '-1', string $name = '_wpnonce'): string {
+        return add_query_arg($name, 'test_nonce_' . $action, $actionurl);
+    }
+}
+
 if (!function_exists('admin_url')) {
     function admin_url(string $path = ''): string {
         return 'https://example.com/wp-admin/' . ltrim($path, '/');
