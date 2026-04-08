@@ -1,0 +1,10 @@
+# Exclude from WordPress.org SVN archive
+tests/
+docs/
+.github/
+.ddev/
+phpunit.xml.dist
+phpcs.xml.dist
+composer.lock
+.gitignore
+.distignore
