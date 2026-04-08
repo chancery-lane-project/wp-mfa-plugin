@@ -290,8 +290,8 @@ class StatsPageTest extends TestCase {
     }
 
     public function test_active_preset_link_has_current_class(): void {
-        $_GET['date_from'] = date( 'Y-m-d', strtotime( '-6 days' ) );
-        $_GET['date_to']   = date( 'Y-m-d' );
+        $_GET['date_from'] = gmdate( 'Y-m-d', strtotime( '-6 days' ) );
+        $_GET['date_to']   = gmdate( 'Y-m-d' );
         $this->stub_empty_repository();
 
         ob_start();
