@@ -65,7 +65,7 @@ class CodeBlockConverter implements ConverterInterface {
 			// Fall through to fallback.
 		}
 
-		$code = strip_tags( $element->getChildrenAsString() );
+		$code = wp_strip_all_tags( $element->getChildrenAsString() );
 		$code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 		return rtrim( $code );
 	}

@@ -237,7 +237,7 @@ if (!function_exists('get_queried_object')) {
 
 if (!function_exists('wp_strip_all_tags')) {
     function wp_strip_all_tags(string $string, bool $remove_breaks = false): string {
-        return strip_tags($string);
+        return strip_tags($string); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
     }
 }
 
@@ -255,7 +255,7 @@ if (!function_exists('sanitize_key')) {
 
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $str): string {
-        return trim(strip_tags($str));
+        return trim(strip_tags($str)); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
     }
 }
 

@@ -93,7 +93,7 @@ class TableConverter implements ConverterInterface {
 		$rows    = array();
 
 		foreach ( $dom->getElementsByTagName( 'th' ) as $th ) {
-			$headers[] = trim( strip_tags( $th->textContent ) );
+			$headers[] = trim( wp_strip_all_tags( $th->textContent ) );
 		}
 
 		foreach ( $dom->getElementsByTagName( 'tr' ) as $tr ) {
@@ -101,7 +101,7 @@ class TableConverter implements ConverterInterface {
 			$td_nodes = $tr->getElementsByTagName( 'td' );
 			if ( $td_nodes->length > 0 ) {
 				foreach ( $td_nodes as $td ) {
-					$cells[] = trim( strip_tags( $td->textContent ) );
+					$cells[] = trim( wp_strip_all_tags( $td->textContent ) );
 				}
 				if ( ! empty( $cells ) ) {
 					$rows[] = $cells;

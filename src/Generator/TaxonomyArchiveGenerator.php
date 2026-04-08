@@ -276,9 +276,9 @@ class TaxonomyArchiveGenerator {
 		];
 
 		foreach ( $posts as $post ) {
-			$title   = strip_tags( $post->post_title );
+			$title   = wp_strip_all_tags( $post->post_title );
 			$url     = get_permalink( $post->ID );
-			$excerpt = strip_tags( $post->post_excerpt );
+			$excerpt = wp_strip_all_tags( $post->post_excerpt );
 
 			$line = '- [' . $title . '](' . $url . ')';
 
