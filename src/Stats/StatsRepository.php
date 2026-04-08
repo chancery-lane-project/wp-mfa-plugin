@@ -98,11 +98,10 @@ class StatsRepository {
 		$limit     = max( 1, (int) ( $filters['limit'] ?? 50 ) );
 		$offset    = max( 0, (int) ( $filters['offset'] ?? 0 ) );
 
-		$sql = "SELECT post_id, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT {$limit} OFFSET {$offset}";
-
-		if ( ! empty( $values ) ) {
-			$sql = $this->wpdb->prepare( $sql, ...$values );
-		}
+		$sql = $this->wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			"SELECT post_id, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT %d OFFSET %d",
+			...array_merge( $values, array( $limit, $offset ) )
+		);
 
 		return $this->wpdb->get_results( $sql );
 	}
@@ -120,13 +119,13 @@ class StatsRepository {
 
 		$where_sql = $clause['sql'];
 		$values    = $clause['values'];
-		$sql       = "SELECT COUNT(*) FROM {$table} {$where_sql}";
+		$sql = "SELECT COUNT(*) FROM {$table} {$where_sql}"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( ! empty( $values ) ) {
-			$sql = $this->wpdb->prepare( $sql, ...$values );
+			$sql = $this->wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 
-		return (int) $this->wpdb->get_var( $sql );
+		return (int) $this->wpdb->get_var( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/**
@@ -212,10 +211,10 @@ class StatsRepository {
 		$sql = "SELECT agent, access_method, SUM(`count`) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent, access_method ORDER BY total DESC"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( ! empty( $values ) ) {
-			$sql = $this->wpdb->prepare( $sql, ...$values );
+			$sql = $this->wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 
-		return $this->wpdb->get_results( $sql );
+		return $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/**
@@ -226,7 +225,9 @@ class StatsRepository {
 	 */
 	public function get_posts_with_stats(): array {
 		$table = self::get_table_name( $this->wpdb );
-		$rows  = $this->wpdb->get_results( "SELECT DISTINCT post_id FROM {$table} ORDER BY post_id ASC" );
+		$rows  = $this->wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"SELECT DISTINCT post_id FROM {$table} ORDER BY post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
 
 		$result = array();
 		foreach ( $rows as $row ) {
