@@ -7,7 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Core;
 /**
  * Centralised option defaults and access.
  *
- * All plugin options are stored under the single key `wp_mfa_options` for
+ * All plugin options are stored under the single key `markdown_for_agents_options` for
  * clean uninstall. This class provides the canonical defaults and a
  * convenience getter that always returns a fully-merged array.
  *

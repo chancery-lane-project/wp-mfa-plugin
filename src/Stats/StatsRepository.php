@@ -7,7 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Stats;
 /**
  * Database access layer for agent access statistics.
  *
- * All queries against the custom `wp_mfa_access_stats` table go through
+ * All queries against the custom `{prefix}mfa_access_stats` table go through
  * this class. Counters are aggregated daily per post + agent combination.
  *
  * @since  1.1.0
