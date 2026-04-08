@@ -34,7 +34,7 @@ class MetaBox {
 	public function register(): void {
 		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $post_type ) {
 			add_meta_box(
-				'wp_mfa_status',
+				'markdown_for_agents_status',
 				__( 'Markdown for Agents', 'markdown-for-agents' ),
 				array( $this, 'render' ),
 				$post_type,
@@ -54,8 +54,8 @@ class MetaBox {
 		$filepath = $this->generator->get_export_path( $post );
 		$exists   = file_exists( $filepath );
 		$regen_url = wp_nonce_url(
-			admin_url( 'admin-post.php?action=wp_mfa_regenerate_post&post_id=' . $post->ID ),
-			'wp_mfa_regenerate_' . $post->ID
+			admin_url( 'admin-post.php?action=markdown_for_agents_regenerate_post&post_id=' . $post->ID ),
+			'markdown_for_agents_regenerate_' . $post->ID
 		);
 		?>
 		<p>

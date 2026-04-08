@@ -150,8 +150,8 @@ class Plugin {
 		$this->loader->add_action( 'admin_menu', $admin, 'add_settings_page' );
 		$this->loader->add_action( 'admin_init', $admin, 'register_settings' );
 		$this->loader->add_action( 'add_meta_boxes', $admin, 'add_meta_boxes' );
-		$this->loader->add_action( 'admin_post_wp_mfa_generate', $admin, 'handle_generate_action' );
-		$this->loader->add_action( 'admin_post_wp_mfa_regenerate_post', $admin, 'handle_regenerate_post_action' );
+		$this->loader->add_action( 'admin_post_markdown_for_agents_generate', $admin, 'handle_generate_action' );
+		$this->loader->add_action( 'admin_post_markdown_for_agents_regenerate_post', $admin, 'handle_regenerate_post_action' );
 		$this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_taxonomy_batch', $admin, 'handle_generate_taxonomy_batch_ajax' );

@@ -69,7 +69,7 @@ class Admin {
 	/**
 	 * Handle the bulk-generate POST action.
 	 *
-	 * Hooked to `admin_post_wp_mfa_generate`.
+	 * Hooked to `admin_post_markdown_for_agents_generate`.
 	 *
 	 * @since  1.0.0
 	 */
@@ -80,12 +80,12 @@ class Admin {
 
 		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
 
-		check_admin_referer( 'wp_mfa_generate_' . $post_type );
+		check_admin_referer( 'markdown_for_agents_generate_' . $post_type );
 
 		$results = $this->generator->generate_post_type( $post_type );
 
 		set_transient(
-			'wp_mfa_admin_notice',
+			'markdown_for_agents_admin_notice',
 			array(
 				'type'    => 'success',
 				'message' => sprintf(
@@ -105,7 +105,7 @@ class Admin {
 	/**
 	 * Handle the single-post regenerate POST action.
 	 *
-	 * Hooked to `admin_post_wp_mfa_regenerate_post`.
+	 * Hooked to `admin_post_markdown_for_agents_regenerate_post`.
 	 *
 	 * @since  1.0.0
 	 */
@@ -117,14 +117,14 @@ class Admin {
 			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents' ) );
 		}
 
-		check_admin_referer( 'wp_mfa_regenerate_' . $post_id );
+		check_admin_referer( 'markdown_for_agents_regenerate_' . $post_id );
 
 		$post = get_post( $post_id );
 
 		if ( $post instanceof \WP_Post ) {
 			$ok = $this->generator->generate_post( $post );
 			set_transient(
-				'wp_mfa_admin_notice',
+				'markdown_for_agents_admin_notice',
 				array(
 					'type'    => $ok ? 'success' : 'error',
 					'message' => $ok
@@ -235,13 +235,13 @@ class Admin {
 	 * @since  1.0.0
 	 */
 	public function display_admin_notices(): void {
-		$notice = get_transient( 'wp_mfa_admin_notice' );
+		$notice = get_transient( 'markdown_for_agents_admin_notice' );
 
 		if ( ! is_array( $notice ) ) {
 			return;
 		}
 
-		delete_transient( 'wp_mfa_admin_notice' );
+		delete_transient( 'markdown_for_agents_admin_notice' );
 
 		$type    = in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true )
 			? $notice['type'] : 'info';
