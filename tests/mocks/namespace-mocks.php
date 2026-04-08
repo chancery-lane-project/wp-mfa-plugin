@@ -10,10 +10,10 @@
  */
 
 namespace {
-    if ( defined( 'WP_MFA_NAMESPACE_MOCKS_LOADED' ) ) {
+    if ( defined( 'MARKDOWN_FOR_AGENTS_NAMESPACE_MOCKS_LOADED' ) ) {
         return;
     }
-    define( 'WP_MFA_NAMESPACE_MOCKS_LOADED', true );
+    define( 'MARKDOWN_FOR_AGENTS_NAMESPACE_MOCKS_LOADED', true );
 }
 
 namespace Tclp\WpMarkdownForAgents\Negotiate {
