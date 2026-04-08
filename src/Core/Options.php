@@ -21,7 +21,7 @@ class Options {
 	 *
 	 * @since  1.0.0
 	 */
-	public const OPTION_KEY = 'wp_mfa_options';
+	public const OPTION_KEY = 'markdown_for_agents_options';
 
 	/**
 	 * Return the default option values.

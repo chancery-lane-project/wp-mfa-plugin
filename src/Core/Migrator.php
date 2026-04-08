@@ -18,7 +18,7 @@ use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
  */
 class Migrator {
 
-	public const OPTION_KEY = 'wp_mfa_db_version';
+	public const OPTION_KEY = 'markdown_for_agents_db_version';
 
 	/**
 	 * Run any pending DB migrations.

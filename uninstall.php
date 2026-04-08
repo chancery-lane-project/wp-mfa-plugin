@@ -17,4 +17,4 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-delete_option( 'wp_mfa_options' );
+delete_option( 'markdown_for_agents_options' );
