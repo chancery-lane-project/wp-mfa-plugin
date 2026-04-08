@@ -22,7 +22,7 @@ class SettingsPage {
 	 *
 	 * @since  1.0.0
 	 */
-	private const SETTINGS_GROUP = 'wp_mfa_settings_group';
+	private const SETTINGS_GROUP = 'markdown_for_agents_settings_group';
 
 	/**
 	 * Settings page slug.
@@ -72,24 +72,24 @@ class SettingsPage {
 		);
 
 		add_settings_section(
-			'wp_mfa_general',
+			'markdown_for_agents_general',
 			__( 'General', 'markdown-for-agents' ),
 			'__return_false',
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'wp_mfa_enabled', __( 'Enable plugin', 'markdown-for-agents' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'wp_mfa_general' );
-		add_settings_field( 'wp_mfa_post_types', __( 'Post types', 'markdown-for-agents' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'wp_mfa_general' );
-		add_settings_field( 'wp_mfa_export_dir', __( 'Export directory', 'markdown-for-agents' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'wp_mfa_general' );
-		add_settings_field( 'wp_mfa_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'wp_mfa_general' );
-		add_settings_field( 'wp_mfa_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'wp_mfa_general' );
+		add_settings_field( 'markdown_for_agents_enabled', __( 'Enable plugin', 'markdown-for-agents' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
 		foreach ( $enabled_types as $type_slug ) {
 			$type_obj    = get_post_type_object( $type_slug );
 			$type_label  = $type_obj ? $type_obj->label : $type_slug;
-			$section_id  = 'wp_mfa_type_' . $type_slug;
+			$section_id  = 'markdown_for_agents_type_' . $type_slug;
 
 			add_settings_section(
 				$section_id,
@@ -100,7 +100,7 @@ class SettingsPage {
 			);
 
 			add_settings_field(
-				'wp_mfa_frontmatter_fields_' . $type_slug,
+				'markdown_for_agents_frontmatter_fields_' . $type_slug,
 				__( 'Frontmatter fields', 'markdown-for-agents' ),
 				function () use ( $type_slug ): void {
 					$this->field_type_frontmatter_fields( $type_slug );
@@ -110,7 +110,7 @@ class SettingsPage {
 			);
 
 			add_settings_field(
-				'wp_mfa_content_fields_' . $type_slug,
+				'markdown_for_agents_content_fields_' . $type_slug,
 				__( 'Content fields', 'markdown-for-agents' ),
 				function () use ( $type_slug ): void {
 					$this->field_type_content_fields( $type_slug );
@@ -121,14 +121,14 @@ class SettingsPage {
 		}
 
 		add_settings_section(
-			'wp_mfa_ua_detection',
+			'markdown_for_agents_ua_detection',
 			__( 'Agent Detection', 'markdown-for-agents' ),
 			'__return_false',
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'wp_mfa_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents' ), array( $this, 'field_ua_force_enabled' ), self::PAGE_SLUG, 'wp_mfa_ua_detection' );
-		add_settings_field( 'wp_mfa_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents' ), array( $this, 'field_ua_agent_strings' ), self::PAGE_SLUG, 'wp_mfa_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents' ), array( $this, 'field_ua_force_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents' ), array( $this, 'field_ua_agent_strings' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
 	}
 
 	/**
