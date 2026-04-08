@@ -195,7 +195,13 @@ if (!function_exists('wp_get_attachment_url')) {
 
 if (!function_exists('wp_mkdir_p')) {
     function wp_mkdir_p(string $dir): bool {
-        return $GLOBALS['_mock_mkdir_result'] ?? true;
+        if (isset($GLOBALS['_mock_mkdir_result'])) {
+            return $GLOBALS['_mock_mkdir_result'];
+        }
+        if (is_dir($dir)) {
+            return true;
+        }
+        return mkdir($dir, 0755, true);
     }
 }
 

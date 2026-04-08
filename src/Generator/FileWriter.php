@@ -54,7 +54,7 @@ class FileWriter {
 
 		$dir = dirname( $filepath );
 
-		if ( ! is_dir( $dir ) && ! mkdir( $dir, 0755, true ) && ! is_dir( $dir ) ) {
+		if ( ! is_dir( $dir ) && ! wp_mkdir_p( $dir ) ) {
 			return false;
 		}
 

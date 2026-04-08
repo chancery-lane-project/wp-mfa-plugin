@@ -104,16 +104,17 @@ class LlmsTxtGenerator {
 			return array();
 		}
 
-		$handle = fopen( $filepath, 'r' );
-		if ( false === $handle ) {
+		$contents = $this->read_file_contents( $filepath );
+		if ( null === $contents ) {
 			return array();
 		}
 
+		$lines   = explode( "\n", $contents );
 		$data    = array();
 		$in_fm   = false;
 		$started = false;
 
-		while ( false !== ( $line = fgets( $handle ) ) ) {
+		foreach ( $lines as $line ) {
 			$trimmed = rtrim( $line );
 
 			if ( ! $started && '---' === $trimmed ) {
@@ -157,9 +158,30 @@ class LlmsTxtGenerator {
 			}
 		}
 
-		fclose( $handle );
-
 		return $data;
+	}
+
+	/**
+	 * Read a file's contents using WP_Filesystem when available, falling back
+	 * to file_get_contents() for CLI contexts where WP_Filesystem is unavailable.
+	 *
+	 * @since  1.2.0
+	 * @param  string $filepath Absolute path to the file.
+	 * @return string|null File contents, or null on failure.
+	 */
+	private function read_file_contents( string $filepath ): ?string {
+		if ( ! defined( 'WP_CLI' ) && function_exists( 'WP_Filesystem' ) ) {
+			global $wp_filesystem;
+			if ( empty( $wp_filesystem ) ) {
+				WP_Filesystem();
+			}
+			if ( $wp_filesystem instanceof \WP_Filesystem_Base ) {
+				$result = $wp_filesystem->get_contents( $filepath );
+				return ( false !== $result ) ? $result : null;
+			}
+		}
+		$result = file_get_contents( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		return ( false !== $result ) ? $result : null;
 	}
 
 	/**
