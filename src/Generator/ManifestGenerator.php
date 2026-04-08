@@ -273,7 +273,7 @@ class ManifestGenerator {
 		return array(
 			'export_timestamp'  => current_time( 'mysql' ),
 			'wordpress_version' => $wp_version ?? '',
-			'plugin_version'    => defined( 'WP_MFA_VERSION' ) ? WP_MFA_VERSION : '1.0.0',
+			'plugin_version'    => defined( 'MARKDOWN_FOR_AGENTS_VERSION' ) ? MARKDOWN_FOR_AGENTS_VERSION : '1.0.0',
 			'total_documents'   => 0,
 			'documents'         => array(),
 			'change_summary'    => array(

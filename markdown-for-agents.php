@@ -24,11 +24,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WP_MFA_VERSION', '1.2.0' );
-define( 'WP_MFA_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'WP_MFA_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'MARKDOWN_FOR_AGENTS_VERSION', '1.2.0' );
+define( 'MARKDOWN_FOR_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'MARKDOWN_FOR_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-require_once WP_MFA_PLUGIN_DIR . 'vendor/autoload.php';
+require_once MARKDOWN_FOR_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';
 
 use Tclp\WpMarkdownForAgents\Core\Activator;
 use Tclp\WpMarkdownForAgents\Core\Deactivator;
@@ -37,5 +37,5 @@ use Tclp\WpMarkdownForAgents\Core\Plugin;
 register_activation_hook( __FILE__, array( Activator::class, 'activate' ) );
 register_deactivation_hook( __FILE__, array( Deactivator::class, 'deactivate' ) );
 
-$plugin = new Plugin( WP_MFA_VERSION );
+$plugin = new Plugin( MARKDOWN_FOR_AGENTS_VERSION );
 $plugin->run();

@@ -21,12 +21,12 @@ if (!defined('WP_CONTENT_DIR')) {
     define('WP_CONTENT_DIR', sys_get_temp_dir());
 }
 
-if (!defined('WP_MFA_PLUGIN_URL')) {
-    define('WP_MFA_PLUGIN_URL', 'https://example.com/wp-content/plugins/markdown-for-agents/');
+if (!defined('MARKDOWN_FOR_AGENTS_PLUGIN_URL')) {
+    define('MARKDOWN_FOR_AGENTS_PLUGIN_URL', 'https://example.com/wp-content/plugins/markdown-for-agents/');
 }
 
-if (!defined('WP_MFA_VERSION')) {
-    define('WP_MFA_VERSION', '1.0.0-test');
+if (!defined('MARKDOWN_FOR_AGENTS_VERSION')) {
+    define('MARKDOWN_FOR_AGENTS_VERSION', '1.0.0-test');
 }
 
 // ---------------------------------------------------------------------------

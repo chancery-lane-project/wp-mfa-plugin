@@ -211,9 +211,9 @@ class Admin {
 
 		wp_enqueue_script(
 			'mfa-bulk-generate',
-			WP_MFA_PLUGIN_URL . 'assets/js/bulk-generate.js',
+			MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/bulk-generate.js',
 			array(),
-			WP_MFA_VERSION,
+			MARKDOWN_FOR_AGENTS_VERSION,
 			true
 		);
 
