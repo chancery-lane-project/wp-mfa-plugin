@@ -179,14 +179,14 @@ wp markdown-agents generate-llms-txt
 
 | Filter | Signature | Description |
 |---|---|---|
-| `wp_mfa_serve_enabled` | `(bool $enabled, WP_Post $post)` | Enable/disable serving for a specific post |
-| `wp_mfa_serve_post_types` | `(array $types)` | Modify the list of serveable post types |
-| `wp_mfa_serve_taxonomies` | `(bool $enabled)` | Enable/disable serving for taxonomy archives |
-| `wp_mfa_frontmatter` | `(array $fm, WP_Post $post)` | Modify frontmatter before serialisation |
-| `wp_mfa_taxonomy_frontmatter` | `(array $fm, WP_Term $term)` | Modify taxonomy archive frontmatter |
-| `wp_mfa_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
-| `wp_mfa_post_convert` | `(string $markdown, WP_Post $post)` | Filter Markdown after conversion |
-| `wp_mfa_content_signal` | `(string $signal)` | Modify the `Content-Signal` header value |
+| `markdown_for_agents_serve_enabled` | `(bool $enabled, WP_Post $post)` | Enable/disable serving for a specific post |
+| `markdown_for_agents_serve_post_types` | `(array $types)` | Modify the list of serveable post types |
+| `markdown_for_agents_serve_taxonomies` | `(bool $enabled)` | Enable/disable serving for taxonomy archives |
+| `markdown_for_agents_frontmatter` | `(array $fm, WP_Post $post)` | Modify frontmatter before serialisation |
+| `markdown_for_agents_taxonomy_frontmatter` | `(array $fm, WP_Term $term)` | Modify taxonomy archive frontmatter |
+| `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
+| `markdown_for_agents_post_convert` | `(string $markdown, WP_Post $post)` | Filter Markdown after conversion |
+| `markdown_for_agents_content_signal` | `(string $signal)` | Modify the `Content-Signal` header value |
 
 ---
 
@@ -194,8 +194,8 @@ wp markdown-agents generate-llms-txt
 
 | Action | Description |
 |---|---|
-| `wp_mfa_file_generated` | Fired after a `.md` file is written |
-| `wp_mfa_file_deleted` | Fired after a `.md` file is deleted |
+| `markdown_for_agents_file_generated` | Fired after a `.md` file is written |
+| `markdown_for_agents_file_deleted` | Fired after a `.md` file is deleted |
 
 ---
 

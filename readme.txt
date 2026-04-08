@@ -107,14 +107,14 @@ are automatically converted to a list of post titles.
 
 Yes. Several filters are available:
 
-* `wp_mfa_pre_convert` — filter HTML before conversion
-* `wp_mfa_post_convert` — filter Markdown after conversion
-* `wp_mfa_frontmatter` — modify frontmatter fields for a post
-* `wp_mfa_taxonomy_frontmatter` — modify frontmatter fields for a taxonomy archive
-* `wp_mfa_serve_enabled` — enable/disable serving for a specific post
-* `wp_mfa_serve_taxonomies` — enable/disable serving for taxonomy archive pages
-* `wp_mfa_file_generated` — action fired after a file is written
-* `wp_mfa_file_deleted` — action fired after a file is deleted
+* `markdown_for_agents_pre_convert` — filter HTML before conversion
+* `markdown_for_agents_post_convert` — filter Markdown after conversion
+* `markdown_for_agents_frontmatter` — modify frontmatter fields for a post
+* `markdown_for_agents_taxonomy_frontmatter` — modify frontmatter fields for a taxonomy archive
+* `markdown_for_agents_serve_enabled` — enable/disable serving for a specific post
+* `markdown_for_agents_serve_taxonomies` — enable/disable serving for taxonomy archive pages
+* `markdown_for_agents_file_generated` — action fired after a file is written
+* `markdown_for_agents_file_deleted` — action fired after a file is deleted
 
 = How do I generate taxonomy archives via WP-CLI? =
 
@@ -138,8 +138,8 @@ wp markdown-agents generate-taxonomies --dry-run
 * AJAX bulk generation for taxonomy archives on the Settings page with live progress counter.
 * New WP-CLI command: `wp markdown-agents generate-taxonomies [--taxonomy=<slug>] [--dry-run]`.
 * `<link rel="alternate" type="text/markdown">` tag now emitted on taxonomy archive pages.
-* New filter: `wp_mfa_serve_taxonomies` to enable/disable taxonomy archive serving globally.
-* New filter: `wp_mfa_taxonomy_frontmatter` to modify taxonomy archive frontmatter before serialisation.
+* New filter: `markdown_for_agents_serve_taxonomies` to enable/disable taxonomy archive serving globally.
+* New filter: `markdown_for_agents_taxonomy_frontmatter` to modify taxonomy archive frontmatter before serialisation.
 * Bulk generation buttons converted to AJAX with live counter — no more page timeouts on large sites.
 
 = 1.1.0 =
