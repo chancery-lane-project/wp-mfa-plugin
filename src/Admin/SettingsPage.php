@@ -48,8 +48,8 @@ class SettingsPage {
 	 */
 	public function add_page(): void {
 		add_options_page(
-			__( 'Markdown for Agents and Statistics', 'markdown-for-agents' ),
-			__( 'Markdown for Agents', 'markdown-for-agents' ),
+			__( 'Markdown for Agents and Statistics', 'markdown-for-agents-and-statistics' ),
+			__( 'Markdown for Agents', 'markdown-for-agents-and-statistics' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -73,16 +73,16 @@ class SettingsPage {
 
 		add_settings_section(
 			'markdown_for_agents_general',
-			__( 'General', 'markdown-for-agents' ),
+			__( 'General', 'markdown-for-agents-and-statistics' ),
 			'__return_false',
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'markdown_for_agents_enabled', __( 'Enable plugin', 'markdown-for-agents' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_enabled', __( 'Enable plugin', 'markdown-for-agents-and-statistics' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents-and-statistics' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -94,14 +94,14 @@ class SettingsPage {
 			add_settings_section(
 				$section_id,
 				/* translators: %s: post type label */
-				sprintf( __( 'Field Configuration: %s', 'markdown-for-agents' ), $type_label ),
+				sprintf( __( 'Field Configuration: %s', 'markdown-for-agents-and-statistics' ), $type_label ),
 				'__return_false',
 				self::PAGE_SLUG
 			);
 
 			add_settings_field(
 				'markdown_for_agents_frontmatter_fields_' . $type_slug,
-				__( 'Frontmatter fields', 'markdown-for-agents' ),
+				__( 'Frontmatter fields', 'markdown-for-agents-and-statistics' ),
 				function () use ( $type_slug ): void {
 					$this->field_type_frontmatter_fields( $type_slug );
 				},
@@ -111,7 +111,7 @@ class SettingsPage {
 
 			add_settings_field(
 				'markdown_for_agents_content_fields_' . $type_slug,
-				__( 'Content fields', 'markdown-for-agents' ),
+				__( 'Content fields', 'markdown-for-agents-and-statistics' ),
 				function () use ( $type_slug ): void {
 					$this->field_type_content_fields( $type_slug );
 				},
@@ -122,13 +122,13 @@ class SettingsPage {
 
 		add_settings_section(
 			'markdown_for_agents_ua_detection',
-			__( 'Agent Detection', 'markdown-for-agents' ),
+			__( 'Agent Detection', 'markdown-for-agents-and-statistics' ),
 			'__return_false',
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents' ), array( $this, 'field_ua_force_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
-		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents' ), array( $this, 'field_ua_agent_strings' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_force_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_agent_strings' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
 	}
 
 	/**
@@ -203,7 +203,7 @@ class SettingsPage {
 		}
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Markdown for Agents and Statistics', 'markdown-for-agents' ); ?></h1>
+			<h1><?php esc_html_e( 'Markdown for Agents and Statistics', 'markdown-for-agents-and-statistics' ); ?></h1>
 			<form method="post" action="options.php">
 				<?php
 				settings_fields( self::SETTINGS_GROUP );
@@ -228,24 +228,24 @@ class SettingsPage {
 		}
 		?>
 		<hr>
-		<h2><?php esc_html_e( 'Generate Markdown files', 'markdown-for-agents' ); ?></h2>
-		<p><?php esc_html_e( 'Regenerate all Markdown files for a post type. This may take a while on large sites.', 'markdown-for-agents' ); ?></p>
+		<h2><?php esc_html_e( 'Generate Markdown files', 'markdown-for-agents-and-statistics' ); ?></h2>
+		<p><?php esc_html_e( 'Regenerate all Markdown files for a post type. This may take a while on large sites.', 'markdown-for-agents-and-statistics' ); ?></p>
 		<?php foreach ( $post_types as $post_type ) : ?>
 			<p>
 				<button type="button" class="button button-secondary" data-post-type="<?php echo esc_attr( $post_type ); ?>">
 					<?php
 					/* translators: %s: post type slug */
-					printf( esc_html__( 'Generate all: %s', 'markdown-for-agents' ), esc_html( $post_type ) );
+					printf( esc_html__( 'Generate all: %s', 'markdown-for-agents-and-statistics' ), esc_html( $post_type ) );
 					?>
 				</button>
 			</p>
 		<?php endforeach; ?>
 		<hr>
-		<h2><?php esc_html_e( 'Taxonomy Archives', 'markdown-for-agents' ); ?></h2>
-		<p><?php esc_html_e( 'Generate Markdown archive files for all public taxonomy terms.', 'markdown-for-agents' ); ?></p>
+		<h2><?php esc_html_e( 'Taxonomy Archives', 'markdown-for-agents-and-statistics' ); ?></h2>
+		<p><?php esc_html_e( 'Generate Markdown archive files for all public taxonomy terms.', 'markdown-for-agents-and-statistics' ); ?></p>
 		<p>
 			<button type="button" class="button button-secondary" data-action="mfa_generate_taxonomy_batch">
-				<?php esc_html_e( 'Generate All Taxonomy Archives', 'markdown-for-agents' ); ?>
+				<?php esc_html_e( 'Generate All Taxonomy Archives', 'markdown-for-agents-and-statistics' ); ?>
 			</button>
 		</p>
 		<?php
@@ -274,14 +274,14 @@ class SettingsPage {
 	public function field_export_dir(): void {
 		$val = esc_attr( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
 		echo '<input type="text" name="' . esc_attr( Options::OPTION_KEY ) . '[export_dir]" value="' . $val . '" class="regular-text">';
-		echo '<p class="description">' . esc_html__( 'Subdirectory within wp-content/uploads/ to store exported .md files.', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Subdirectory within wp-content/uploads/ to store exported .md files.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.0.0 */
 	public function field_auto_generate(): void {
 		$checked = checked( ! empty( $this->options['auto_generate'] ), true, false );
 		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[auto_generate]" value="1" ' . $checked . '>';
-		echo '<p class="description">' . esc_html__( 'Automatically regenerate the .md file when a post is saved.', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Automatically regenerate the .md file when a post is saved.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.0.0 */
@@ -303,7 +303,7 @@ class SettingsPage {
 		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][frontmatter_fields]';
 
 		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
-		echo '<p class="description">' . esc_html__( 'Meta or ACF fields to include in YAML frontmatter. One per line. Use dot notation for ACF groups (e.g. group_name.field_name).', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Meta or ACF fields to include in YAML frontmatter. One per line. Use dot notation for ACF groups (e.g. group_name.field_name).', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/**
@@ -319,7 +319,7 @@ class SettingsPage {
 		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][content_fields]';
 
 		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
-		echo '<p class="description">' . esc_html__( 'ACF or meta fields to use as the body content. When set, post_content is automatically excluded. One per line. Use dot notation for ACF groups.', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'ACF or meta fields to use as the body content. When set, post_content is automatically excluded. One per line. Use dot notation for ACF groups.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/**
@@ -352,13 +352,13 @@ class SettingsPage {
 	public function field_ua_force_enabled(): void {
 		$checked = checked( ! empty( $this->options['ua_force_enabled'] ), true, false );
 		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[ua_force_enabled]" value="1" ' . $checked . '>';
-		echo '<p class="description">' . esc_html__( 'Serve Markdown to known LLM agent crawlers based on User-Agent string.', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Serve Markdown to known LLM agent crawlers based on User-Agent string.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.1.0 */
 	public function field_ua_agent_strings(): void {
 		$val = esc_textarea( implode( "\n", (array) ( $this->options['ua_agent_strings'] ?? array() ) ) );
 		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[ua_agent_strings]" rows="8" class="large-text">' . $val . '</textarea>';
-		echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'markdown-for-agents' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 }

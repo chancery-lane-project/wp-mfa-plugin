@@ -35,7 +35,7 @@ class MetaBox {
 		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $post_type ) {
 			add_meta_box(
 				'markdown_for_agents_status',
-				__( 'Markdown for Agents', 'markdown-for-agents' ),
+				__( 'Markdown for Agents', 'markdown-for-agents-and-statistics' ),
 				array( $this, 'render' ),
 				$post_type,
 				'side',
@@ -60,15 +60,15 @@ class MetaBox {
 		?>
 		<p>
 			<?php if ( $exists ) : ?>
-				<strong><?php esc_html_e( 'Markdown file:', 'markdown-for-agents' ); ?></strong>
-				<?php esc_html_e( 'Generated', 'markdown-for-agents' ); ?><br>
+				<strong><?php esc_html_e( 'Markdown file:', 'markdown-for-agents-and-statistics' ); ?></strong>
+				<?php esc_html_e( 'Generated', 'markdown-for-agents-and-statistics' ); ?><br>
 				<small><?php echo esc_html( gmdate( 'Y-m-d H:i:s', (int) filemtime( $filepath ) ) ); ?></small>
 			<?php else : ?>
-				<?php esc_html_e( 'No Markdown file generated yet.', 'markdown-for-agents' ); ?>
+				<?php esc_html_e( 'No Markdown file generated yet.', 'markdown-for-agents-and-statistics' ); ?>
 			<?php endif; ?>
 		</p>
 		<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
-			<?php esc_html_e( 'Regenerate', 'markdown-for-agents' ); ?>
+			<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
 		</a>
 		<?php
 	}

@@ -75,7 +75,7 @@ class Admin {
 	 */
 	public function handle_generate_action(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents-and-statistics' ) );
 		}
 
 		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
@@ -90,7 +90,7 @@ class Admin {
 				'type'    => 'success',
 				'message' => sprintf(
 					/* translators: 1: success count, 2: failed count */
-					__( 'Generated %1$d files. Failed: %2$d.', 'markdown-for-agents' ),
+					__( 'Generated %1$d files. Failed: %2$d.', 'markdown-for-agents-and-statistics' ),
 					$results['success'],
 					$results['failed']
 				),
@@ -114,7 +114,7 @@ class Admin {
 		$post_id = (int) ( $_REQUEST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents' ) );
+			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents-and-statistics' ) );
 		}
 
 		check_admin_referer( 'markdown_for_agents_regenerate_' . $post_id );
@@ -128,8 +128,8 @@ class Admin {
 				array(
 					'type'    => $ok ? 'success' : 'error',
 					'message' => $ok
-						? __( 'Markdown file regenerated.', 'markdown-for-agents' )
-						: __( 'Failed to regenerate Markdown file.', 'markdown-for-agents' ),
+						? __( 'Markdown file regenerated.', 'markdown-for-agents-and-statistics' )
+						: __( 'Failed to regenerate Markdown file.', 'markdown-for-agents-and-statistics' ),
 				),
 				60
 			);

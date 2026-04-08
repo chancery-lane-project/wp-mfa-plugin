@@ -11,7 +11,7 @@
  * Author URI:        https://chancerylane.uk
  * License:           GPL-3.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
- * Text Domain:       markdown-for-agents
+ * Text Domain:       markdown-for-agents-and-statistics
  * Domain Path:       /languages
  *
  * @package Tclp\WpMarkdownForAgents

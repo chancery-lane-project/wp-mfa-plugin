@@ -31,8 +31,8 @@ class StatsPage {
 	 */
 	public function add_page(): void {
 		add_menu_page(
-			__( 'Agent Access Statistics', 'markdown-for-agents' ),
-			__( 'Agent Stats', 'markdown-for-agents' ),
+			__( 'Agent Access Statistics', 'markdown-for-agents-and-statistics' ),
+			__( 'Agent Stats', 'markdown-for-agents-and-statistics' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' ),
@@ -118,20 +118,20 @@ class StatsPage {
 
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'Agent Access Statistics', 'markdown-for-agents' ); ?></h1>
+			<h1><?php esc_html_e( 'Agent Access Statistics', 'markdown-for-agents-and-statistics' ); ?></h1>
 
 			<ul class="subsubsub">
 				<li>
-					<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' class="current"' : ''; ?>><?php esc_html_e( 'All time', 'markdown-for-agents' ); ?></a> |
+					<a href="<?php echo esc_url( $preset_all ); ?>"<?php echo $active_all ? ' class="current"' : ''; ?>><?php esc_html_e( 'All time', 'markdown-for-agents-and-statistics' ); ?></a> |
 				</li>
 				<li>
-					<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'markdown-for-agents' ); ?></a> |
+					<a href="<?php echo esc_url( $preset_7d ); ?>"<?php echo $active_7d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 7 days', 'markdown-for-agents-and-statistics' ); ?></a> |
 				</li>
 				<li>
-					<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'markdown-for-agents' ); ?></a> |
+					<a href="<?php echo esc_url( $preset_30d ); ?>"<?php echo $active_30d ? ' class="current"' : ''; ?>><?php esc_html_e( 'Last 30 days', 'markdown-for-agents-and-statistics' ); ?></a> |
 				</li>
 				<li>
-					<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' class="current"' : ''; ?>><?php esc_html_e( 'This month', 'markdown-for-agents' ); ?></a>
+					<a href="<?php echo esc_url( $preset_month ); ?>"<?php echo $active_month ? ' class="current"' : ''; ?>><?php esc_html_e( 'This month', 'markdown-for-agents-and-statistics' ); ?></a>
 				</li>
 			</ul>
 
@@ -140,7 +140,7 @@ class StatsPage {
 				<div class="tablenav top">
 					<div class="alignleft actions">
 						<select name="post_id">
-							<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents' ); ?></option>
+							<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( $posts as $id => $title ) : ?>
 								<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
 									<?php echo esc_html( $title ); ?>
@@ -148,7 +148,7 @@ class StatsPage {
 							<?php endforeach; ?>
 						</select>
 						<select name="agent">
-							<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents' ); ?></option>
+							<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( $agents as $agent ) : ?>
 								<option value="<?php echo esc_attr( $agent ); ?>" <?php selected( $filter_agent, $agent ); ?>>
 									<?php echo esc_html( $agent ); ?>
@@ -156,18 +156,18 @@ class StatsPage {
 							<?php endforeach; ?>
 						</select>
 						<select name="access_method">
-							<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents' ); ?></option>
+							<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
 								<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
 									<?php echo esc_html( $method ); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
-						<label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents' ); ?></label>
+						<label for="date_from"><?php esc_html_e( 'From', 'markdown-for-agents-and-statistics' ); ?></label>
 						<input type="date" id="date_from" name="date_from" value="<?php echo esc_attr( $date_from ); ?>">
-						<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents' ); ?></label>
+						<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents-and-statistics' ); ?></label>
 						<input type="date" id="date_to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
-						<?php submit_button( __( 'Filter', 'markdown-for-agents' ), 'secondary', 'filter', false ); ?>
+						<?php submit_button( __( 'Filter', 'markdown-for-agents-and-statistics' ), 'secondary', 'filter', false ); ?>
 					</div>
 					<br class="clear">
 				</div>
@@ -175,19 +175,19 @@ class StatsPage {
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
-				<h2><?php esc_html_e( 'Summary', 'markdown-for-agents' ); ?></h2>
+				<h2><?php esc_html_e( 'Summary', 'markdown-for-agents-and-statistics' ); ?></h2>
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
-							<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
-							<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
-							<th scope="col" class="manage-column column-total num"><?php esc_html_e( 'Total accesses', 'markdown-for-agents' ); ?></th>
-							<th scope="col" class="manage-column column-unique num"><?php esc_html_e( 'Unique posts', 'markdown-for-agents' ); ?></th>
+							<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-total num"><?php esc_html_e( 'Total accesses', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-unique num"><?php esc_html_e( 'Unique posts', 'markdown-for-agents-and-statistics' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
 						<?php if ( empty( $summary ) ) : ?>
-							<tr><td colspan="4"><?php esc_html_e( 'No data for this period.', 'markdown-for-agents' ); ?></td></tr>
+							<tr><td colspan="4"><?php esc_html_e( 'No data for this period.', 'markdown-for-agents-and-statistics' ); ?></td></tr>
 						<?php else : ?>
 							<?php foreach ( $summary as $row ) : ?>
 								<tr>
@@ -198,7 +198,7 @@ class StatsPage {
 								</tr>
 							<?php endforeach; ?>
 							<tr>
-								<td><strong><?php esc_html_e( 'Total', 'markdown-for-agents' ); ?></strong></td>
+								<td><strong><?php esc_html_e( 'Total', 'markdown-for-agents-and-statistics' ); ?></strong></td>
 								<td>&mdash;</td>
 								<td class="num"><strong><?php echo esc_html( number_format_i18n( (int) array_sum( array_column( $summary, 'total' ) ) ) ); ?></strong></td>
 								<td>&mdash;</td>
@@ -211,17 +211,17 @@ class StatsPage {
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
 					<tr>
-						<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Post', 'markdown-for-agents' ); ?></th>
-						<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents' ); ?></th>
-						<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents' ); ?></th>
-						<th scope="col" class="manage-column column-date"><?php esc_html_e( 'Date', 'markdown-for-agents' ); ?></th>
-						<th scope="col" class="manage-column column-count num"><?php esc_html_e( 'Count', 'markdown-for-agents' ); ?></th>
+						<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Post', 'markdown-for-agents-and-statistics' ); ?></th>
+						<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents-and-statistics' ); ?></th>
+						<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents-and-statistics' ); ?></th>
+						<th scope="col" class="manage-column column-date"><?php esc_html_e( 'Date', 'markdown-for-agents-and-statistics' ); ?></th>
+						<th scope="col" class="manage-column column-count num"><?php esc_html_e( 'Count', 'markdown-for-agents-and-statistics' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ( empty( $rows ) ) : ?>
 						<tr>
-						<td colspan="5"><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents' ); ?></td>
+						<td colspan="5"><?php esc_html_e( 'No access data recorded yet.', 'markdown-for-agents-and-statistics' ); ?></td>
 					</tr>
 					<?php else : ?>
 						<?php foreach ( $rows as $row ) : ?>
@@ -241,7 +241,7 @@ class StatsPage {
 				<div class="tablenav bottom">
 					<div class="tablenav-pages">
 						<span class="displaying-num">
-							<?php echo esc_html( sprintf( _n( '%s item', '%s items', $total, 'markdown-for-agents' ), number_format_i18n( $total ) ) ); ?>
+							<?php echo esc_html( sprintf( _n( '%s item', '%s items', $total, 'markdown-for-agents-and-statistics' ), number_format_i18n( $total ) ) ); ?>
 						</span>
 						<span class="pagination-links">
 							<?php if ( $paged <= 1 ) : ?>
