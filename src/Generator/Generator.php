@@ -70,7 +70,7 @@ class Generator {
 			 * @param  string    $path The filesystem path to the written file.
 			 * @param  \WP_Post  $post The post.
 			 */
-			do_action( 'wp_mfa_file_generated', $path, $post );
+			do_action( 'markdown_for_agents_file_generated', $path, $post );
 		}
 
 		return $result;
@@ -215,7 +215,7 @@ class Generator {
 			 * @param  string $path    The filesystem path of the deleted file.
 			 * @param  int    $post_id The post ID.
 			 */
-			do_action( 'wp_mfa_file_deleted', $path, $post_id );
+			do_action( 'markdown_for_agents_file_deleted', $path, $post_id );
 		}
 
 		return $result;
@@ -247,7 +247,7 @@ class Generator {
 		 * @param  string    $path The default export path.
 		 * @param  \WP_Post  $post The post.
 		 */
-		$filtered = (string) apply_filters( 'wp_mfa_export_path', $path, $post );
+		$filtered = (string) apply_filters( 'markdown_for_agents_export_path', $path, $post );
 
 		// Reject any filtered path that escapes the export base directory.
 		$real_base     = realpath( $base );
@@ -283,12 +283,12 @@ class Generator {
 		}
 
 		// Guard against recursive triggers from within generate_post.
-		if ( get_post_meta( $post_id, '_wp_mfa_generating', true ) ) {
+		if ( get_post_meta( $post_id, '_markdown_for_agents_generating', true ) ) {
 			return;
 		}
 
 		try {
-			update_post_meta( $post_id, '_wp_mfa_generating', '1' );
+			update_post_meta( $post_id, '_markdown_for_agents_generating', '1' );
 
 			if ( 'publish' === $post->post_status ) {
 				$this->generate_post( $post );
@@ -300,7 +300,7 @@ class Generator {
 				error_log( 'WP Markdown for Agents: on_save_post failed for post ' . $post_id . ': ' . $e->getMessage() );
 			}
 		} finally {
-			delete_post_meta( $post_id, '_wp_mfa_generating' );
+			delete_post_meta( $post_id, '_markdown_for_agents_generating' );
 		}
 
 		// Regenerate taxonomy archives for all terms on this post (outside guard block).

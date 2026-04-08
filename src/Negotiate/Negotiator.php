@@ -73,7 +73,7 @@ class Negotiator {
 			 * @param bool     $enabled Whether serving is enabled. Default true.
 			 * @param \WP_Post $post    The queried post.
 			 */
-			if ( ! apply_filters( 'wp_mfa_serve_enabled', true, $post ) ) {
+			if ( ! apply_filters( 'markdown_for_agents_serve_enabled', true, $post ) ) {
 				return;
 			}
 
@@ -107,7 +107,7 @@ class Negotiator {
 			 * @since 1.1.0
 			 * @param bool $enabled Whether serving is enabled. Default true.
 			 */
-			if ( ! apply_filters( 'wp_mfa_serve_taxonomies', true ) ) {
+			if ( ! apply_filters( 'markdown_for_agents_serve_taxonomies', true ) ) {
 				return;
 			}
 
@@ -186,7 +186,7 @@ class Negotiator {
 		 * @since 1.1.0
 		 * @param string[] $post_types Post type slugs from plugin settings.
 		 */
-		$post_types = (array) apply_filters( 'wp_mfa_serve_post_types', $post_types );
+		$post_types = (array) apply_filters( 'markdown_for_agents_serve_post_types', $post_types );
 
 		return is_singular( $post_types );
 	}
@@ -240,7 +240,7 @@ class Negotiator {
 		$content_signal = preg_replace(
 			'/[^\w=,\-\. ]/',
 			'',
-			(string) apply_filters( 'wp_mfa_content_signal', 'ai-input=yes, search=yes' )
+			(string) apply_filters( 'markdown_for_agents_content_signal', 'ai-input=yes, search=yes' )
 		);
 
 		if ( $content_signal ) {

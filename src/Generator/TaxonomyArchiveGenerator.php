@@ -78,7 +78,7 @@ class TaxonomyArchiveGenerator {
 		 * @param  array<string, mixed> $frontmatter The frontmatter array.
 		 * @param  \WP_Term             $term        The term.
 		 */
-		$frontmatter = (array) apply_filters( 'wp_mfa_taxonomy_frontmatter', $frontmatter, $term );
+		$frontmatter = (array) apply_filters( 'markdown_for_agents_taxonomy_frontmatter', $frontmatter, $term );
 
 		$yaml    = $this->yaml_formatter->format( $frontmatter );
 		$body    = $this->build_body( $term, $posts );

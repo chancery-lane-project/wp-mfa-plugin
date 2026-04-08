@@ -73,7 +73,7 @@ class FrontmatterBuilder {
 		 * @param  array<string, mixed> $frontmatter The assembled frontmatter.
 		 * @param  \WP_Post             $post        The post.
 		 */
-		return apply_filters( 'wp_mfa_frontmatter', $frontmatter, $post );
+		return apply_filters( 'markdown_for_agents_frontmatter', $frontmatter, $post );
 	}
 
 	/**

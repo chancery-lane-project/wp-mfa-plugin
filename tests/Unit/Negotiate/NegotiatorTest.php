@@ -466,7 +466,7 @@ class NegotiatorTest extends TestCase {
         $this->logger->method( 'log_access' );
 
         $filter_received = null;
-        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static function ( string $val ) use ( &$filter_received ): string {
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] = static function ( string $val ) use ( &$filter_received ): string {
             $filter_received = $val;
             return $val;
         };
@@ -479,7 +479,7 @@ class NegotiatorTest extends TestCase {
         $this->assertSame( 'ai-input=yes, search=yes', $filter_received );
         $this->assertContains( 'Content-Signal: ai-input=yes, search=yes', $GLOBALS['_mock_sent_headers'] );
         $this->assertContains( 'X-Markdown-Source: markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] );
     }
 
     public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
@@ -493,7 +493,7 @@ class NegotiatorTest extends TestCase {
 
         $this->generator->method( 'get_export_path' )->willReturn( $md_file );
 
-        $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] = static fn( string $val ): string => '';
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] = static fn( string $val ): string => '';
 
         // The method must proceed all the way to log_access (no fatal early-return
         // when the filter suppresses the Content-Signal header).
@@ -504,7 +504,7 @@ class NegotiatorTest extends TestCase {
             $neg->maybe_serve_markdown();
         } catch ( \Exception $e ) {}
 
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_content_signal'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] );
     }
 
     // -----------------------------------------------------------------------
@@ -518,14 +518,14 @@ class NegotiatorTest extends TestCase {
         $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
 
         // Filter fires on hot path — after Accept check, after WP_Post check.
-        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] = static fn( bool $val, \WP_Post $p ): bool => false;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_enabled'] = static fn( bool $val, \WP_Post $p ): bool => false;
 
         $this->generator->expects( $this->never() )->method( 'get_export_path' );
         $this->logger->expects( $this->never() )->method( 'log_access' );
 
         $this->make_negotiator()->maybe_serve_markdown();
 
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_enabled'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_enabled'] );
     }
 
     // -----------------------------------------------------------------------
@@ -535,7 +535,7 @@ class NegotiatorTest extends TestCase {
     public function test_serves_post_type_added_to_allowlist_via_filter(): void {
         // 'event' is not in options['post_types'], but the filter adds it.
         // With the updated is_singular mock, the test verifies the full hot path runs.
-        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] = static fn( array $types ): array =>
             array_merge( $types, [ 'event' ] );
 
         $post = new \WP_Post( [ 'ID' => 2, 'post_type' => 'event', 'post_name' => 'my-event' ] );
@@ -550,13 +550,13 @@ class NegotiatorTest extends TestCase {
 
         $this->make_negotiator()->maybe_serve_markdown();
 
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] );
     }
 
     public function test_does_not_serve_post_type_removed_from_allowlist_via_filter(): void {
         // Negotiator is configured with only 'post'. The filter removes it,
         // leaving an empty array. is_singular([]) returns false (Task 0 fix).
-        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] = static fn( array $types ): array =>
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] = static fn( array $types ): array =>
             array_values( array_filter( $types, static fn( string $t ): bool => $t !== 'post' ) );
 
         $post = $this->make_post(); // post_type = 'post'
@@ -569,7 +569,7 @@ class NegotiatorTest extends TestCase {
 
         $this->make_negotiator( [ 'post_types' => [ 'post' ] ] )->maybe_serve_markdown();
 
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_post_types'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] );
     }
 
     // -----------------------------------------------------------------------
@@ -591,12 +591,12 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_is_tax']      = true;
         $_SERVER['HTTP_ACCEPT']       = 'text/markdown';
 
-        $GLOBALS['_mock_apply_filters']['wp_mfa_serve_taxonomies'] = fn( bool $v ): bool => false;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_taxonomies'] = fn( bool $v ): bool => false;
         $this->taxonomy_generator->expects( $this->never() )->method( 'get_export_path' );
 
         $this->make_negotiator()->maybe_serve_markdown();
 
-        unset( $GLOBALS['_mock_apply_filters']['wp_mfa_serve_taxonomies'] );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_taxonomies'] );
     }
 
     public function test_taxonomy_branch_does_nothing_when_queried_object_is_not_wp_term(): void {

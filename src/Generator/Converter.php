@@ -32,7 +32,7 @@ class Converter {
 	 * Initialise the converter.
 	 *
 	 * Accepts an optional options array which is merged over the defaults and
-	 * passed through the `wp_mfa_converter_options` filter.
+	 * passed through the `markdown_for_agents_converter_options` filter.
 	 *
 	 * @since  1.0.0
 	 * @param  array<string, mixed> $options Override options for HtmlConverter.
@@ -54,7 +54,7 @@ class Converter {
 		 * @param  array<string, mixed> $options Merged converter options.
 		 */
 		$merged_options = apply_filters(
-			'wp_mfa_converter_options',
+			'markdown_for_agents_converter_options',
 			array_merge( $defaults, $options )
 		);
 
@@ -73,11 +73,11 @@ class Converter {
 	 * The ContentFilter should be applied before calling this method to strip
 	 * WordPress block editor comments. This method handles:
 	 *
-	 * 1. `wp_mfa_pre_convert` filter on the HTML
+	 * 1. `markdown_for_agents_pre_convert` filter on the HTML
 	 * 2. HTML → Markdown via HtmlConverter
 	 * 3. Image spacing fix (ensures blank line after inline images)
 	 * 4. `html_entity_decode()` to clean up leftover entities
-	 * 5. `wp_mfa_post_convert` filter on the Markdown
+	 * 5. `markdown_for_agents_post_convert` filter on the Markdown
 	 *
 	 * @since  1.0.0
 	 * @param  string        $html The HTML content.
@@ -96,7 +96,7 @@ class Converter {
 		 * @param  string        $html The HTML content.
 		 * @param  \WP_Post|null $post The post object.
 		 */
-		$html = apply_filters( 'wp_mfa_pre_convert', $html, $post );
+		$html = apply_filters( 'markdown_for_agents_pre_convert', $html, $post );
 
 		$markdown = $this->html_converter->convert( $html );
 
@@ -111,7 +111,7 @@ class Converter {
 		 * @param  string        $markdown The Markdown content.
 		 * @param  \WP_Post|null $post     The post object.
 		 */
-		$markdown = apply_filters( 'wp_mfa_post_convert', $markdown, $post );
+		$markdown = apply_filters( 'markdown_for_agents_post_convert', $markdown, $post );
 
 		return $markdown;
 	}
