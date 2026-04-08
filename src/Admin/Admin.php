@@ -243,14 +243,13 @@ class Admin {
 
 		delete_transient( 'markdown_for_agents_admin_notice' );
 
-		$type    = in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true )
+		$type = in_array( $notice['type'], array( 'success', 'error', 'warning', 'info' ), true )
 			? $notice['type'] : 'info';
-		$message = wp_kses_post( (string) ( $notice['message'] ?? '' ) );
 
 		printf(
 			'<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
 			esc_attr( $type ),
-			$message
+			wp_kses_post( (string) ( $notice['message'] ?? '' ) )
 		);
 	}
 }

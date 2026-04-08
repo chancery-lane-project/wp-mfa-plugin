@@ -257,37 +257,32 @@ class SettingsPage {
 
 	/** @since 1.0.0 */
 	public function field_enabled(): void {
-		$checked = checked( ! empty( $this->options['enabled'] ), true, false );
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[enabled]" value="1" ' . $checked . '>';
+		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[enabled]" value="1" ' . checked( ! empty( $this->options['enabled'] ), true, false ) . '>';
 	}
 
 	/** @since 1.0.0 */
 	public function field_post_types(): void {
 		$enabled = (array) ( $this->options['post_types'] ?? array() );
 		foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $type ) {
-			$checked = checked( in_array( $type->name, $enabled, true ), true, false );
-			echo '<label><input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[post_types][]" value="' . esc_attr( $type->name ) . '" ' . $checked . '> ' . esc_html( $type->label ) . '</label><br>';
+			echo '<label><input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[post_types][]" value="' . esc_attr( $type->name ) . '" ' . checked( in_array( $type->name, $enabled, true ), true, false ) . '> ' . esc_html( $type->label ) . '</label><br>';
 		}
 	}
 
 	/** @since 1.0.0 */
 	public function field_export_dir(): void {
-		$val = esc_attr( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
-		echo '<input type="text" name="' . esc_attr( Options::OPTION_KEY ) . '[export_dir]" value="' . $val . '" class="regular-text">';
+		echo '<input type="text" name="' . esc_attr( Options::OPTION_KEY ) . '[export_dir]" value="' . esc_attr( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '" class="regular-text">';
 		echo '<p class="description">' . esc_html__( 'Subdirectory within wp-content/uploads/ to store exported .md files.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.0.0 */
 	public function field_auto_generate(): void {
-		$checked = checked( ! empty( $this->options['auto_generate'] ), true, false );
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[auto_generate]" value="1" ' . $checked . '>';
+		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[auto_generate]" value="1" ' . checked( ! empty( $this->options['auto_generate'] ), true, false ) . '>';
 		echo '<p class="description">' . esc_html__( 'Automatically regenerate the .md file when a post is saved.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.0.0 */
 	public function field_include_taxonomies(): void {
-		$checked = checked( ! empty( $this->options['include_taxonomies'] ), true, false );
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_taxonomies]" value="1" ' . $checked . '>';
+		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_taxonomies]" value="1" ' . checked( ! empty( $this->options['include_taxonomies'] ), true, false ) . '>';
 	}
 
 	/**
@@ -299,10 +294,8 @@ class SettingsPage {
 	public function field_type_frontmatter_fields( string $type_slug ): void {
 		$configs = (array) ( $this->options['post_type_configs'] ?? array() );
 		$fields  = (array) ( $configs[ $type_slug ]['frontmatter_fields'] ?? array() );
-		$val     = esc_textarea( implode( "\n", $fields ) );
-		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][frontmatter_fields]';
 
-		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
+		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][frontmatter_fields]" rows="4" class="large-text">' . esc_textarea( implode( "\n", $fields ) ) . '</textarea>';
 		echo '<p class="description">' . esc_html__( 'Meta or ACF fields to include in YAML frontmatter. One per line. Use dot notation for ACF groups (e.g. group_name.field_name).', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
@@ -315,10 +308,8 @@ class SettingsPage {
 	public function field_type_content_fields( string $type_slug ): void {
 		$configs = (array) ( $this->options['post_type_configs'] ?? array() );
 		$fields  = (array) ( $configs[ $type_slug ]['content_fields'] ?? array() );
-		$val     = esc_textarea( implode( "\n", $fields ) );
-		$name    = esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][content_fields]';
 
-		echo '<textarea name="' . $name . '" rows="4" class="large-text">' . $val . '</textarea>';
+		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[post_type_configs][' . esc_attr( $type_slug ) . '][content_fields]" rows="4" class="large-text">' . esc_textarea( implode( "\n", $fields ) ) . '</textarea>';
 		echo '<p class="description">' . esc_html__( 'ACF or meta fields to use as the body content. When set, post_content is automatically excluded. One per line. Use dot notation for ACF groups.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
@@ -350,15 +341,13 @@ class SettingsPage {
 
 	/** @since 1.1.0 */
 	public function field_ua_force_enabled(): void {
-		$checked = checked( ! empty( $this->options['ua_force_enabled'] ), true, false );
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[ua_force_enabled]" value="1" ' . $checked . '>';
+		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[ua_force_enabled]" value="1" ' . checked( ! empty( $this->options['ua_force_enabled'] ), true, false ) . '>';
 		echo '<p class="description">' . esc_html__( 'Serve Markdown to known LLM agent crawlers based on User-Agent string.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/** @since 1.1.0 */
 	public function field_ua_agent_strings(): void {
-		$val = esc_textarea( implode( "\n", (array) ( $this->options['ua_agent_strings'] ?? array() ) ) );
-		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[ua_agent_strings]" rows="8" class="large-text">' . $val . '</textarea>';
+		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[ua_agent_strings]" rows="8" class="large-text">' . esc_textarea( implode( "\n", (array) ( $this->options['ua_agent_strings'] ?? array() ) ) ) . '</textarea>';
 		echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 }
