@@ -104,4 +104,28 @@ class AgentDetectorTest extends TestCase {
         $this->assertSame( 'GPTBot', $this->make_detector()->detect_agent( 'gptbot/1.0' ) );
         $this->assertSame( 'GPTBot', $this->make_detector()->detect_agent( 'GPTBOT/1.0' ) );
     }
+
+    // -----------------------------------------------------------------------
+    // normalise_ua
+    // -----------------------------------------------------------------------
+
+    public function test_normalise_ua_strips_version_from_product_slash_version(): void {
+        $this->assertSame( 'LangChain', $this->make_detector()->normalise_ua( 'LangChain/0.1.0' ) );
+    }
+
+    public function test_normalise_ua_strips_version_from_hyphenated_product(): void {
+        $this->assertSame( 'python-openai', $this->make_detector()->normalise_ua( 'python-openai/1.2.3' ) );
+    }
+
+    public function test_normalise_ua_returns_bare_product_with_no_slash(): void {
+        $this->assertSame( 'curl', $this->make_detector()->normalise_ua( 'curl' ) );
+    }
+
+    public function test_normalise_ua_returns_first_token_for_mozilla_ua(): void {
+        $this->assertSame( 'Mozilla', $this->make_detector()->normalise_ua( 'Mozilla/5.0 (compatible; MyBot/1.0)' ) );
+    }
+
+    public function test_normalise_ua_returns_empty_string_for_empty_input(): void {
+        $this->assertSame( '', $this->make_detector()->normalise_ua( '' ) );
+    }
 }

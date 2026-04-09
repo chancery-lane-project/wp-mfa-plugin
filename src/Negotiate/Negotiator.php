@@ -93,7 +93,9 @@ class Negotiator {
 			}
 
 			// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
-			$agent = $this->agent_detector->detect_agent( $ua ) ?? '';
+			// Falls back to normalised UA so query-param / accept-header requests still
+			// record the caller's product name even when no known-agent pattern matches.
+			$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
 
 			$this->access_logger->log_access( $post->ID, $agent, $access_method );
 			$this->send_markdown_file( $filepath, $via_accept );
