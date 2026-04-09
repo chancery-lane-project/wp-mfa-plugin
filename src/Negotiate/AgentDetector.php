@@ -65,6 +65,29 @@ class AgentDetector {
 	}
 
 	/**
+	 * Extract a stable product name from a UA string for stats labelling.
+	 *
+	 * Returns the first token before the first '/' (e.g. 'LangChain' from
+	 * 'LangChain/0.1.0'), making the label consistent across version changes.
+	 * Returns the raw string if it contains no '/', and '' for empty input.
+	 *
+	 * @since  1.2.0
+	 * @param  string $ua The HTTP User-Agent header value.
+	 * @return string
+	 */
+	public function normalise_ua( string $ua ): string {
+		if ( '' === $ua ) {
+			return '';
+		}
+
+		if ( preg_match( '/^([^\/\s]+)/', $ua, $matches ) ) {
+			return $matches[1];
+		}
+
+		return $ua;
+	}
+
+	/**
 	 * Return true if the given UA string contains a known agent substring.
 	 *
 	 * Note: this method inherits the ua_force_enabled guard from get_matched_agent()

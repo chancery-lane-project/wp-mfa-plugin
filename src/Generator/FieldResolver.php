@@ -97,10 +97,29 @@ class FieldResolver {
 					$value = $root_value;
 					$segment_count = count( $segments );
 					for ( $i = 1; $i < $segment_count; $i++ ) {
-						if ( ! is_array( $value ) || ! isset( $value[ $segments[ $i ] ] ) ) {
+						if ( ! is_array( $value ) ) {
 							return null;
 						}
-						$value = $value[ $segments[ $i ] ];
+
+						$segment = $segments[ $i ];
+
+						// Repeater: numerically-indexed array of row arrays.
+						// Collect the sub-field value from every row.
+						if ( array_is_list( $value ) && isset( $value[0] ) && is_array( $value[0] ) ) {
+							$collected = array();
+							foreach ( $value as $row ) {
+								if ( isset( $row[ $segment ] ) ) {
+									$collected[] = $row[ $segment ];
+								}
+							}
+							$value = $collected;
+							continue;
+						}
+
+						if ( ! isset( $value[ $segment ] ) ) {
+							return null;
+						}
+						$value = $value[ $segment ];
 					}
 					return $value;
 				}

@@ -426,6 +426,26 @@ class NegotiatorTest extends TestCase {
         try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
     }
 
+    public function test_log_access_uses_normalised_ua_when_no_agent_pattern_matches(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'LangChain/0.1.0';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 1, 'LangChain', 'query-param' );
+
+        $neg = $this->make_negotiator( [ 'ua_agent_strings' => [] ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \Exception $e ) {}
+    }
+
     // -----------------------------------------------------------------------
     // output_link_tag — href includes ?output_format=md (B3)
     // -----------------------------------------------------------------------
