@@ -185,7 +185,10 @@ class SettingsPage {
 		$clean['ua_force_enabled'] = ! empty( $input['ua_force_enabled'] );
 
 		// UA agent strings: one per line, trim whitespace, drop empty lines.
-		$ua_raw                    = (string) ( $input['ua_agent_strings'] ?? '' );
+		// Guard against the WordPress double-sanitize quirk where the callback receives
+		// its own array output on a second pass, which would cast to the string 'Array'.
+		$ua_input = $input['ua_agent_strings'] ?? '';
+		$ua_raw   = is_array( $ua_input ) ? implode( "\n", $ua_input ) : (string) $ua_input;
 		$ua_lines                  = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
 		$clean['ua_agent_strings'] = array_values( $ua_lines );
 
