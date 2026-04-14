@@ -297,6 +297,7 @@ class Generator {
 			}
 		} catch ( \Throwable $e ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 				error_log( 'WP Markdown for Agents: on_save_post failed for post ' . $post_id . ': ' . $e->getMessage() );
 			}
 		} finally {
@@ -310,6 +311,7 @@ class Generator {
 			}
 		} catch ( \Throwable $e ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 				error_log( 'WP Markdown for Agents: term archive regeneration failed for post ' . $post_id . ': ' . $e->getMessage() );
 			}
 		}
@@ -384,6 +386,7 @@ class Generator {
 		$content_fields = (array) ( $type_config['content_fields'] ?? array() );
 
 		if ( empty( $content_fields ) ) {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WP filter, not plugin-owned.
 			return apply_filters( 'the_content', $post->post_content );
 		}
 
@@ -420,6 +423,7 @@ class Generator {
 
 		$html = implode( "\n\n", $parts );
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WP filter, not plugin-owned.
 		return apply_filters( 'the_content', $html );
 	}
 

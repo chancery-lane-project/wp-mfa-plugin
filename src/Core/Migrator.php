@@ -36,6 +36,7 @@ class Migrator {
 		// Drop the old 3-column unique index if it exists so dbDelta can
 		// create the new 4-column version. dbDelta will not alter an existing
 		// index — it only adds indexes whose name is entirely absent.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional migration query, caching not appropriate here.
 		$old_index = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(1) FROM information_schema.STATISTICS
@@ -49,7 +50,8 @@ class Migrator {
 		);
 
 		if ( $old_index > 0 ) {
-			$wpdb->query( "ALTER TABLE {$table} DROP INDEX post_agent_date" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Intentional schema migration; $table is $wpdb->prefix value only.
+			$wpdb->query( "ALTER TABLE {$table} DROP INDEX post_agent_date" );
 		}
 
 		if ( ! function_exists( 'dbDelta' ) ) {
@@ -58,14 +60,18 @@ class Migrator {
 		dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
 
 		// Convert old rows where agent stored the method for unknown agents.
-		$wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional migration query, caching not appropriate here.
+		$wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is set to $wpdb->prefix value only.
 			"UPDATE {$table} SET access_method = agent, agent = ''
 			 WHERE agent IN ('accept-header', 'query-param')"
 		);
 
 		// Back-fill remaining named-agent rows — these could only have arrived via UA.
 		// After column addition with DEFAULT '', un-migrated rows have access_method = ''.
-		$wpdb->query( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional migration query, caching not appropriate here.
+		$wpdb->query(
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $table is set to $wpdb->prefix value only.
 			"UPDATE {$table} SET access_method = 'ua'
 			 WHERE access_method IS NULL OR access_method = ''"
 		);
