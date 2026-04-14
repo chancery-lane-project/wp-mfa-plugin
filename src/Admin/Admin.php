@@ -111,7 +111,7 @@ class Admin {
 	 */
 	public function handle_regenerate_post_action(): void {
 		// post_id is needed for both capability and nonce checks; (int) cast sanitises the value.
-		$post_id = (int) ( $_REQUEST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$post_id = absint( wp_unslash( $_REQUEST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents-and-statistics' ) );

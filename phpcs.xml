@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<ruleset name="markdown-for-agents">
+	<description>WordPress coding standards for the Markdown for Agents plugin.</description>
+
+	<file>src</file>
+
+	<arg name="basepath" value="."/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+	<arg name="extensions" value="php"/>
+
+	<rule ref="WordPress">
+		<!-- Allow tabs for indentation (project uses tabs). -->
+		<exclude name="Generic.WhiteSpace.DisallowTabIndent"/>
+
+		<!-- Doc-comment style rules: not Plugin Check violations. -->
+		<exclude name="Squiz.Commenting.FileComment"/>
+		<exclude name="Squiz.Commenting.ClassComment"/>
+		<exclude name="Squiz.Commenting.FunctionComment"/>
+		<exclude name="Squiz.Commenting.VariableComment"/>
+		<exclude name="Generic.Commenting.DocComment.MissingShort"/>
+
+		<!-- File naming: namespaced classes use PSR-4. -->
+		<exclude name="WordPress.Files.FileName"/>
+
+		<!-- Alignment: cosmetic only, not a Plugin Check concern. -->
+		<exclude name="Generic.Formatting.MultipleStatementAlignment"/>
+
+		<!-- Array formatting: cosmetic only. -->
+		<exclude name="WordPress.Arrays.ArrayDeclarationSpacing.AssociativeArrayFound"/>
+
+		<!-- Yoda conditions: stylistic preference, not a security issue. -->
+		<exclude name="WordPress.PHP.YodaConditions.NotYoda"/>
+
+		<!-- count() in loop: performance style rule, not Plugin Check. -->
+		<exclude name="Squiz.PHP.DisallowSizeFunctionsInLoops.Found"/>
+
+		<!-- Unused parameters and non-executable returns: not Plugin Check. -->
+		<exclude name="Generic.CodeAnalysis.UnusedFunctionParameter"/>
+		<exclude name="Squiz.PHP.NonExecutableCode.ReturnNotRequired"/>
+
+		<!-- Function call spacing: auto-fixable cosmetic rule. -->
+		<exclude name="Generic.Functions.FunctionCallArgumentSpacing.TooMuchSpaceAfterComma"/>
+	</rule>
+
+	<rule ref="WordPress.Security"/>
+	<rule ref="WordPress.DB"/>
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="tclp_mfa"/>
+				<element value="tclp"/>
+				<element value="Tclp"/>
+				<element value="markdown_for_agents"/>
+				<element value="mfa_"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>
