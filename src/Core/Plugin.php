@@ -177,9 +177,11 @@ class Plugin {
 			return;
 		}
 
+		global $wpdb;
+
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator )
+			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
 		);
 	}
 

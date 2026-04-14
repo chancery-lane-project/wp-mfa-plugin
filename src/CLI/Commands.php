@@ -9,6 +9,7 @@ use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
 /**
  * WP-CLI commands for Markdown for Agents and Statistics.
@@ -24,10 +25,12 @@ class Commands {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed>  $options    Plugin options.
-	 * @param  Generator             $generator  Generator instance.
-	 * @param  LlmsTxtGenerator|null $llms_txt   Optional llms.txt generator.
-	 * @param  FileWriter|null       $file_writer FileWriter for manifest I/O.
+	 * @param  array<string, mixed>       $options           Plugin options.
+	 * @param  Generator                  $generator         Generator instance.
+	 * @param  LlmsTxtGenerator|null      $llms_txt          Optional llms.txt generator.
+	 * @param  FileWriter|null            $file_writer        FileWriter for manifest I/O.
+	 * @param  TaxonomyArchiveGenerator|null $taxonomy_generator Optional taxonomy archive generator.
+	 * @param  StatsRepository|null       $stats_repository  Optional stats repository for prune-stats.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -35,6 +38,7 @@ class Commands {
 		private readonly ?LlmsTxtGenerator $llms_txt = null,
 		private readonly ?FileWriter $file_writer = null,
 		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
+		private readonly ?StatsRepository $stats_repository = null,
 	) {}
 
 	/**
@@ -257,6 +261,47 @@ class Commands {
 				$results['failed']
 			)
 		);
+	}
+
+	/**
+	 * Prune access statistics older than a given number of days.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--days=<n>]
+	 * : Delete records older than this many days. Default: 90.
+	 *
+	 * [--yes]
+	 * : Skip confirmation prompt.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents prune-stats
+	 *   wp markdown-agents prune-stats --days=30 --yes
+	 *
+	 * @since  1.2.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function prune_stats( array $args, array $assoc_args ): void {
+		if ( null === $this->stats_repository ) {
+			\WP_CLI::error( 'StatsRepository is not available.' );
+			return;
+		}
+
+		$days = max( 1, (int) ( $assoc_args['days'] ?? 90 ) );
+
+		\WP_CLI::confirm(
+			sprintf( 'Delete access stats older than %d days?', $days ),
+			$assoc_args
+		);
+
+		try {
+			$deleted = $this->stats_repository->delete_before_date( $days );
+			\WP_CLI::success( sprintf( 'Deleted %d stat records older than %d days.', $deleted, $days ) );
+		} catch ( \InvalidArgumentException $e ) {
+			\WP_CLI::error( $e->getMessage() );
+		}
 	}
 
 	// -----------------------------------------------------------------------

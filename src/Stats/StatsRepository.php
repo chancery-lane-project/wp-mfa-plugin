@@ -222,6 +222,32 @@ class StatsRepository {
 	}
 
 	/**
+	 * Delete access stats records older than the given number of days.
+	 *
+	 * @since  1.2.0
+	 * @param  int $days Records older than this many days are removed. Must be >= 1.
+	 * @return int       Number of rows deleted.
+	 * @throws \InvalidArgumentException If $days < 1.
+	 */
+	public function delete_before_date( int $days ): int {
+		if ( $days < 1 ) {
+			throw new \InvalidArgumentException( 'days must be >= 1' );
+		}
+
+		$table  = self::get_table_name( $this->wpdb );
+		$cutoff = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+		$sql    = $this->wpdb->prepare(
+			'DELETE FROM %i WHERE access_date < %s',
+			$table,
+			$cutoff
+		);
+
+		$result = $this->wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
+
+		return is_int( $result ) ? $result : 0;
+	}
+
+	/**
 	 * Return post IDs and titles for posts that have at least one stat row.
 	 *
 	 * @since  1.1.0
