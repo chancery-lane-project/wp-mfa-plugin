@@ -244,17 +244,37 @@ class ManifestGenerator {
 	}
 
 	/**
-	 * Compute the full hash for a post (content + metadata).
+	 * Compute the full hash for a post (content, metadata, and taxonomy terms).
 	 *
 	 * @since  1.1.0
 	 * @param  \WP_Post $post The post.
 	 * @return string MD5 hash.
 	 */
 	public static function compute_full_hash( \WP_Post $post ): string {
-		$content_hash = md5( $post->post_content );
-		$meta_hash    = md5( $post->post_modified . $post->post_title );
+		$content_hash  = md5( $post->post_content );
+		$meta_hash     = md5( $post->post_modified . $post->post_title );
+		$taxonomy_hash = self::hash_taxonomies( $post );
 
-		return md5( $content_hash . $meta_hash );
+		return md5( $content_hash . $meta_hash . $taxonomy_hash );
+	}
+
+	private static function hash_taxonomies( \WP_Post $post ): string {
+		$parts      = array();
+		$taxonomies = get_object_taxonomies( $post->post_type );
+
+		foreach ( $taxonomies as $taxonomy ) {
+			$terms = get_the_terms( $post->ID, $taxonomy );
+
+			if ( ! is_array( $terms ) || empty( $terms ) ) {
+				continue;
+			}
+
+			$slugs = wp_list_pluck( $terms, 'slug' );
+			sort( $slugs );
+			$parts[] = $taxonomy . ':' . implode( ',', $slugs );
+		}
+
+		return md5( implode( '|', $parts ) );
 	}
 
 	// -----------------------------------------------------------------------
