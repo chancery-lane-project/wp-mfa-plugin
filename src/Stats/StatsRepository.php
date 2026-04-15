@@ -70,16 +70,17 @@ class StatsRepository {
 		$date  = gmdate( 'Y-m-d' );
 
 		$sql = $this->wpdb->prepare(
-			"INSERT INTO {$table} (post_id, agent, access_method, access_date, count)
+			'INSERT INTO %i (post_id, agent, access_method, access_date, count)
          VALUES (%d, %s, %s, %s, 1)
-         ON DUPLICATE KEY UPDATE count = count + 1",
+         ON DUPLICATE KEY UPDATE count = count + 1',
+			$table,
 			$post_id,
 			$agent,
 			$access_method,
 			$date
 		);
 
-		$this->wpdb->query( $sql );
+		$this->wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
 	}
 
 	/**
@@ -98,12 +99,14 @@ class StatsRepository {
 		$limit     = max( 1, (int) ( $filters['limit'] ?? 50 ) );
 		$offset    = max( 0, (int) ( $filters['offset'] ?? 0 ) );
 
-		$sql = $this->wpdb->prepare( // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $table is $wpdb->prefix only; $where_sql is built by build_where() with safe placeholders; spread arg count is dynamic but correct.
+		$sql = $this->wpdb->prepare(
 			"SELECT post_id, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT %d OFFSET %d",
 			...array_merge( $values, array( $limit, $offset ) )
 		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
 
-		return $this->wpdb->get_results( $sql );
+		return $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
 	}
 
 	/**
@@ -182,12 +185,13 @@ class StatsRepository {
 	public function get_distinct_agents(): array {
 		$table = self::get_table_name( $this->wpdb );
 		$sql   = $this->wpdb->prepare(
-			"SELECT DISTINCT agent FROM {$table} WHERE agent NOT IN (%s, %s, %s) ORDER BY agent ASC",
+			'SELECT DISTINCT agent FROM %i WHERE agent NOT IN (%s, %s, %s) ORDER BY agent ASC',
+			$table,
 			'',
 			'accept-header',
 			'query-param'
 		);
-		$rows  = $this->wpdb->get_results( $sql );
+		$rows  = $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
 
 		return array_map( fn( object $row ) => $row->agent, $rows );
 	}
@@ -215,6 +219,32 @@ class StatsRepository {
 		}
 
 		return $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Delete access stats records older than the given number of days.
+	 *
+	 * @since  1.2.0
+	 * @param  int $days Records older than this many days are removed. Must be >= 1.
+	 * @return int       Number of rows deleted.
+	 * @throws \InvalidArgumentException If $days < 1.
+	 */
+	public function delete_before_date( int $days ): int {
+		if ( $days < 1 ) {
+			throw new \InvalidArgumentException( 'days must be >= 1' );
+		}
+
+		$table  = self::get_table_name( $this->wpdb );
+		$cutoff = gmdate( 'Y-m-d', strtotime( "-{$days} days" ) );
+		$sql    = $this->wpdb->prepare(
+			'DELETE FROM %i WHERE access_date < %s',
+			$table,
+			$cutoff
+		);
+
+		$result = $this->wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
+
+		return is_int( $result ) ? $result : 0;
 	}
 
 	/**

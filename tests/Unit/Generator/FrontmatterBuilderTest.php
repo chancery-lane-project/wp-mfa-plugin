@@ -20,6 +20,11 @@ class FrontmatterBuilderTest extends TestCase {
         $GLOBALS['_mock_post_meta']         = [];
         $GLOBALS['_mock_thumbnail']         = null;
         $GLOBALS['_mock_permalink']         = 'https://example.com/my-post/';
+        $GLOBALS['_mock_hierarchical_types'] = [];
+        $GLOBALS['_mock_post_parent']        = [];
+        $GLOBALS['_mock_post_ancestors']     = [];
+        $GLOBALS['_mock_posts']              = [];
+        $GLOBALS['_mock_user_data']          = [];
     }
 
     private function make_post( array $props = [] ): \WP_Post {
@@ -159,5 +164,94 @@ class FrontmatterBuilderTest extends TestCase {
         $result = $this->make_builder()->build( $post );
 
         $this->assertArrayNotHasKey( 'featured_image', $result );
+    }
+
+    public function test_hierarchy_fields_included_for_hierarchical_type(): void {
+        $GLOBALS['_mock_hierarchical_types']  = ['page'];
+        $GLOBALS['_mock_post_parent'][10]     = 5;
+        $GLOBALS['_mock_post_ancestors'][10]  = [5, 3];
+        // The get_posts() mock in wordpress-mocks.php returns $GLOBALS['_mock_posts']
+        // regardless of query args — set to [] to simulate no child pages found.
+        $GLOBALS['_mock_posts']              = []; // no children
+
+        $post   = $this->make_post(['ID' => 10, 'post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertSame(5, $result['parent']);
+        $this->assertSame([5, 3], $result['ancestors']);
+        $this->assertSame([], $result['children']);
+    }
+
+    public function test_hierarchy_fields_absent_when_option_disabled(): void {
+        $post   = $this->make_post(['post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => false])->build($post);
+
+        $this->assertArrayNotHasKey('parent', $result);
+        $this->assertArrayNotHasKey('ancestors', $result);
+        $this->assertArrayNotHasKey('children', $result);
+    }
+
+    public function test_hierarchy_fields_absent_for_non_hierarchical_type(): void {
+        $GLOBALS['_mock_hierarchical_types'] = []; // 'post' is not hierarchical
+        $post   = $this->make_post(['post_type' => 'post']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertArrayNotHasKey('parent', $result);
+    }
+
+    public function test_hierarchy_children_populated_when_present(): void {
+        $GLOBALS['_mock_hierarchical_types'] = ['page'];
+        $GLOBALS['_mock_post_parent'][20]    = 0;
+        $GLOBALS['_mock_post_ancestors'][20] = [];
+        $GLOBALS['_mock_posts']              = [101, 102]; // get_posts() mock returns this regardless of args
+
+        $post   = $this->make_post(['ID' => 20, 'post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertSame([101, 102], $result['children']);
+    }
+
+    public function test_author_name_included_when_option_enabled(): void {
+        $GLOBALS['_mock_user_data'][1] = new \WP_User(['ID' => 1, 'display_name' => 'Jane Smith']);
+
+        $post   = $this->make_post(['post_author' => '1']);
+        $result = $this->make_builder(['include_author' => true])->build($post);
+
+        $this->assertSame('Jane Smith', $result['author']);
+    }
+
+    public function test_author_not_included_when_option_disabled(): void {
+        $post   = $this->make_post();
+        $result = $this->make_builder(['include_author' => false])->build($post);
+
+        $this->assertArrayNotHasKey('author', $result);
+    }
+
+    public function test_author_not_included_when_user_not_found(): void {
+        $GLOBALS['_mock_user_data'] = []; // no user
+        $post   = $this->make_post(['post_author' => '99']);
+        $result = $this->make_builder(['include_author' => true])->build($post);
+
+        $this->assertArrayNotHasKey('author', $result);
+    }
+
+    public function test_featured_image_is_relative_when_option_enabled(): void {
+        $GLOBALS['_mock_thumbnail']          = 99;
+        $GLOBALS['_mock_attachment_url'][99] = 'https://example.com/wp-content/uploads/photo.jpg';
+
+        $post   = $this->make_post();
+        $result = $this->make_builder(['relative_image_paths' => true])->build($post);
+
+        $this->assertSame('/wp-content/uploads/photo.jpg', $result['featured_image']);
+    }
+
+    public function test_featured_image_is_absolute_when_option_disabled(): void {
+        $GLOBALS['_mock_thumbnail']          = 99;
+        $GLOBALS['_mock_attachment_url'][99] = 'https://example.com/wp-content/uploads/photo.jpg';
+
+        $post   = $this->make_post();
+        $result = $this->make_builder(['relative_image_paths' => false])->build($post);
+
+        $this->assertSame('https://example.com/wp-content/uploads/photo.jpg', $result['featured_image']);
     }
 }

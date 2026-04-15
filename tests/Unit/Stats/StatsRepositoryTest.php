@@ -221,4 +221,23 @@ class StatsRepositoryTest extends TestCase {
     public function test_db_version_constant_is_defined(): void {
         $this->assertSame( '1.1', StatsRepository::DB_VERSION );
     }
+
+    public function test_delete_before_date_issues_delete_query(): void {
+        $wpdb = new \wpdb();
+        $repo = new StatsRepository( $wpdb );
+
+        $deleted = $repo->delete_before_date( 90 );
+
+        $this->assertSame( 0, $deleted ); // mock query() returns true (bool), so is_int check gives 0
+
+        $last_query = end( $wpdb->queries )['query'];
+        $this->assertStringContainsString( 'DELETE FROM', $last_query );
+        $this->assertStringContainsString( 'access_date', $last_query );
+    }
+
+    public function test_delete_before_date_rejects_zero_days(): void {
+        $repo = new StatsRepository( new \wpdb() );
+        $this->expectException( \InvalidArgumentException::class );
+        $repo->delete_before_date( 0 );
+    }
 }

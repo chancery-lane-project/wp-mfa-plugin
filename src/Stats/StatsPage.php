@@ -15,7 +15,7 @@ namespace Tclp\WpMarkdownForAgents\Stats;
  */
 class StatsPage {
 
-	private const PAGE_SLUG = 'wp-mfa-stats';
+	private const PAGE_SLUG = 'markdown-for-agents-stats';
 	private const PER_PAGE  = 50;
 
 	/**
@@ -241,7 +241,10 @@ class StatsPage {
 				<div class="tablenav bottom">
 					<div class="tablenav-pages">
 						<span class="displaying-num">
-							<?php echo esc_html( sprintf( _n( '%s item', '%s items', $total, 'markdown-for-agents-and-statistics' ), number_format_i18n( $total ) ) ); ?>
+							<?php
+							/* translators: %s: number of agent access log entries */
+							echo esc_html( sprintf( _n( '%s item', '%s items', $total, 'markdown-for-agents-and-statistics' ), number_format_i18n( $total ) ) );
+							?>
 						</span>
 						<span class="pagination-links">
 							<?php if ( $paged <= 1 ) : ?>

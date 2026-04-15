@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Core;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\CLI\Commands;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
@@ -53,7 +57,7 @@ class Plugin {
 
 		$this->define_generator( $options );
 
-		// DB migration — must run unconditionally regardless of 'enabled' state.
+		// DB migration — runs on every load.
 		add_action(
 			'plugins_loaded',
 			static function (): void {
@@ -61,10 +65,6 @@ class Plugin {
 				Migrator::maybe_migrate( $wpdb );
 			}
 		);
-
-		if ( empty( $options['enabled'] ) ) {
-			return;
-		}
 
 		$this->define_negotiate_hooks( $options );
 		$this->define_admin_hooks( $options );
@@ -155,6 +155,7 @@ class Plugin {
 		$this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_taxonomy_batch', $admin, 'handle_generate_taxonomy_batch_ajax' );
+		$this->loader->add_action( 'wp_ajax_mfa_preview_post', $admin, 'handle_preview_post_ajax' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 
 		global $wpdb;
@@ -173,9 +174,11 @@ class Plugin {
 			return;
 		}
 
+		global $wpdb;
+
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator )
+			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
 		);
 	}
 

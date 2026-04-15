@@ -3,8 +3,8 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 6.9
-Stable tag: 1.2.0
-Requires PHP: 8.0
+Stable tag: 1.3.0
+Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -41,7 +41,10 @@ to AI agents and language model tools that request it via HTTP content negotiati
 * Incremental export — only re-export changed documents (`--incremental`)
 * Delta file (`changes.json`) for RAG system sync
 * Access statistics — logs AI agent requests with a dedicated stats admin page
-* WP-CLI commands: `generate`, `generate-taxonomies`, `status`, `delete`
+* **Optional frontmatter fields** — hierarchy (parent/ancestors/children IDs), author display name, root-relative featured image paths
+* **Topics section** — appends a `## Topics` section with linked taxonomy terms to the Markdown body
+* **Export preview** — preview generated Markdown inline in the post editor without writing to disk
+* WP-CLI commands: `generate`, `generate-taxonomies`, `prune-stats`, `status`, `delete`
 * Fully unit-tested
 
 == Installation ==
@@ -127,10 +130,19 @@ wp markdown-agents generate-taxonomies --dry-run
 == Screenshots ==
 
 1. Settings page with export options and bulk generation.
-2. Post meta box showing file status and regenerate button.
+2. Post meta box showing file status, regenerate button, and inline Markdown preview.
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.3.0 =
+* Optional hierarchy frontmatter fields (`parent`, `ancestors`, `children` IDs) for hierarchical post types (pages, etc.).
+* Optional author display name in frontmatter.
+* Optional root-relative paths for featured images (survives domain migrations).
+* Optional `## Topics` section appended to the Markdown body with linked taxonomy terms.
+* Export preview — "Preview Markdown" button in the post meta box renders generated Markdown inline without writing to disk.
+* New WP-CLI command: `wp markdown-agents prune-stats [--days=<n>] [--yes]` — removes access stats older than N days.
+* Manifest hash now covers taxonomy term slugs — incremental export correctly detects posts whose terms changed.
 
 = 1.2.0 =
 * Taxonomy archive support — generates Markdown index files for all public taxonomy terms (categories, tags, custom taxonomies), served via content negotiation.
@@ -159,6 +171,9 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.3.0 =
+New optional frontmatter fields (hierarchy, author, relative image paths), a Topics body section, inline Markdown preview, and the prune-stats WP-CLI command. All features are opt-in via Settings. No breaking changes or database migrations required.
 
 = 1.2.0 =
 Adds taxonomy archive support and AJAX bulk generation. No breaking changes. Taxonomy archive files will be generated on the next post save or via Settings → Generate All Taxonomy Archives.

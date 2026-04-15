@@ -78,11 +78,14 @@ class SettingsPage {
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'markdown_for_agents_enabled', __( 'Enable plugin', 'markdown-for-agents-and-statistics' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents-and-statistics' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_hierarchy', __( 'Include hierarchy', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_hierarchy' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -146,16 +149,19 @@ class SettingsPage {
 		$defaults = Options::get_defaults();
 		$clean    = array();
 
-		$clean['enabled']            = ! empty( $input['enabled'] );
 		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
 		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
-		$clean['frontmatter_format'] = 'yaml';
+		$clean['include_hierarchy']    = ! empty( $input['include_hierarchy'] );
+		$clean['include_author']          = ! empty( $input['include_author'] );
+		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
+		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
+		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
 		$export_dir = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
 		// Strip any remaining double-dot sequences that could form traversal after sanitisation.
 		$export_dir          = trim( str_replace( '..', '', $export_dir ), '-' );
-		$clean['export_dir'] = $export_dir ?: $defaults['export_dir'];
+		$clean['export_dir'] = $export_dir ? $export_dir : $defaults['export_dir'];
 
 		// Post types: validate each is a registered public post type.
 		$public_types        = array_keys( get_post_types( array( 'public' => true ) ) );
@@ -185,7 +191,10 @@ class SettingsPage {
 		$clean['ua_force_enabled'] = ! empty( $input['ua_force_enabled'] );
 
 		// UA agent strings: one per line, trim whitespace, drop empty lines.
-		$ua_raw                    = (string) ( $input['ua_agent_strings'] ?? '' );
+		// Guard against the WordPress double-sanitize quirk where the callback receives
+		// its own array output on a second pass, which would cast to the string 'Array'.
+		$ua_input = $input['ua_agent_strings'] ?? '';
+		$ua_raw   = is_array( $ua_input ) ? implode( "\n", $ua_input ) : (string) $ua_input;
 		$ua_lines                  = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
 		$clean['ua_agent_strings'] = array_values( $ua_lines );
 
@@ -256,11 +265,6 @@ class SettingsPage {
 	// -----------------------------------------------------------------------
 
 	/** @since 1.0.0 */
-	public function field_enabled(): void {
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[enabled]" value="1" ' . checked( ! empty( $this->options['enabled'] ), true, false ) . '>';
-	}
-
-	/** @since 1.0.0 */
 	public function field_post_types(): void {
 		$enabled = (array) ( $this->options['post_types'] ?? array() );
 		foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $type ) {
@@ -283,6 +287,70 @@ class SettingsPage {
 	/** @since 1.0.0 */
 	public function field_include_taxonomies(): void {
 		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_taxonomies]" value="1" ' . checked( ! empty( $this->options['include_taxonomies'] ), true, false ) . '>';
+	}
+
+	/**
+	 * Render the include-hierarchy checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_include_hierarchy(): void {
+		$checked = ! empty( $this->options['include_hierarchy'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_hierarchy]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Add parent, ancestors, and children IDs to frontmatter for hierarchical post types (pages, etc.).', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the include-author checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_include_author(): void {
+		$checked = ! empty( $this->options['include_author'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_author]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( "Add the post author's display name to frontmatter.", 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the relative-image-paths checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_relative_image_paths(): void {
+		$checked = ! empty( $this->options['relative_image_paths'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[relative_image_paths]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Use root-relative paths for featured images (e.g. /wp-content/uploads/…). Helps exports survive domain changes.', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the topics-section checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_include_taxonomy_topics(): void {
+		$checked = ! empty( $this->options['include_taxonomy_topics'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_taxonomy_topics]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Append a "## Topics" section with linked taxonomy terms to the Markdown body.', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
 	}
 
 	/**

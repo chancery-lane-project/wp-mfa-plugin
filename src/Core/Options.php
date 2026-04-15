@@ -31,11 +31,14 @@ class Options {
 	 */
 	public static function get_defaults(): array {
 		return array(
-			'enabled'                   => true,
 			'post_types'                => array( 'post', 'page' ),
 			'export_dir'                => 'wp-mfa-exports',
 			'auto_generate'             => false,
 			'include_taxonomies'        => true,
+			'include_hierarchy'         => false,
+			'include_author'            => false,
+			'relative_image_paths'      => false,
+			'include_taxonomy_topics'   => false,
 			'post_type_configs'         => array(),
 			'frontmatter_format'        => 'yaml',
 			'delete_files_on_uninstall' => false,

@@ -135,10 +135,33 @@ if (!function_exists('delete_option')) {
 // ---------------------------------------------------------------------------
 
 /** @var array<int, array<string, mixed>> */
-$GLOBALS['_mock_terms']     = [];
-$GLOBALS['_mock_permalink'] = 'https://example.com/test-post/';
-$GLOBALS['_mock_post_meta'] = [];
-$GLOBALS['_mock_thumbnail'] = null;
+$GLOBALS['_mock_terms']             = [];
+$GLOBALS['_mock_permalink']         = 'https://example.com/test-post/';
+$GLOBALS['_mock_post_meta']         = [];
+$GLOBALS['_mock_thumbnail']         = null;
+$GLOBALS['_mock_hierarchical_types'] = ['page'];
+$GLOBALS['_mock_post_parent']        = [];
+$GLOBALS['_mock_post_ancestors']     = [];
+
+if (!function_exists('is_post_type_hierarchical')) {
+    function is_post_type_hierarchical(string $post_type): bool {
+        return in_array($post_type, $GLOBALS['_mock_hierarchical_types'] ?? ['page'], true);
+    }
+}
+
+if (!function_exists('wp_get_post_parent_id')) {
+    function wp_get_post_parent_id(int|\WP_Post $post): int|false {
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_post_parent'][$id] ?? 0;
+    }
+}
+
+if (!function_exists('get_post_ancestors')) {
+    function get_post_ancestors(int|\WP_Post $post): array {
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_post_ancestors'][$id] ?? [];
+    }
+}
 
 if (!function_exists('get_the_terms')) {
     function get_the_terms(int $post_id, string $taxonomy): array|false|\WP_Error {
@@ -289,6 +312,12 @@ if (!function_exists('esc_html')) {
     }
 }
 
+if (!function_exists('wp_specialchars_decode')) {
+    function wp_specialchars_decode(string $text, int|string $quote_style = ENT_QUOTES): string {
+        return html_entity_decode($text, is_int($quote_style) ? $quote_style : ENT_QUOTES, 'UTF-8');
+    }
+}
+
 if (!function_exists('esc_url')) {
     function esc_url(string $url): string {
         return $url;
@@ -424,7 +453,7 @@ if (!function_exists('wp_doing_ajax')) {
 }
 
 if (!function_exists('current_user_can')) {
-    function current_user_can(string $capability): bool {
+    function current_user_can(string $capability, mixed ...$args): bool {
         return $GLOBALS['_mock_current_user_can'] ?? true;
     }
 }
@@ -915,6 +944,38 @@ if (!class_exists('WP_Term')) {
 }
 
 // ---------------------------------------------------------------------------
+// WP_User stub
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_user_data'] = [];
+
+if (!class_exists('WP_User')) {
+    class WP_User {
+        public int    $ID           = 0;
+        public string $display_name = '';
+        public string $user_email   = '';
+
+        public function __construct(array $props = []) {
+            foreach ($props as $key => $value) {
+                $this->$key = $value;
+            }
+        }
+    }
+}
+
+if (!function_exists('get_userdata')) {
+    function get_userdata(int $user_id): \WP_User|false {
+        return $GLOBALS['_mock_user_data'][$user_id] ?? false;
+    }
+}
+
+if (!function_exists('wp_make_link_relative')) {
+    function wp_make_link_relative(string $link): string {
+        return preg_replace('|^https?://[^/]+|', '', $link) ?? $link;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Taxonomy function stubs
 // ---------------------------------------------------------------------------
 
@@ -969,4 +1030,21 @@ if (!function_exists('get_term_link')) {
         }
         return 'https://example.com/term/' . (int) $term . '/';
     }
+}
+
+// ---------------------------------------------------------------------------
+// WP_Screen stub
+// ---------------------------------------------------------------------------
+
+if (!class_exists('WP_Screen')) {
+	class WP_Screen {
+		public string $base      = '';
+		public string $post_type = '';
+	}
+}
+
+if (!function_exists('get_current_screen')) {
+	function get_current_screen(): ?\WP_Screen {
+		return $GLOBALS['_mock_current_screen'] ?? null;
+	}
 }

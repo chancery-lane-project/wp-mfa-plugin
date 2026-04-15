@@ -66,6 +66,30 @@ class FrontmatterBuilder {
 
 		$frontmatter = $this->add_featured_image( $frontmatter, $post );
 
+		if ( ! empty( $this->options['include_hierarchy'] ) && is_post_type_hierarchical( $post->post_type ) ) {
+			$parent_id                = wp_get_post_parent_id( $post->ID );
+			$frontmatter['parent']    = $parent_id ? $parent_id : null;
+			$frontmatter['ancestors'] = get_post_ancestors( $post->ID );
+			$children                 = get_posts(
+				array(
+					'post_type'      => $post->post_type,
+					'post_parent'    => $post->ID,
+					'post_status'    => 'publish',
+					'posts_per_page' => -1, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- intentional, bounded to direct children only
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+				)
+			);
+			$frontmatter['children'] = is_array( $children ) ? $children : array();
+		}
+
+		if ( ! empty( $this->options['include_author'] ) ) {
+			$user = get_userdata( (int) $post->post_author );
+			if ( $user instanceof \WP_User ) {
+				$frontmatter['author'] = $user->display_name;
+			}
+		}
+
 		/**
 		 * Modify the frontmatter array before serialisation.
 		 *
@@ -94,6 +118,9 @@ class FrontmatterBuilder {
 		$url = wp_get_attachment_url( $thumbnail_id );
 
 		if ( $url ) {
+			if ( ! empty( $this->options['relative_image_paths'] ) ) {
+				$url = wp_make_link_relative( $url );
+			}
 			$frontmatter['featured_image'] = $url;
 
 			$alt = get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true );
