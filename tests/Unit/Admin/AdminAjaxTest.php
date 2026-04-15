@@ -243,7 +243,7 @@ class AdminAjaxTest extends TestCase {
 
         $localised = $GLOBALS['_mock_localized_scripts']['mfa-bulk-generate'] ?? null;
         $this->assertNotNull( $localised );
-        $this->assertSame( 'mfaBulkGenerate', $localised['object'] );
+        $this->assertSame( 'markdownForAgentsBulkGenerate', $localised['object'] );
         $this->assertArrayHasKey( 'nonce', $localised['data'] );
         $this->assertArrayHasKey( 'ajaxurl', $localised['data'] );
     }

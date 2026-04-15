@@ -34,12 +34,12 @@ class StatsPageTest extends TestCase {
 
     public function test_add_page_registers_menu_page(): void {
         $this->page->add_page();
-        $this->assertArrayHasKey( 'wp-mfa-stats', $GLOBALS['_mock_menu_pages'] );
+        $this->assertArrayHasKey( 'markdown-for-agents-stats', $GLOBALS['_mock_menu_pages'] );
     }
 
     public function test_add_page_uses_chart_icon(): void {
         $this->page->add_page();
-        $this->assertSame( 'dashicons-chart-bar', $GLOBALS['_mock_menu_pages']['wp-mfa-stats']['icon_url'] );
+        $this->assertSame( 'dashicons-chart-bar', $GLOBALS['_mock_menu_pages']['markdown-for-agents-stats']['icon_url'] );
     }
 
     public function test_render_page_shows_heading(): void {

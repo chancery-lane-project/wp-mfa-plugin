@@ -46,6 +46,7 @@ class Negotiator {
 	public function maybe_serve_markdown(): void {
 		$accept    = $_SERVER['HTTP_ACCEPT'] ?? '';          // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 		$ua        = $_SERVER['HTTP_USER_AGENT'] ?? '';      // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		// Public content-negotiation parameter on anonymous frontend requests — nonces are not applicable here.
 		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		$matched_agent = $this->agent_detector->get_matched_agent( $ua );  // serving gate.

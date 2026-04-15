@@ -15,7 +15,7 @@ namespace Tclp\WpMarkdownForAgents\Stats;
  */
 class StatsPage {
 
-	private const PAGE_SLUG = 'wp-mfa-stats';
+	private const PAGE_SLUG = 'markdown-for-agents-stats';
 	private const PER_PAGE  = 50;
 
 	/**

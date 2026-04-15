@@ -78,9 +78,9 @@ class Admin {
 			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents-and-statistics' ) );
 		}
 
-		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
+		check_admin_referer( 'markdown_for_agents_generate' );
 
-		check_admin_referer( 'markdown_for_agents_generate_' . $post_type );
+		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) );
 
 		$results = $this->generator->generate_post_type( $post_type );
 
@@ -110,14 +110,13 @@ class Admin {
 	 * @since  1.0.0
 	 */
 	public function handle_regenerate_post_action(): void {
-		// post_id is needed for both capability and nonce checks; (int) cast sanitises the value.
-		$post_id = absint( wp_unslash( $_REQUEST['post_id'] ?? 0 ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		check_admin_referer( 'markdown_for_agents_regenerate' );
+
+		$post_id = absint( wp_unslash( $_REQUEST['post_id'] ?? 0 ) );
 
 		if ( ! current_user_can( 'edit_post', $post_id ) ) {
 			wp_die( esc_html__( 'Insufficient permissions.', 'markdown-for-agents-and-statistics' ) );
 		}
-
-		check_admin_referer( 'markdown_for_agents_regenerate_' . $post_id );
 
 		$post = get_post( $post_id );
 
@@ -252,7 +251,7 @@ class Admin {
 
 			wp_localize_script(
 				'mfa-bulk-generate',
-				'mfaBulkGenerate',
+				'markdownForAgentsBulkGenerate',
 				array(
 					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
