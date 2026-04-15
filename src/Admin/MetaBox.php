@@ -55,7 +55,7 @@ class MetaBox {
 		$exists        = file_exists( $filepath );
 		$regen_url     = wp_nonce_url(
 			admin_url( 'admin-post.php?action=markdown_for_agents_regenerate_post&post_id=' . $post->ID ),
-			'markdown_for_agents_regenerate_' . $post->ID
+			'markdown_for_agents_regenerate'
 		);
 		$preview_nonce = wp_create_nonce( 'mfa_preview_post_' . $post->ID );
 		?>

@@ -1,4 +1,4 @@
-/* global mfaBulkGenerate */
+/* global markdownForAgentsBulkGenerate */
 /* WordPress admin bulk-generate AJAX loop.
  * Intercepts clicks on [data-post-type] and [data-action] buttons, drives
  * sequential AJAX batch requests, and updates a live counter.
@@ -20,7 +20,7 @@
      */
     function sendBatch(action, postType, offset, accumulated, button) {
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', mfaBulkGenerate.ajaxurl, true);
+        xhr.open('POST', markdownForAgentsBulkGenerate.ajaxurl, true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
         xhr.onload = function () {
@@ -69,7 +69,7 @@
         };
 
         var params = 'action='  + encodeURIComponent(action)
-            + '&nonce='         + encodeURIComponent(mfaBulkGenerate.nonce)
+            + '&nonce='         + encodeURIComponent(markdownForAgentsBulkGenerate.nonce)
             + '&offset='        + encodeURIComponent(offset)
             + '&limit='         + encodeURIComponent(BATCH_SIZE);
 
