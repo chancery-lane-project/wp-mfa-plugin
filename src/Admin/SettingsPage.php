@@ -78,7 +78,6 @@ class SettingsPage {
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'markdown_for_agents_enabled', __( 'Enable plugin', 'markdown-for-agents-and-statistics' ), array( $this, 'field_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents-and-statistics' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
@@ -150,7 +149,6 @@ class SettingsPage {
 		$defaults = Options::get_defaults();
 		$clean    = array();
 
-		$clean['enabled']            = ! empty( $input['enabled'] );
 		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
 		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
 		$clean['include_hierarchy']    = ! empty( $input['include_hierarchy'] );
@@ -265,11 +263,6 @@ class SettingsPage {
 	// -----------------------------------------------------------------------
 	// Field renderers
 	// -----------------------------------------------------------------------
-
-	/** @since 1.0.0 */
-	public function field_enabled(): void {
-		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[enabled]" value="1" ' . checked( ! empty( $this->options['enabled'] ), true, false ) . '>';
-	}
 
 	/** @since 1.0.0 */
 	public function field_post_types(): void {

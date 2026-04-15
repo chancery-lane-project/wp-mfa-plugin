@@ -19,14 +19,10 @@ class OptionsTest extends TestCase {
     public function test_defaults_contain_required_keys(): void {
         $defaults = Options::get_defaults();
 
-        foreach ( [ 'enabled', 'post_types', 'export_dir', 'auto_generate',
+        foreach ( [ 'post_types', 'export_dir', 'auto_generate',
                     'include_taxonomies', 'post_type_configs' ] as $key ) {
             $this->assertArrayHasKey( $key, $defaults );
         }
-    }
-
-    public function test_defaults_enabled_is_true(): void {
-        $this->assertTrue( Options::get_defaults()['enabled'] );
     }
 
     public function test_defaults_post_types_includes_post_and_page(): void {
@@ -40,11 +36,10 @@ class OptionsTest extends TestCase {
     }
 
     public function test_get_merges_saved_values_over_defaults(): void {
-        update_option( Options::OPTION_KEY, [ 'enabled' => false, 'export_dir' => 'custom-dir' ] );
+        update_option( Options::OPTION_KEY, [ 'export_dir' => 'custom-dir' ] );
 
         $options = Options::get();
 
-        $this->assertFalse( $options['enabled'] );
         $this->assertSame( 'custom-dir', $options['export_dir'] );
         // Defaults still present for unset keys.
         $this->assertContains( 'post', $options['post_types'] );
