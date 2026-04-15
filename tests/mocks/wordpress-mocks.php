@@ -453,7 +453,7 @@ if (!function_exists('wp_doing_ajax')) {
 }
 
 if (!function_exists('current_user_can')) {
-    function current_user_can(string $capability): bool {
+    function current_user_can(string $capability, mixed ...$args): bool {
         return $GLOBALS['_mock_current_user_can'] ?? true;
     }
 }
@@ -1030,4 +1030,21 @@ if (!function_exists('get_term_link')) {
         }
         return 'https://example.com/term/' . (int) $term . '/';
     }
+}
+
+// ---------------------------------------------------------------------------
+// WP_Screen stub
+// ---------------------------------------------------------------------------
+
+if (!class_exists('WP_Screen')) {
+	class WP_Screen {
+		public string $base      = '';
+		public string $post_type = '';
+	}
+}
+
+if (!function_exists('get_current_screen')) {
+	function get_current_screen(): ?\WP_Screen {
+		return $GLOBALS['_mock_current_screen'] ?? null;
+	}
 }

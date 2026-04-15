@@ -580,6 +580,35 @@ class GeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // get_post_markdown()
+    // -----------------------------------------------------------------------
+
+    public function test_get_post_markdown_returns_yaml_and_body(): void {
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( ['title' => 'Test'] );
+        $this->content_filter->method( 'filter' )->willReturn( '<p>Hello</p>' );
+        $this->converter->method( 'convert' )->willReturn( 'Hello' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\ntitle: Test\n---\n" );
+
+        $output = $this->generator->get_post_markdown( $post );
+
+        $this->assertNotNull( $output );
+        $this->assertStringContainsString( '---', $output );
+        $this->assertStringContainsString( 'Hello', $output );
+    }
+
+    public function test_get_post_markdown_returns_null_for_ineligible_post(): void {
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'draft'] );
+
+        $this->frontmatter_builder->expects( $this->never() )->method( 'build' );
+
+        $output = $this->generator->get_post_markdown( $post );
+
+        $this->assertNull( $output );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

@@ -51,12 +51,13 @@ class MetaBox {
 	 * @param  \WP_Post $post The current post.
 	 */
 	public function render( \WP_Post $post ): void {
-		$filepath = $this->generator->get_export_path( $post );
-		$exists   = file_exists( $filepath );
-		$regen_url = wp_nonce_url(
+		$filepath      = $this->generator->get_export_path( $post );
+		$exists        = file_exists( $filepath );
+		$regen_url     = wp_nonce_url(
 			admin_url( 'admin-post.php?action=markdown_for_agents_regenerate_post&post_id=' . $post->ID ),
 			'markdown_for_agents_regenerate_' . $post->ID
 		);
+		$preview_nonce = wp_create_nonce( 'mfa_preview_post_' . $post->ID );
 		?>
 		<p>
 			<?php if ( $exists ) : ?>
@@ -67,9 +68,21 @@ class MetaBox {
 				<?php esc_html_e( 'No Markdown file generated yet.', 'markdown-for-agents-and-statistics' ); ?>
 			<?php endif; ?>
 		</p>
-		<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
-			<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
-		</a>
+		<p>
+			<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
+				<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
+			</a>
+			<button type="button" class="button button-secondary button-small mfa-preview-btn"
+					data-post-id="<?php echo esc_attr( (string) $post->ID ); ?>"
+					data-nonce="<?php echo esc_attr( $preview_nonce ); ?>"
+					data-ajaxurl="<?php echo esc_attr( admin_url( 'admin-ajax.php' ) ); ?>">
+				<?php esc_html_e( 'Preview Markdown', 'markdown-for-agents-and-statistics' ); ?>
+			</button>
+		</p>
+		<details class="mfa-preview-output" hidden>
+			<summary><?php esc_html_e( 'Markdown preview', 'markdown-for-agents-and-statistics' ); ?></summary>
+			<pre class="mfa-preview-content" style="max-height:300px;overflow:auto;font-size:11px;white-space:pre-wrap;"></pre>
+		</details>
 		<?php
 	}
 }
