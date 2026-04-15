@@ -57,7 +57,7 @@ class Plugin {
 
 		$this->define_generator( $options );
 
-		// DB migration — must run unconditionally regardless of 'enabled' state.
+		// DB migration — runs on every load.
 		add_action(
 			'plugins_loaded',
 			static function (): void {
@@ -65,10 +65,6 @@ class Plugin {
 				Migrator::maybe_migrate( $wpdb );
 			}
 		);
-
-		if ( empty( $options['enabled'] ) ) {
-			return;
-		}
 
 		$this->define_negotiate_hooks( $options );
 		$this->define_admin_hooks( $options );

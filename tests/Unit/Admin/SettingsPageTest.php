@@ -47,24 +47,16 @@ class SettingsPageTest extends TestCase {
     public function test_register_adds_all_fields(): void {
         $this->make_page()->register();
         $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
-        foreach ( [ 'markdown_for_agents_enabled', 'markdown_for_agents_post_types', 'markdown_for_agents_export_dir',
+        foreach ( [ 'markdown_for_agents_post_types', 'markdown_for_agents_export_dir',
                     'markdown_for_agents_auto_generate', 'markdown_for_agents_include_taxonomies' ] as $field ) {
             $this->assertContains( $field, $fields );
         }
     }
 
     public function test_sanitize_strips_unknown_keys(): void {
-        $input  = [ 'enabled' => '1', 'unknown_key' => 'evil', 'export_dir' => 'my-exports' ];
+        $input  = [ 'unknown_key' => 'evil', 'export_dir' => 'my-exports' ];
         $result = $this->make_page()->sanitize_options( $input );
         $this->assertArrayNotHasKey( 'unknown_key', $result );
-    }
-
-    public function test_sanitize_casts_enabled_to_bool(): void {
-        $result = $this->make_page()->sanitize_options( [ 'enabled' => '1' ] );
-        $this->assertTrue( $result['enabled'] );
-
-        $result = $this->make_page()->sanitize_options( [] );
-        $this->assertFalse( $result['enabled'] );
     }
 
     public function test_sanitize_blocks_path_traversal_in_export_dir(): void {

@@ -31,7 +31,6 @@ class Options {
 	 */
 	public static function get_defaults(): array {
 		return array(
-			'enabled'                   => true,
 			'post_types'                => array( 'post', 'page' ),
 			'export_dir'                => 'wp-mfa-exports',
 			'auto_generate'             => false,
