@@ -83,6 +83,7 @@ class SettingsPage {
 		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_hierarchy', __( 'Include hierarchy', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_hierarchy' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -149,6 +150,7 @@ class SettingsPage {
 		$clean['enabled']            = ! empty( $input['enabled'] );
 		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
 		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
+		$clean['include_hierarchy']  = ! empty( $input['include_hierarchy'] );
 		$clean['frontmatter_format'] = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
@@ -286,6 +288,22 @@ class SettingsPage {
 	/** @since 1.0.0 */
 	public function field_include_taxonomies(): void {
 		echo '<input type="checkbox" name="' . esc_attr( Options::OPTION_KEY ) . '[include_taxonomies]" value="1" ' . checked( ! empty( $this->options['include_taxonomies'] ), true, false ) . '>';
+	}
+
+	/**
+	 * Render the include-hierarchy checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_include_hierarchy(): void {
+		$checked = ! empty( $this->options['include_hierarchy'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_hierarchy]"
+				   value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Add parent, ancestors, and children IDs to frontmatter for hierarchical post types (pages, etc.).', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
 	}
 
 	/**
