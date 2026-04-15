@@ -135,10 +135,33 @@ if (!function_exists('delete_option')) {
 // ---------------------------------------------------------------------------
 
 /** @var array<int, array<string, mixed>> */
-$GLOBALS['_mock_terms']     = [];
-$GLOBALS['_mock_permalink'] = 'https://example.com/test-post/';
-$GLOBALS['_mock_post_meta'] = [];
-$GLOBALS['_mock_thumbnail'] = null;
+$GLOBALS['_mock_terms']             = [];
+$GLOBALS['_mock_permalink']         = 'https://example.com/test-post/';
+$GLOBALS['_mock_post_meta']         = [];
+$GLOBALS['_mock_thumbnail']         = null;
+$GLOBALS['_mock_hierarchical_types'] = ['page'];
+$GLOBALS['_mock_post_parent']        = [];
+$GLOBALS['_mock_post_ancestors']     = [];
+
+if (!function_exists('is_post_type_hierarchical')) {
+    function is_post_type_hierarchical(string $post_type): bool {
+        return in_array($post_type, $GLOBALS['_mock_hierarchical_types'] ?? ['page'], true);
+    }
+}
+
+if (!function_exists('wp_get_post_parent_id')) {
+    function wp_get_post_parent_id(int|\WP_Post $post): int|false {
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_post_parent'][$id] ?? 0;
+    }
+}
+
+if (!function_exists('get_post_ancestors')) {
+    function get_post_ancestors(int|\WP_Post $post): array {
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_post_ancestors'][$id] ?? [];
+    }
+}
 
 if (!function_exists('get_the_terms')) {
     function get_the_terms(int $post_id, string $taxonomy): array|false|\WP_Error {

@@ -20,6 +20,10 @@ class FrontmatterBuilderTest extends TestCase {
         $GLOBALS['_mock_post_meta']         = [];
         $GLOBALS['_mock_thumbnail']         = null;
         $GLOBALS['_mock_permalink']         = 'https://example.com/my-post/';
+        $GLOBALS['_mock_hierarchical_types'] = [];
+        $GLOBALS['_mock_post_parent']        = [];
+        $GLOBALS['_mock_post_ancestors']     = [];
+        $GLOBALS['_mock_posts']              = [];
     }
 
     private function make_post( array $props = [] ): \WP_Post {
@@ -159,5 +163,50 @@ class FrontmatterBuilderTest extends TestCase {
         $result = $this->make_builder()->build( $post );
 
         $this->assertArrayNotHasKey( 'featured_image', $result );
+    }
+
+    public function test_hierarchy_fields_included_for_hierarchical_type(): void {
+        $GLOBALS['_mock_hierarchical_types']  = ['page'];
+        $GLOBALS['_mock_post_parent'][10]     = 5;
+        $GLOBALS['_mock_post_ancestors'][10]  = [5, 3];
+        // The get_posts() mock in wordpress-mocks.php returns $GLOBALS['_mock_posts']
+        // regardless of query args — set to [] to simulate no child pages found.
+        $GLOBALS['_mock_posts']              = []; // no children
+
+        $post   = $this->make_post(['ID' => 10, 'post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertSame(5, $result['parent']);
+        $this->assertSame([5, 3], $result['ancestors']);
+        $this->assertSame([], $result['children']);
+    }
+
+    public function test_hierarchy_fields_absent_when_option_disabled(): void {
+        $post   = $this->make_post(['post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => false])->build($post);
+
+        $this->assertArrayNotHasKey('parent', $result);
+        $this->assertArrayNotHasKey('ancestors', $result);
+        $this->assertArrayNotHasKey('children', $result);
+    }
+
+    public function test_hierarchy_fields_absent_for_non_hierarchical_type(): void {
+        $GLOBALS['_mock_hierarchical_types'] = []; // 'post' is not hierarchical
+        $post   = $this->make_post(['post_type' => 'post']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertArrayNotHasKey('parent', $result);
+    }
+
+    public function test_hierarchy_children_populated_when_present(): void {
+        $GLOBALS['_mock_hierarchical_types'] = ['page'];
+        $GLOBALS['_mock_post_parent'][20]    = 0;
+        $GLOBALS['_mock_post_ancestors'][20] = [];
+        $GLOBALS['_mock_posts']              = [101, 102]; // get_posts() mock returns this regardless of args
+
+        $post   = $this->make_post(['ID' => 20, 'post_type' => 'page']);
+        $result = $this->make_builder(['include_hierarchy' => true])->build($post);
+
+        $this->assertSame([101, 102], $result['children']);
     }
 }

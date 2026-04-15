@@ -66,6 +66,23 @@ class FrontmatterBuilder {
 
 		$frontmatter = $this->add_featured_image( $frontmatter, $post );
 
+		if ( ! empty( $this->options['include_hierarchy'] ) && is_post_type_hierarchical( $post->post_type ) ) {
+			$parent_id                = wp_get_post_parent_id( $post->ID );
+			$frontmatter['parent']    = $parent_id ? $parent_id : null;
+			$frontmatter['ancestors'] = get_post_ancestors( $post->ID );
+			$children                 = get_posts(
+				array(
+					'post_type'      => $post->post_type,
+					'post_parent'    => $post->ID,
+					'post_status'    => 'publish',
+					'posts_per_page' => -1, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page -- intentional, bounded to direct children only
+					'fields'         => 'ids',
+					'no_found_rows'  => true,
+				)
+			);
+			$frontmatter['children'] = is_array( $children ) ? $children : array();
+		}
+
 		/**
 		 * Modify the frontmatter array before serialisation.
 		 *
