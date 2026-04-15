@@ -159,6 +159,7 @@ class Plugin {
 		$this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
 		$this->loader->add_action( 'wp_ajax_mfa_generate_taxonomy_batch', $admin, 'handle_generate_taxonomy_batch_ajax' );
+		$this->loader->add_action( 'wp_ajax_mfa_preview_post', $admin, 'handle_preview_post_ajax' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 
 		global $wpdb;

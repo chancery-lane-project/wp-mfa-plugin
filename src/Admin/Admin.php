@@ -197,7 +197,43 @@ class Admin {
 	}
 
 	/**
-	 * Enqueue the bulk-generate JS on the plugin settings page.
+	 * Handle the AJAX preview-post request.
+	 *
+	 * Returns the generated Markdown as JSON without writing to disk.
+	 *
+	 * Hooked to `wp_ajax_mfa_preview_post`.
+	 *
+	 * @since  1.2.0
+	 */
+	public function handle_preview_post_ajax(): void {
+		$post_id = absint( $_POST['post_id'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce checked below.
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
+			return;
+		}
+
+		check_ajax_referer( 'mfa_preview_post_' . $post_id, 'nonce' );
+
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			wp_send_json_error( array( 'message' => 'Post not found.' ), 404 );
+			return;
+		}
+
+		$markdown = $this->generator->get_post_markdown( $post );
+
+		if ( null === $markdown ) {
+			wp_send_json_error( array( 'message' => 'Post is not eligible for export (check post type and status).' ), 422 );
+			return;
+		}
+
+		wp_send_json_success( array( 'markdown' => $markdown ) );
+	}
+
+	/**
+	 * Enqueue admin JS on the plugin settings page and post editor screens.
 	 *
 	 * Hooked to `admin_enqueue_scripts`.
 	 *
@@ -205,26 +241,40 @@ class Admin {
 	 * @param  string $hook The current admin page hook suffix.
 	 */
 	public function enqueue_scripts( string $hook ): void {
-		if ( 'settings_page_markdown-for-agents' !== $hook ) {
-			return;
+		if ( 'settings_page_markdown-for-agents' === $hook ) {
+			wp_enqueue_script(
+				'mfa-bulk-generate',
+				MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/bulk-generate.js',
+				array(),
+				MARKDOWN_FOR_AGENTS_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'mfa-bulk-generate',
+				'mfaBulkGenerate',
+				array(
+					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+				)
+			);
 		}
 
-		wp_enqueue_script(
-			'mfa-bulk-generate',
-			MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/bulk-generate.js',
-			array(),
-			MARKDOWN_FOR_AGENTS_VERSION,
-			true
-		);
-
-		wp_localize_script(
-			'mfa-bulk-generate',
-			'mfaBulkGenerate',
-			array(
-				'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
-				'ajaxurl' => admin_url( 'admin-ajax.php' ),
-			)
-		);
+		// Enqueue preview JS on post editor screens for enabled post types.
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if (
+			$screen instanceof \WP_Screen &&
+			'post' === $screen->base &&
+			in_array( $screen->post_type, (array) ( $this->options['post_types'] ?? array() ), true )
+		) {
+			wp_enqueue_script(
+				'mfa-preview',
+				MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/preview.js',
+				array(),
+				MARKDOWN_FOR_AGENTS_VERSION,
+				true
+			);
+		}
 	}
 
 	/**

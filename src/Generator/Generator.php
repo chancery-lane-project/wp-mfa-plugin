@@ -84,6 +84,36 @@ class Generator {
 	}
 
 	/**
+	 * Build the Markdown content for a post without writing to disk.
+	 *
+	 * Returns null if the post is not eligible for export (wrong type or status).
+	 *
+	 * @since  1.2.0
+	 * @param  \WP_Post $post The post.
+	 * @return string|null Rendered Markdown (YAML frontmatter + body), or null.
+	 */
+	public function get_post_markdown( \WP_Post $post ): ?string {
+		if ( ! $this->is_eligible( $post ) ) {
+			return null;
+		}
+
+		$frontmatter = $this->frontmatter_builder->build( $post );
+		$html        = $this->get_post_content( $post );
+		$html        = $this->content_filter->filter( $html );
+		$markdown    = $this->converter->convert( $html, $post );
+
+		if ( ! empty( $this->options['include_taxonomy_topics'] ) ) {
+			$topics = $this->build_topics_section( $post );
+			if ( '' !== $topics ) {
+				$markdown .= "\n\n" . $topics;
+			}
+		}
+
+		$yaml = $this->yaml_formatter->format( $frontmatter );
+		return $yaml . "\n" . $markdown;
+	}
+
+	/**
 	 * Generate Markdown files for all published posts of a given post type.
 	 *
 	 * Processes in batches of 100 to avoid memory exhaustion on large sites.
