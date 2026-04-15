@@ -56,6 +56,13 @@ class Generator {
 		$html = $this->content_filter->filter( $html );
 		$markdown = $this->converter->convert( $html, $post );
 
+		if ( ! empty( $this->options['include_taxonomy_topics'] ) ) {
+			$topics = $this->build_topics_section( $post );
+			if ( '' !== $topics ) {
+				$markdown .= "\n\n" . $topics;
+			}
+		}
+
 		$yaml    = $this->yaml_formatter->format( $frontmatter );
 		$content = $yaml . "\n" . $markdown;
 
@@ -447,6 +454,44 @@ class Generator {
 				$this->taxonomy_generator->generate_term( $term );
 			}
 		}
+	}
+
+	/**
+	 * Build a Markdown "## Topics" section with linked taxonomy terms.
+	 *
+	 * Returns an empty string if the post has no terms in any taxonomy.
+	 * Only called when the `include_taxonomy_topics` option is enabled.
+	 *
+	 * @since  1.2.0
+	 * @param  \WP_Post $post The post.
+	 * @return string Markdown fragment, or '' if nothing to show.
+	 */
+	private function build_topics_section( \WP_Post $post ): string {
+		$taxonomies = get_object_taxonomies( $post->post_type, 'objects' );
+		$lines      = array();
+
+		foreach ( $taxonomies as $taxonomy ) {
+			$terms = get_the_terms( $post->ID, $taxonomy->name );
+
+			if ( ! is_array( $terms ) || empty( $terms ) ) {
+				continue;
+			}
+
+			$links = array();
+			foreach ( $terms as $term ) {
+				$url     = get_term_link( $term );
+				$name    = html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$links[] = is_string( $url ) ? "[{$name}]({$url})" : $name;
+			}
+
+			$lines[] = '**' . wp_specialchars_decode( (string) $taxonomy->label, ENT_QUOTES ) . ':** ' . implode( ', ', $links );
+		}
+
+		if ( empty( $lines ) ) {
+			return '';
+		}
+
+		return "## Topics\n\n" . implode( "\n\n", $lines );
 	}
 
 	/**
