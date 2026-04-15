@@ -938,6 +938,38 @@ if (!class_exists('WP_Term')) {
 }
 
 // ---------------------------------------------------------------------------
+// WP_User stub
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_user_data'] = [];
+
+if (!class_exists('WP_User')) {
+    class WP_User {
+        public int    $ID           = 0;
+        public string $display_name = '';
+        public string $user_email   = '';
+
+        public function __construct(array $props = []) {
+            foreach ($props as $key => $value) {
+                $this->$key = $value;
+            }
+        }
+    }
+}
+
+if (!function_exists('get_userdata')) {
+    function get_userdata(int $user_id): \WP_User|false {
+        return $GLOBALS['_mock_user_data'][$user_id] ?? false;
+    }
+}
+
+if (!function_exists('wp_make_link_relative')) {
+    function wp_make_link_relative(string $link): string {
+        return preg_replace('|^https?://[^/]+|', '', $link) ?? $link;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Taxonomy function stubs
 // ---------------------------------------------------------------------------
 
