@@ -86,6 +86,7 @@ class SettingsPage {
 		add_settings_field( 'markdown_for_agents_include_hierarchy', __( 'Include hierarchy', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_hierarchy' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -153,9 +154,10 @@ class SettingsPage {
 		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
 		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
 		$clean['include_hierarchy']    = ! empty( $input['include_hierarchy'] );
-		$clean['include_author']       = ! empty( $input['include_author'] );
-		$clean['relative_image_paths'] = ! empty( $input['relative_image_paths'] );
-		$clean['frontmatter_format']   = 'yaml';
+		$clean['include_author']          = ! empty( $input['include_author'] );
+		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
+		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
+		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
 		$export_dir = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
@@ -338,6 +340,22 @@ class SettingsPage {
 			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[relative_image_paths]"
 					value="1" <?php checked( $checked, true ); ?>>
 			<?php esc_html_e( 'Use root-relative paths for featured images (e.g. /wp-content/uploads/…). Helps exports survive domain changes.', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the topics-section checkbox field.
+	 *
+	 * @since  1.2.0
+	 */
+	public function field_include_taxonomy_topics(): void {
+		$checked = ! empty( $this->options['include_taxonomy_topics'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_taxonomy_topics]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Append a "## Topics" section with linked taxonomy terms to the Markdown body.', 'markdown-for-agents-and-statistics' ); ?>
 		</label>
 		<?php
 	}

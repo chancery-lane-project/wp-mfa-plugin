@@ -68,6 +68,10 @@ class GeneratorTest extends TestCase {
         $GLOBALS['_mock_post_objects'] = [];
         $GLOBALS['_mock_wp_query']     = null;
 
+        $GLOBALS['_mock_object_taxonomies'] = [];
+        $GLOBALS['_mock_terms']             = [];
+        $GLOBALS['_mock_term_link']         = [];
+
         $this->taxonomy_generator    = $this->createMock( TaxonomyArchiveGenerator::class );
         $GLOBALS['_mock_post_terms'] = [];
 
@@ -464,6 +468,115 @@ class GeneratorTest extends TestCase {
         $this->assertSame( 1, $result['total'] );
         $this->assertSame( 0, $result['processed'] );
         $this->assertSame( [], $result['errors'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // Topics section (include_taxonomy_topics option)
+    // -----------------------------------------------------------------------
+
+    public function test_topics_section_appended_when_option_enabled(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $GLOBALS['_mock_object_taxonomies']['post'] = [
+            'category' => (object) ['name' => 'category', 'label' => 'Categories'],
+        ];
+        $GLOBALS['_mock_terms'][42]['category'] = [
+            new \WP_Term( ['term_id' => 1, 'slug' => 'news', 'name' => 'News', 'taxonomy' => 'category'] ),
+        ];
+        $GLOBALS['_mock_term_link'][1] = 'https://example.com/category/news/';
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'Body content.' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
+        $gen->generate_post( $post );
+
+        $this->assertStringContainsString( '## Topics', $written );
+        $this->assertStringContainsString( '[News](https://example.com/category/news/)', $written );
+        $this->assertStringContainsString( 'Categories', $written );
+    }
+
+    public function test_topics_section_absent_when_option_disabled(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $GLOBALS['_mock_object_taxonomies']['post'] = [
+            'category' => (object) ['name' => 'category', 'label' => 'Categories'],
+        ];
+        $GLOBALS['_mock_terms'][42]['category'] = [
+            new \WP_Term( ['term_id' => 1, 'slug' => 'news', 'name' => 'News', 'taxonomy' => 'category'] ),
+        ];
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'Body content.' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['include_taxonomy_topics' => false] );
+        $gen->generate_post( $post );
+
+        $this->assertStringNotContainsString( '## Topics', $written );
+    }
+
+    public function test_topics_section_absent_when_no_terms(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $GLOBALS['_mock_object_taxonomies']['post'] = []; // no taxonomies
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'Body content.' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
+        $gen->generate_post( $post );
+
+        $this->assertStringNotContainsString( '## Topics', $written );
+    }
+
+    public function test_topics_section_absent_when_taxonomy_has_no_assigned_terms(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $GLOBALS['_mock_object_taxonomies']['post'] = [
+            'category' => (object) ['name' => 'category', 'label' => 'Categories'],
+        ];
+        // Taxonomy exists but post has no terms assigned (get_the_terms returns false)
+        $GLOBALS['_mock_terms'][42] = []; // no terms for this post
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'Body content.' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
+        $gen->generate_post( $post );
+
+        $this->assertStringNotContainsString( '## Topics', $written );
     }
 
     // -----------------------------------------------------------------------
