@@ -83,6 +83,13 @@ class FrontmatterBuilder {
 			$frontmatter['children'] = is_array( $children ) ? $children : array();
 		}
 
+		if ( ! empty( $this->options['include_author'] ) ) {
+			$user = get_userdata( (int) $post->post_author );
+			if ( $user instanceof \WP_User ) {
+				$frontmatter['author'] = $user->display_name;
+			}
+		}
+
 		/**
 		 * Modify the frontmatter array before serialisation.
 		 *
@@ -111,6 +118,9 @@ class FrontmatterBuilder {
 		$url = wp_get_attachment_url( $thumbnail_id );
 
 		if ( $url ) {
+			if ( ! empty( $this->options['relative_image_paths'] ) ) {
+				$url = wp_make_link_relative( $url );
+			}
 			$frontmatter['featured_image'] = $url;
 
 			$alt = get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true );

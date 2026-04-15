@@ -24,6 +24,7 @@ class FrontmatterBuilderTest extends TestCase {
         $GLOBALS['_mock_post_parent']        = [];
         $GLOBALS['_mock_post_ancestors']     = [];
         $GLOBALS['_mock_posts']              = [];
+        $GLOBALS['_mock_user_data']          = [];
     }
 
     private function make_post( array $props = [] ): \WP_Post {
@@ -208,5 +209,49 @@ class FrontmatterBuilderTest extends TestCase {
         $result = $this->make_builder(['include_hierarchy' => true])->build($post);
 
         $this->assertSame([101, 102], $result['children']);
+    }
+
+    public function test_author_name_included_when_option_enabled(): void {
+        $GLOBALS['_mock_user_data'][1] = new \WP_User(['ID' => 1, 'display_name' => 'Jane Smith']);
+
+        $post   = $this->make_post(['post_author' => '1']);
+        $result = $this->make_builder(['include_author' => true])->build($post);
+
+        $this->assertSame('Jane Smith', $result['author']);
+    }
+
+    public function test_author_not_included_when_option_disabled(): void {
+        $post   = $this->make_post();
+        $result = $this->make_builder(['include_author' => false])->build($post);
+
+        $this->assertArrayNotHasKey('author', $result);
+    }
+
+    public function test_author_not_included_when_user_not_found(): void {
+        $GLOBALS['_mock_user_data'] = []; // no user
+        $post   = $this->make_post(['post_author' => '99']);
+        $result = $this->make_builder(['include_author' => true])->build($post);
+
+        $this->assertArrayNotHasKey('author', $result);
+    }
+
+    public function test_featured_image_is_relative_when_option_enabled(): void {
+        $GLOBALS['_mock_thumbnail']          = 99;
+        $GLOBALS['_mock_attachment_url'][99] = 'https://example.com/wp-content/uploads/photo.jpg';
+
+        $post   = $this->make_post();
+        $result = $this->make_builder(['relative_image_paths' => true])->build($post);
+
+        $this->assertSame('/wp-content/uploads/photo.jpg', $result['featured_image']);
+    }
+
+    public function test_featured_image_is_absolute_when_option_disabled(): void {
+        $GLOBALS['_mock_thumbnail']          = 99;
+        $GLOBALS['_mock_attachment_url'][99] = 'https://example.com/wp-content/uploads/photo.jpg';
+
+        $post   = $this->make_post();
+        $result = $this->make_builder(['relative_image_paths' => false])->build($post);
+
+        $this->assertSame('https://example.com/wp-content/uploads/photo.jpg', $result['featured_image']);
     }
 }
