@@ -465,6 +465,34 @@ class Commands {
 	}
 
 	/**
+	 * Generate the llms.txt index file from exported Markdown files.
+	 *
+	 * Scans the export base directory for .md files, builds a sectioned index
+	 * grouped by post type, and writes llms.txt to the export base.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents generate_llms_txt
+	 *
+	 * @since  1.3.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function generate_llms_txt( array $args, array $assoc_args ): void {
+		if ( null === $this->llms_txt ) {
+			\WP_CLI::error( 'LlmsTxtGenerator is not available.' );
+			return;
+		}
+
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		$result      = $this->llms_txt->generate( $export_base );
+
+		$result
+			? \WP_CLI::success( 'llms.txt generated.' )
+			: \WP_CLI::error( 'llms.txt generation failed. Check that the export directory exists and contains .md files.' );
+	}
+
+	/**
 	 * @since  1.0.0
 	 */
 	private function delete_type( string $post_type ): void {

@@ -170,7 +170,7 @@ wp markdown-agents status
 wp markdown-agents delete --all --yes
 
 # Generate llms.txt
-wp markdown-agents generate-llms-txt
+wp markdown-agents generate_llms_txt
 ```
 
 ---
