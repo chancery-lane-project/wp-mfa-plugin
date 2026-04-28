@@ -22,6 +22,7 @@ class SettingsPageTest extends TestCase {
         $GLOBALS['_mock_registered_settings'] = [];
         $GLOBALS['_mock_settings_sections']   = [];
         $GLOBALS['_mock_settings_fields']     = [];
+        $GLOBALS['_mock_transients']          = [];
         $this->generator = $this->createMock( Generator::class );
     }
 
@@ -132,5 +133,47 @@ class SettingsPageTest extends TestCase {
             'ua_agent_strings' => "\n\nGPTBot\n\n",
         ] );
         $this->assertSame( [ 'GPTBot' ], $result['ua_agent_strings'] );
+    }
+
+    public function test_sanitize_flags_regen_when_post_type_configs_change(): void {
+        $page = $this->make_page( [
+            'post_types'        => [ 'post' ],
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => [ 'old_field' ], 'content_fields' => [] ],
+            ],
+        ] );
+
+        $page->sanitize_options( [
+            'post_types'        => [ 'post' ],
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => "new_field\n", 'content_fields' => '' ],
+            ],
+        ] );
+
+        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_sanitize_does_not_flag_regen_when_unrelated_settings_change(): void {
+        $page = $this->make_page( [
+            'post_types'         => [ 'post' ],
+            'post_type_configs'  => [
+                'post' => [ 'frontmatter_fields' => [ 'my_field' ], 'content_fields' => [] ],
+            ],
+            'include_taxonomies' => true,
+            'export_dir'         => 'wp-mfa-exports',
+            'ua_force_enabled'   => false,
+        ] );
+
+        $page->sanitize_options( [
+            'post_types'         => [ 'post' ],
+            'post_type_configs'  => [
+                'post' => [ 'frontmatter_fields' => "my_field\n", 'content_fields' => '' ],
+            ],
+            'include_taxonomies' => '1',
+            'export_dir'         => 'wp-mfa-exports',
+            'ua_force_enabled'   => '1',
+        ] );
+
+        $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
     }
 }

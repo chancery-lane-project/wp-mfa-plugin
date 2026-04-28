@@ -591,6 +591,12 @@ if (!function_exists('wp_send_json_error')) {
     }
 }
 
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode(mixed $data, int $options = 0, int $depth = 512): string|false {
+        return json_encode($data, $options, $depth);
+    }
+}
+
 if (!function_exists('set_transient')) {
     function set_transient(string $transient, mixed $value, int $expiration = 0): bool {
         $GLOBALS['_mock_transients'][$transient] = $value;

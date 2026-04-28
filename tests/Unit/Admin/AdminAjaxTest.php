@@ -38,6 +38,7 @@ class AdminAjaxTest extends TestCase {
         );
         $GLOBALS['_mock_verify_nonce']     = 1;
         $GLOBALS['_mock_current_user_can'] = true;
+        $GLOBALS['_mock_transients']       = [];
         $_POST = [];
     }
 
@@ -151,6 +152,61 @@ class AdminAjaxTest extends TestCase {
         $this->admin->handle_generate_batch_ajax();
 
         $this->assertSame( 50, $captured_limit );
+    }
+
+    public function test_final_batch_clears_post_type_from_pending_regen(): void {
+        set_transient( 'markdown_for_agents_needs_regen', [ 'post', 'page' ], 0 );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $this->admin->handle_generate_batch_ajax();
+
+        $this->assertSame( [ 'page' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_final_batch_for_last_pending_type_deletes_transient(): void {
+        set_transient( 'markdown_for_agents_needs_regen', [ 'post' ], 0 );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 3, 'processed' => 3, 'errors' => [] ] );
+
+        $this->admin->handle_generate_batch_ajax();
+
+        $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_non_final_batch_does_not_clear_pending_regen(): void {
+        set_transient( 'markdown_for_agents_needs_regen', [ 'post' ], 0 );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        // total exceeds offset+limit — more batches to come.
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
+
+        $this->admin->handle_generate_batch_ajax();
+
+        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
     }
 
     public function test_handle_generate_taxonomy_batch_ajax_returns_batch_result(): void {

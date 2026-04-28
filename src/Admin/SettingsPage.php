@@ -189,7 +189,48 @@ class SettingsPage {
 		$ua_lines                  = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
 		$clean['ua_agent_strings'] = array_values( $ua_lines );
 
+		$this->maybe_flag_regeneration( $this->options, $clean );
+
 		return $clean;
+	}
+
+	/**
+	 * Set the regeneration-needed transient when output-affecting settings change.
+	 *
+	 * Compares old vs new options on the keys that influence generated file
+	 * contents or location. When any differ, stores the snapshot of currently
+	 * enabled post types as the pending set; the AJAX bulk-generate handler
+	 * removes types from this set as they complete and clears the transient
+	 * once the set is empty.
+	 *
+	 * @since  1.2.0
+	 * @param  array<string, mixed> $old Existing saved options.
+	 * @param  array<string, mixed> $new Sanitised incoming options.
+	 */
+	private function maybe_flag_regeneration( array $old, array $new ): void {
+		$old_pt = (array) ( $old['post_types'] ?? array() );
+		$new_pt = (array) ( $new['post_types'] ?? array() );
+		sort( $old_pt );
+		sort( $new_pt );
+
+		$changed =
+			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
+			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
+			|| $old_pt !== $new_pt
+			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
+
+		if ( ! $changed ) {
+			return;
+		}
+
+		$pending = array_values( (array) ( $new['post_types'] ?? array() ) );
+
+		if ( empty( $pending ) ) {
+			delete_transient( 'markdown_for_agents_needs_regen' );
+			return;
+		}
+
+		set_transient( 'markdown_for_agents_needs_regen', $pending, 0 );
 	}
 
 	/**
@@ -228,7 +269,7 @@ class SettingsPage {
 		}
 		?>
 		<hr>
-		<h2><?php esc_html_e( 'Generate Markdown files', 'markdown-for-agents-and-statistics' ); ?></h2>
+		<h2 id="generate-markdown-files"><?php esc_html_e( 'Generate Markdown files', 'markdown-for-agents-and-statistics' ); ?></h2>
 		<p><?php esc_html_e( 'Regenerate all Markdown files for a post type. This may take a while on large sites.', 'markdown-for-agents-and-statistics' ); ?></p>
 		<?php foreach ( $post_types as $post_type ) : ?>
 			<p>
