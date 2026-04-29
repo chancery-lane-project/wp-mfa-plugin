@@ -167,8 +167,39 @@ class Admin {
 
 		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
 
+		// Final batch for this post type — drop it from the pending-regen list.
+		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
+			$this->mark_post_type_regenerated( $post_type );
+		}
+
 		wp_send_json_success( $result );
 		return;
+	}
+
+	/**
+	 * Remove a post type from the pending-regeneration transient, deleting
+	 * the transient entirely once every flagged type has been regenerated.
+	 *
+	 * @since  1.2.0
+	 * @param  string $post_type Slug just regenerated to completion.
+	 */
+	private function mark_post_type_regenerated( string $post_type ): void {
+		$pending = get_transient( 'markdown_for_agents_needs_regen' );
+
+		if ( ! is_array( $pending ) || empty( $pending ) ) {
+			return;
+		}
+
+		$remaining = array_values( array_diff( $pending, array( $post_type ) ) );
+
+		if ( empty( $remaining ) ) {
+			delete_transient( 'markdown_for_agents_needs_regen' );
+			return;
+		}
+
+		if ( $remaining !== $pending ) {
+			set_transient( 'markdown_for_agents_needs_regen', $remaining, 0 );
+		}
 	}
 
 	/**
@@ -284,6 +315,16 @@ class Admin {
 	 * @since  1.0.0
 	 */
 	public function display_admin_notices(): void {
+		$this->display_action_notice();
+		$this->display_regen_notice();
+	}
+
+	/**
+	 * Render the transient-backed action notice (set by POST handlers).
+	 *
+	 * @since  1.0.0
+	 */
+	private function display_action_notice(): void {
 		$notice = get_transient( 'markdown_for_agents_admin_notice' );
 
 		if ( ! is_array( $notice ) ) {
@@ -299,6 +340,31 @@ class Admin {
 			'<div class="notice notice-%s is-dismissible"><p>%s</p></div>',
 			esc_attr( $type ),
 			wp_kses_post( (string) ( $notice['message'] ?? '' ) )
+		);
+	}
+
+	/**
+	 * Render the "settings changed — regenerate" warning when the regen
+	 * transient is set. Dismissible via core's `is-dismissible` JS, which
+	 * only hides for the session; the notice returns on the next page load
+	 * until a full bulk regeneration of every flagged post type completes.
+	 *
+	 * @since  1.2.0
+	 */
+	private function display_regen_notice(): void {
+		$pending = get_transient( 'markdown_for_agents_needs_regen' );
+
+		if ( ! is_array( $pending ) || empty( $pending ) ) {
+			return;
+		}
+
+		$settings_url = admin_url( 'options-general.php?page=markdown-for-agents#generate-markdown-files' );
+
+		printf(
+			'<div class="notice notice-warning is-dismissible" data-mfa-notice="needs_regen"><p>%s <a href="%s">%s</a></p></div>',
+			esc_html__( 'Markdown for Agents: settings changed since the last bulk run. Existing Markdown files may be out of date until you regenerate.', 'markdown-for-agents-and-statistics' ),
+			esc_url( $settings_url ),
+			esc_html__( 'Regenerate now', 'markdown-for-agents-and-statistics' )
 		);
 	}
 }
