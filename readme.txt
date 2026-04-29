@@ -49,10 +49,12 @@ to AI agents and language model tools that request it via HTTP content negotiati
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/markdown-for-agents` directory,
-   or install the plugin through the WordPress Plugins screen directly.
+1. Upload the plugin to `/wp-content/plugins/markdown-for-agents/`, or install via the WordPress Plugins screen.
 2. Activate the plugin through the Plugins screen in WordPress.
-3. Configure the plugin via **Settings → Markdown for Agents**.
+3. Visit **Settings → Markdown for Agents** and choose which post types and taxonomies to generate.
+4. Enable **Auto-generate on save** so files stay in sync as you publish or edit content (optional).
+5. Click **Generate All** to create Markdown for your existing content. On large sites you can also run `wp markdown-agents generate` and `wp markdown-agents generate-taxonomies` from WP-CLI.
+6. Verify by appending `?output_format=md` to any post URL (or using an AI User-Agent) to confirm Markdown is served.
 
 == Frequently Asked Questions ==
 
