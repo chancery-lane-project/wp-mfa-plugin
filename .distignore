@@ -8,3 +8,16 @@ phpcs.xml.dist
 composer.lock
 .gitignore
 .distignore
+vendor/bin/
+vendor/league/html-to-markdown/bin/
+vendor/phpunit/
+vendor/squizlabs/
+vendor/nikic/
+vendor/sebastian/
+vendor/phar-io/
+vendor/myclabs/
+vendor/dealerdirect/
+vendor/doctrine/
+vendor/phpcsstandards/
+vendor/theseer/
+vendor/wp-coding-standards/
