@@ -16,7 +16,6 @@ use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
-use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
@@ -178,7 +177,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, new LlmsTxtGenerator( $options ), $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
+			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
 		);
 	}
 
