@@ -6,7 +6,6 @@ namespace Tclp\WpMarkdownForAgents\CLI;
 
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
-use Tclp\WpMarkdownForAgents\Generator\LlmsTxtGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
@@ -27,7 +26,6 @@ class Commands {
 	 * @since  1.0.0
 	 * @param  array<string, mixed>       $options           Plugin options.
 	 * @param  Generator                  $generator         Generator instance.
-	 * @param  LlmsTxtGenerator|null      $llms_txt          Optional llms.txt generator.
 	 * @param  FileWriter|null            $file_writer        FileWriter for manifest I/O.
 	 * @param  TaxonomyArchiveGenerator|null $taxonomy_generator Optional taxonomy archive generator.
 	 * @param  StatsRepository|null       $stats_repository  Optional stats repository for prune-stats.
@@ -35,7 +33,6 @@ class Commands {
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
-		private readonly ?LlmsTxtGenerator $llms_txt = null,
 		private readonly ?FileWriter $file_writer = null,
 		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
 		private readonly ?StatsRepository $stats_repository = null,
@@ -57,9 +54,6 @@ class Commands {
 	 *
 	 * [--force]
 	 * : Regenerate even if the .md file is newer than the post.
-	 *
-	 * [--with-llmstxt]
-	 * : Also regenerate llms.txt after export.
 	 *
 	 * [--with-manifest]
 	 * : Generate manifest.json with content hashes and change tracking.
@@ -108,13 +102,6 @@ class Commands {
 					? \WP_CLI::success( 'manifest.json generated.' )
 					: \WP_CLI::warning( 'manifest.json generation failed.' );
 			}
-		}
-
-		if ( isset( $assoc_args['with-llmstxt'] ) && $this->llms_txt ) {
-			$result = $this->llms_txt->generate( $export_base );
-			$result
-				? \WP_CLI::success( 'llms.txt generated.' )
-				: \WP_CLI::warning( 'llms.txt generation failed.' );
 		}
 	}
 

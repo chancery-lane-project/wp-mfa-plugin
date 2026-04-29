@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.3.0
+Stable tag: 1.4.1
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -25,7 +25,6 @@ to AI agents and language model tools that request it via HTTP content negotiati
    no page render required.
 3. A `<link rel="alternate" type="text/markdown">` tag is added to each page's
    `<head>` so agents can discover Markdown versions automatically.
-4. An `llms.txt` index file can be generated to help LLM tools navigate your site.
 
 **Features:**
 
@@ -36,7 +35,6 @@ to AI agents and language model tools that request it via HTTP content negotiati
 * Per-post-type field configuration — choose which meta/ACF fields go in frontmatter or body
 * ACF support with dot notation for nested group fields (e.g. `group.subfield`)
 * Content fields option — use ACF fields as the body content instead of post_content
-* `llms.txt` index generation following the llmstxt.org specification
 * Manifest generation with content hashes and change tracking per post type
 * Incremental export — only re-export changed documents (`--incremental`)
 * Delta file (`changes.json`) for RAG system sync
@@ -137,6 +135,9 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
+= 1.4.1 =
+* Removed `llms.txt` index generation. The `LlmsTxtGenerator` class, its `--with-llmstxt` WP-CLI flag on `wp markdown-agents generate`, and the corresponding unit tests have been dropped.
+
 = 1.3.0 =
 * Optional hierarchy frontmatter fields (`parent`, `ancestors`, `children` IDs) for hierarchical post types (pages, etc.).
 * Optional author display name in frontmatter.
@@ -173,6 +174,9 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.4.1 =
+Removes `llms.txt` index generation, including the `--with-llmstxt` WP-CLI flag. If you relied on this output, stay on 1.3.x or generate `llms.txt` externally.
 
 = 1.3.0 =
 New optional frontmatter fields (hierarchy, author, relative image paths), a Topics body section, inline Markdown preview, and the prune-stats WP-CLI command. All features are opt-in via Settings. No breaking changes or database migrations required.
