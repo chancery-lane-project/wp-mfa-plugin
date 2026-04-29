@@ -2,7 +2,7 @@
 Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
-Tested up to: 6.9
+Tested up to: 7.0
 Stable tag: 1.3.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later

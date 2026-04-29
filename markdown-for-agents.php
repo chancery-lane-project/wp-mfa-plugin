@@ -2,13 +2,13 @@
 
 /**
  * Plugin Name:       Markdown for Agents and Statistics
- * Plugin URI:        https://github.com/tclp/markdown-for-agents
+ * Plugin URI:        https://labs.chancerylaneproject.org/project/wordpress-markdown-for-agents/
  * Description:       Serve pre-generated Markdown files to AI agents via HTTP content negotiation, with access statistics.
  * Version:           1.3.0
  * Requires at least: 6.3
  * Requires PHP:      8.1
  * Author:            The Chancery Lane Project
- * Author URI:        https://chancerylane.uk
+ * Author URI:        https://chancerylaneproject.org
  * License:           GPL-3.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain:       markdown-for-agents-and-statistics
