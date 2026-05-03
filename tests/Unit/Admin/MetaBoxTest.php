@@ -123,6 +123,40 @@ class MetaBoxTest extends TestCase {
         $this->assertArrayNotHasKey( '_markdown_for_agents_excluded', $GLOBALS['_mock_post_meta'][1] ?? [] );
     }
 
+    // -----------------------------------------------------------------------
+    // render() — exclusion checkbox
+    // -----------------------------------------------------------------------
+
+    public function test_render_checkbox_checked_when_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+
+        ob_start();
+        $meta_box->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'checked="checked"', $output );
+    }
+
+    public function test_render_checkbox_unchecked_when_not_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+        // No exclusion meta set.
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+
+        ob_start();
+        $meta_box->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'checked="checked"', $output );
+    }
+
     // MUST BE LAST in save() tests — define() cannot be undone in a shared process.
     // @runInSeparateProcess with @preserveGlobalState disabled isolates the constant.
     /**

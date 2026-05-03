@@ -51,14 +51,24 @@ class MetaBox {
 	 * @param  \WP_Post $post The current post.
 	 */
 	public function render( \WP_Post $post ): void {
-		$filepath      = $this->generator->get_export_path( $post );
-		$exists        = file_exists( $filepath );
+		$filepath  = $this->generator->get_export_path( $post );
+		$exists    = file_exists( $filepath );
+		$excluded  = (bool) get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
+
 		$regen_url     = wp_nonce_url(
 			admin_url( 'admin-post.php?action=markdown_for_agents_regenerate_post&post_id=' . $post->ID ),
 			'markdown_for_agents_regenerate'
 		);
 		$preview_nonce = wp_create_nonce( 'mfa_preview_post_' . $post->ID );
 		?>
+		<?php wp_nonce_field( 'markdown_for_agents_exclude', 'markdown_for_agents_exclude_nonce' ); ?>
+		<p>
+			<label>
+				<input type="checkbox" name="markdown_for_agents_excluded" value="1"
+					   <?php checked( $excluded, true ); ?>>
+				<?php esc_html_e( 'Exclude from Markdown output', 'markdown-for-agents-and-statistics' ); ?>
+			</label>
+		</p>
 		<p>
 			<?php if ( $exists ) : ?>
 				<strong><?php esc_html_e( 'Markdown file:', 'markdown-for-agents-and-statistics' ); ?></strong>
@@ -69,13 +79,20 @@ class MetaBox {
 			<?php endif; ?>
 		</p>
 		<p>
-			<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
-				<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
-			</a>
+			<?php if ( $excluded ) : ?>
+				<span class="button button-secondary button-small" aria-disabled="true" style="opacity:0.5;cursor:default;">
+					<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
+				</span>
+			<?php else : ?>
+				<a href="<?php echo esc_url( $regen_url ); ?>" class="button button-secondary button-small">
+					<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
+				</a>
+			<?php endif; ?>
 			<button type="button" class="button button-secondary button-small mfa-preview-btn"
 					data-post-id="<?php echo esc_attr( (string) $post->ID ); ?>"
 					data-nonce="<?php echo esc_attr( $preview_nonce ); ?>"
-					data-ajaxurl="<?php echo esc_attr( admin_url( 'admin-ajax.php' ) ); ?>">
+					data-ajaxurl="<?php echo esc_attr( admin_url( 'admin-ajax.php' ) ); ?>"
+					<?php disabled( $excluded, true ); ?>>
 				<?php esc_html_e( 'Preview Markdown', 'markdown-for-agents-and-statistics' ); ?>
 			</button>
 		</p>
