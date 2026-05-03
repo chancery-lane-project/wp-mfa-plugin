@@ -129,6 +129,30 @@ class NegotiatorTest extends TestCase {
         $this->addToAssertionCount( 1 );
     }
 
+    public function test_does_nothing_for_non_published_post(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_type' => 'post', 'post_name' => 'test', 'post_status' => 'private' ] );
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+        $this->addToAssertionCount( 1 );
+    }
+
+    public function test_does_nothing_for_password_protected_post(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_type' => 'post', 'post_name' => 'test', 'post_status' => 'publish', 'post_password' => 'secret' ] );
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+        $this->addToAssertionCount( 1 );
+    }
+
     // -----------------------------------------------------------------------
     // output_link_tag — guard conditions
     // -----------------------------------------------------------------------
@@ -152,6 +176,34 @@ class NegotiatorTest extends TestCase {
 
         $this->generator->method( 'get_export_path' )
             ->willReturn( '/nonexistent/path/post.md' );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertSame( '', $output );
+    }
+
+    public function test_link_tag_not_output_for_private_post(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_type' => 'post', 'post_name' => 'test', 'post_status' => 'private' ] );
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertSame( '', $output );
+    }
+
+    public function test_link_tag_not_output_for_password_protected_post(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_type' => 'post', 'post_name' => 'test', 'post_status' => 'publish', 'post_password' => 'secret' ] );
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
 
         ob_start();
         $this->make_negotiator()->output_link_tag();

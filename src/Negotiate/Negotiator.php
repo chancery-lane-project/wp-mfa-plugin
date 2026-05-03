@@ -63,6 +63,10 @@ class Negotiator {
 				return;
 			}
 
+			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
+				return;
+			}
+
 			/**
 			 * Whether to serve Markdown for this specific post.
 			 *
@@ -140,6 +144,10 @@ class Negotiator {
 		if ( $this->is_eligible_singular() ) {
 			$post = get_queried_object();
 			if ( ! $post instanceof \WP_Post ) {
+				return;
+			}
+
+			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
 				return;
 			}
 

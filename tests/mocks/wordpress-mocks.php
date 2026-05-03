@@ -377,7 +377,8 @@ if (!class_exists('WP_Post')) {
         public string $post_date_gmt = '2025-01-01 12:00:00';
         public string $post_modified = '2025-06-01 12:00:00';
         public string $post_modified_gmt = '2025-06-01 12:00:00';
-        public string $post_author = '1';
+        public string $post_author   = '1';
+        public string $post_password = '';
 
         public function __construct(array $props = []) {
             foreach ($props as $key => $value) {

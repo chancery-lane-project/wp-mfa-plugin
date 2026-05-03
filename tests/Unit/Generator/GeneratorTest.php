@@ -181,6 +181,16 @@ class GeneratorTest extends TestCase {
         $this->assertFalse( $result );
     }
 
+    public function test_generate_post_skips_password_protected_post(): void {
+        $post = $this->make_post( [ 'post_password' => 'secret' ] );
+
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $result = $this->generator->generate_post( $post );
+
+        $this->assertFalse( $result );
+    }
+
     public function test_generate_post_fires_action_on_success(): void {
         $post = $this->make_post();
 
@@ -265,6 +275,16 @@ class GeneratorTest extends TestCase {
 
     public function test_on_save_post_deletes_for_trashed_post(): void {
         $post = $this->make_post( [ 'post_status' => 'trash' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+
+        $this->file_writer->expects( $this->once() )->method( 'delete' )->willReturn( true );
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $this->generator->on_save_post( 1, $post );
+    }
+
+    public function test_on_save_post_deletes_for_password_protected_published_post(): void {
+        $post = $this->make_post( [ 'post_status' => 'publish', 'post_password' => 'secret' ] );
         $GLOBALS['_mock_post_objects'][1] = $post;
 
         $this->file_writer->expects( $this->once() )->method( 'delete' )->willReturn( true );
