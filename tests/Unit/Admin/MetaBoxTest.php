@@ -157,6 +157,58 @@ class MetaBoxTest extends TestCase {
         $this->assertStringNotContainsString( 'checked="checked"', $output );
     }
 
+    public function test_render_regenerate_disabled_when_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        ob_start();
+        ( new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator ) )->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'aria-disabled="true"', $output );
+        $this->assertStringNotContainsString( 'href=', $output );
+    }
+
+    public function test_render_regenerate_enabled_when_not_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        ob_start();
+        ( new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator ) )->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'aria-disabled="true"', $output );
+        $this->assertStringContainsString( 'href=', $output );
+    }
+
+    public function test_render_preview_button_disabled_when_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        ob_start();
+        ( new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator ) )->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'disabled="disabled"', $output );
+    }
+
+    public function test_render_preview_button_enabled_when_not_excluded(): void {
+        $post = new \WP_Post( [ 'ID' => 1, 'post_name' => 'test', 'post_type' => 'post' ] );
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path.md' );
+
+        ob_start();
+        ( new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator ) )->render( $post );
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'disabled="disabled"', $output );
+    }
+
     // MUST BE LAST in save() tests — define() cannot be undone in a shared process.
     // @runInSeparateProcess with @preserveGlobalState disabled isolates the constant.
     /**

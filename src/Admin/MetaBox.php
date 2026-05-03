@@ -80,7 +80,7 @@ class MetaBox {
 		</p>
 		<p>
 			<?php if ( $excluded ) : ?>
-				<span class="button button-secondary button-small" aria-disabled="true" style="opacity:0.5;cursor:default;">
+				<span class="button button-secondary button-small" aria-disabled="true" tabindex="-1" style="opacity:0.5;cursor:default;">
 					<?php esc_html_e( 'Regenerate', 'markdown-for-agents-and-statistics' ); ?>
 				</span>
 			<?php else : ?>
