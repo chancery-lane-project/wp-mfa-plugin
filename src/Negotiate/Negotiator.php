@@ -67,6 +67,10 @@ class Negotiator {
 				return;
 			}
 
+			if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+				return;
+			}
+
 			/**
 			 * Whether to serve Markdown for this specific post.
 			 *
@@ -148,6 +152,10 @@ class Negotiator {
 			}
 
 			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
+				return;
+			}
+
+			if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
 				return;
 			}
 

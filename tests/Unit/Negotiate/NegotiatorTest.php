@@ -43,6 +43,7 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_is_tax']      = false;
         $GLOBALS['_mock_queried_object'] = null;
         $GLOBALS['_mock_sent_headers']   = [];
+        $GLOBALS['_mock_post_meta']      = [];
         $_SERVER['HTTP_ACCEPT']          = '';
     }
 
@@ -153,6 +154,19 @@ class NegotiatorTest extends TestCase {
         $this->addToAssertionCount( 1 );
     }
 
+    public function test_does_nothing_for_excluded_post(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
+        $this->addToAssertionCount( 1 );
+    }
+
     // -----------------------------------------------------------------------
     // output_link_tag — guard conditions
     // -----------------------------------------------------------------------
@@ -200,6 +214,21 @@ class NegotiatorTest extends TestCase {
 
     public function test_link_tag_not_output_for_password_protected_post(): void {
         $post = new \WP_Post( [ 'ID' => 1, 'post_type' => 'post', 'post_name' => 'test', 'post_status' => 'publish', 'post_password' => 'secret' ] );
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        ob_start();
+        $this->make_negotiator()->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertSame( '', $output );
+    }
+
+    public function test_link_tag_not_output_for_excluded_post(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
         $GLOBALS['_mock_is_singular']    = true;
         $GLOBALS['_mock_queried_object'] = $post;
 
