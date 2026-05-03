@@ -85,4 +85,43 @@ class MetaBox {
 		</details>
 		<?php
 	}
+
+	/**
+	 * Save the exclusion checkbox value from the metabox form.
+	 *
+	 * Hooked to `save_post` at priority 5 — runs before Generator::on_save_post
+	 * at priority 10 so the exclusion meta is readable on the same save.
+	 *
+	 * @since  1.3.0
+	 * @param  int $post_id The post being saved.
+	 */
+	public function save( int $post_id ): void {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce(
+			sanitize_key( wp_unslash( $_POST['markdown_for_agents_exclude_nonce'] ?? '' ) ),
+			'markdown_for_agents_exclude'
+		) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			return;
+		}
+
+		$excluded = sanitize_key( wp_unslash( $_POST['markdown_for_agents_excluded'] ?? '' ) ) === '1';
+
+		if ( $excluded ) {
+			update_post_meta( $post_id, '_markdown_for_agents_excluded', '1' );
+			$this->generator->delete_post( $post_id );
+		} else {
+			delete_post_meta( $post_id, '_markdown_for_agents_excluded' );
+		}
+	}
 }

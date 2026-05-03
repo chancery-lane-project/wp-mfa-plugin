@@ -67,6 +67,18 @@ class Admin {
 	}
 
 	/**
+	 * Delegate save_post to MetaBox::save().
+	 *
+	 * Hooked to `save_post` at priority 5.
+	 *
+	 * @since  1.3.0
+	 * @param  int $post_id The post being saved.
+	 */
+	public function handle_meta_box_save( int $post_id ): void {
+		$this->meta_box->save( $post_id );
+	}
+
+	/**
 	 * Handle the bulk-generate POST action.
 	 *
 	 * Hooked to `admin_post_markdown_for_agents_generate`.

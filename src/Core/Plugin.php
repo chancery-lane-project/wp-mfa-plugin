@@ -141,11 +141,17 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
+		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator );
+
+		// Registered unconditionally — exclusion meta must be saved regardless of
+		// is_admin() or auto_generate setting. Priority 5 runs before
+		// Generator::on_save_post at priority 10.
+		$this->loader->add_action( 'save_post', $admin, 'handle_meta_box_save', 5, 1 );
+
 		if ( ! is_admin() ) {
 			return;
 		}
 
-		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator );
 		$this->loader->add_action( 'admin_menu', $admin, 'add_settings_page' );
 		$this->loader->add_action( 'admin_init', $admin, 'register_settings' );
 		$this->loader->add_action( 'add_meta_boxes', $admin, 'add_meta_boxes' );

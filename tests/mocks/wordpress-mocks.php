@@ -326,7 +326,7 @@ if (!function_exists('esc_url')) {
 
 if (!function_exists('wp_is_post_revision')) {
     function wp_is_post_revision(int|\WP_Post $post): int|false {
-        return false;
+        return $GLOBALS['_mock_is_post_revision'] ?? false;
     }
 }
 
@@ -439,6 +439,7 @@ $GLOBALS['_mock_settings_sections']    = [];
 $GLOBALS['_mock_settings_fields']      = [];
 $GLOBALS['_mock_meta_boxes']           = [];
 $GLOBALS['_mock_current_user_can']     = true;
+$GLOBALS['_mock_is_post_revision']     = false;
 $GLOBALS['_mock_transients']           = [];
 
 if (!function_exists('is_admin')) {
@@ -851,6 +852,14 @@ if (!function_exists('checked')) {
         if ($echo) {
             echo $result;
         }
+        return $result;
+    }
+}
+
+if (!function_exists('disabled')) {
+    function disabled(mixed $helper, mixed $current = true, bool $echo = true): string {
+        $result = $helper === $current ? ' disabled="disabled"' : '';
+        if ($echo) echo $result;
         return $result;
     }
 }

@@ -18,8 +18,20 @@ class MetaBoxTest extends TestCase {
     private Generator $generator;
 
     protected function setUp(): void {
-        $GLOBALS['_mock_meta_boxes'] = [];
+        $GLOBALS['_mock_meta_boxes']       = [];
+        $GLOBALS['_mock_post_meta']        = [];
+        $GLOBALS['_mock_verify_nonce']     = 1;
+        $GLOBALS['_mock_current_user_can'] = true;
+        $GLOBALS['_mock_is_post_revision'] = false;
+        $_POST                             = [];
         $this->generator = $this->createMock( Generator::class );
+    }
+
+    protected function tearDown(): void {
+        // Reset mutable globals so later test classes (e.g. GeneratorTest) are
+        // not affected by values set inside individual test methods.
+        $GLOBALS['_mock_is_post_revision'] = false;
+        $_POST                             = [];
     }
 
     public function test_register_adds_meta_box_for_each_post_type(): void {
@@ -54,5 +66,80 @@ class MetaBoxTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringContainsString( 'No Markdown file generated yet', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // save()
+    // -----------------------------------------------------------------------
+
+    public function test_save_sets_meta_and_deletes_file_when_excluded(): void {
+        $_POST['markdown_for_agents_exclude_nonce'] = 'valid';
+        $_POST['markdown_for_agents_excluded']      = '1';
+
+        $this->generator->expects( $this->once() )->method( 'delete_post' )->with( 1 );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+        $meta_box->save( 1 );
+
+        $this->assertSame( '1', $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] ?? null );
+    }
+
+    public function test_save_clears_meta_when_not_excluded(): void {
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+        $_POST['markdown_for_agents_exclude_nonce'] = 'valid';
+        // $_POST['markdown_for_agents_excluded'] intentionally absent — checkbox unticked.
+
+        $this->generator->expects( $this->never() )->method( 'delete_post' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+        $meta_box->save( 1 );
+
+        $this->assertArrayNotHasKey( '_markdown_for_agents_excluded', $GLOBALS['_mock_post_meta'][1] ?? [] );
+    }
+
+    public function test_save_does_nothing_with_invalid_nonce(): void {
+        $GLOBALS['_mock_verify_nonce']              = false;
+        $_POST['markdown_for_agents_exclude_nonce'] = 'bad';
+        $_POST['markdown_for_agents_excluded']      = '1';
+
+        $this->generator->expects( $this->never() )->method( 'delete_post' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+        $meta_box->save( 1 );
+
+        $this->assertArrayNotHasKey( '_markdown_for_agents_excluded', $GLOBALS['_mock_post_meta'][1] ?? [] );
+    }
+
+    public function test_save_skips_revision(): void {
+        $GLOBALS['_mock_is_post_revision']          = 5; // non-false = is a revision
+        $_POST['markdown_for_agents_exclude_nonce'] = 'valid';
+        $_POST['markdown_for_agents_excluded']      = '1';
+
+        $this->generator->expects( $this->never() )->method( 'delete_post' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+        $meta_box->save( 1 );
+
+        $this->assertArrayNotHasKey( '_markdown_for_agents_excluded', $GLOBALS['_mock_post_meta'][1] ?? [] );
+    }
+
+    // MUST BE LAST in save() tests — define() cannot be undone in a shared process.
+    // @runInSeparateProcess with @preserveGlobalState disabled isolates the constant.
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_save_skips_autosave(): void {
+        if ( ! defined( 'DOING_AUTOSAVE' ) ) {
+            define( 'DOING_AUTOSAVE', true );
+        }
+        $_POST['markdown_for_agents_excluded'] = '1';
+
+        $this->generator->expects( $this->never() )->method( 'delete_post' );
+
+        $meta_box = new MetaBox( [ 'post_types' => [ 'post' ] ], $this->generator );
+        $meta_box->save( 1 );
+
+        $this->assertArrayNotHasKey( '_markdown_for_agents_excluded', $GLOBALS['_mock_post_meta'][1] ?? [] );
     }
 }
