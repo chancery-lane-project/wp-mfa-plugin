@@ -14,7 +14,7 @@ Add a checkbox to the existing "Markdown for Agents" metabox on post edit screen
 - The file is not served via content negotiation (`Accept: text/markdown`, `?output_format=md`, or known-UA).
 - The `<link rel="alternate">` tag is suppressed in `<head>`.
 
-The checkbox is saved via the standard WordPress `save_post` flow with a nonce field (Option A), consistent with the plugin's existing nonce patterns.
+The checkbox is saved via the standard WordPress `save_post` flow with a nonce field, consistent with the plugin's existing nonce patterns.
 
 ---
 
@@ -34,40 +34,48 @@ The checkbox is saved via the standard WordPress `save_post` flow with a nonce f
 
 ### Render (`MetaBox::render()`)
 
-Add a nonce field and checkbox above the existing buttons paragraph:
+Add a nonce field and checkbox above the existing buttons paragraph. PHP render output:
 
-```html
-<input type="hidden" name="markdown_for_agents_exclude_nonce"
-       value="{wp_create_nonce('markdown_for_agents_exclude')}">
+```php
+<?php wp_nonce_field( 'markdown_for_agents_exclude', 'markdown_for_agents_exclude_nonce' ); ?>
 <p>
     <label>
         <input type="checkbox" name="markdown_for_agents_excluded" value="1"
-               [checked when meta is '1']>
-        Exclude from Markdown output
+               <?php checked( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ), '1' ); ?>>
+        <?php esc_html_e( 'Exclude from Markdown output', 'markdown-for-agents-and-statistics' ); ?>
     </label>
 </p>
 ```
+
+When excluded, the Regenerate link and Preview Markdown button must be visually disabled. The `render()` method reads the exclusion meta once into `$excluded` (bool) and uses it to conditionally render:
+
+- **Regenerate:** rendered as plain text (no `<a>` href) with a `disabled` CSS class when `$excluded`. The `disabled` HTML attribute has no effect on `<a>` elements, so the href must be omitted entirely.
+- **Preview Markdown:** rendered with the `disabled` attribute on the `<button>` element when `$excluded`.
+
+Both operations would silently fail if triggered on an excluded post (since `is_eligible()` returns false), so removing interactivity is the correct behaviour.
 
 The status line ("Generated" / "No Markdown file generated yet.") continues to reflect filesystem state. After checking the box and saving, the status will update to "No Markdown file generated yet." because the file is deleted on save.
 
 ### Save (`MetaBox::save( int $post_id ): void`) — new method
 
-1. Return early if `defined('DOING_AUTOSAVE') && DOING_AUTOSAVE`.
+1. Return early if `defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE`.
 2. Return early if `wp_is_post_revision( $post_id )`.
-3. Verify nonce: `wp_verify_nonce( $_POST['markdown_for_agents_exclude_nonce'] ?? '', 'markdown_for_agents_exclude' )` — return early if invalid.
-4. Check capability: `current_user_can( 'edit_post', $post_id )` — return early if fails.
-5. If `$_POST['markdown_for_agents_excluded'] === '1'`:
+3. Verify nonce from `$_POST['markdown_for_agents_exclude_nonce']` against action `markdown_for_agents_exclude` — return early if invalid.
+4. Check `current_user_can( 'edit_post', $post_id )` — return early if fails.
+5. Read and sanitise value: `$excluded = sanitize_key( wp_unslash( $_POST['markdown_for_agents_excluded'] ?? '' ) ) === '1'`
+6. If `$excluded`:
    - `update_post_meta( $post_id, '_markdown_for_agents_excluded', '1' )`
    - `$this->generator->delete_post( $post_id )` — removes the `.md` file immediately.
-6. Else:
-   - `delete_post_meta( $post_id, '_markdown_for_agents_excluded' )` — file regenerated on next save (if auto-generate is on) or via Regenerate button.
+7. Else:
+   - `delete_post_meta( $post_id, '_markdown_for_agents_excluded' )` — file stays on disk until next regeneration (auto-generate on next save, or via Regenerate button).
 
 `Generator` is already injected into `MetaBox` — no constructor change needed.
 
 ### Hook wiring
 
 - New method `Admin::handle_meta_box_save( int $post_id ): void` delegates to `$this->meta_box->save( $post_id )`.
-- `Plugin::define_admin_hooks()` adds: `save_post` → `$admin->handle_meta_box_save`, priority 10, 1 arg.
+- `Plugin::define_admin_hooks()` wires: `save_post` → `$admin->handle_meta_box_save` at **priority 5** (before `Generator::on_save_post` at priority 10). This guarantees the exclusion meta is written before `is_eligible()` reads it on the same save.
+- **This hook must be registered unconditionally** — outside the `auto_generate` guard in `define_generator()`. Exclusion meta must always be persisted regardless of the auto-generate setting, so the checkbox works on sites where auto-generation is disabled.
 
 ---
 
@@ -85,23 +93,23 @@ Add one condition to the existing check:
 
 ### `on_save_post()` — `Generator.php`
 
-Add exclusion to the delete branch (defence-in-depth — handles meta set externally, e.g. via CLI import):
+Add exclusion to the delete branch (defence-in-depth — handles meta set externally, e.g. via CLI import, without going through the metabox save flow):
 
 ```php
 } elseif ( in_array( $post->post_status, array( 'trash', 'draft', 'pending', 'private' ), true )
     || ( 'publish' === $post->post_status && '' !== $post->post_password )
-    || get_post_meta( $post_id, '_markdown_for_agents_excluded', true ) ) {
+    || get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
     $this->delete_post( $post_id );
 }
 ```
 
-A published, non-passworded, but excluded post triggers `delete_post()` rather than `generate_post()`.
+Both `$post->ID` and `$post_id` are valid here; use `$post->ID` for consistency with `is_eligible()`.
 
 ---
 
 ## Negotiator Integration
 
-Add an exclusion guard in both `maybe_serve_markdown()` and `output_link_tag()`, immediately after the existing `post_status` / `post_password` check:
+Add an exclusion guard in both `maybe_serve_markdown()` and `output_link_tag()`, immediately after the existing `post_status` / `post_password` check and before the `markdown_for_agents_serve_enabled` filter:
 
 ```php
 if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
@@ -109,23 +117,27 @@ if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
 }
 ```
 
-Defensive — the `.md` file should not exist — but guards against stale files or meta set externally.
+**Ordering note:** The exclusion check intentionally runs before the `markdown_for_agents_serve_enabled` filter — meta exclusion takes precedence over the filter. `get_post_meta()` is backed by the WP object cache so the overhead per page load is a cache read, not a raw DB query, on sites with a persistent object cache.
+
+Defensive — the `.md` file should not exist for excluded posts — but guards against stale files or meta set externally.
 
 ---
 
 ## Testing
 
-### New test class: `tests/Unit/Admin/MetaBoxTest.php`
+### Additions to existing `tests/Unit/Admin/MetaBoxTest.php`
 
 | Test | Assertion |
 |------|-----------|
 | `test_save_sets_meta_and_deletes_file_when_excluded` | Nonce valid, cap passes, checkbox ticked → meta written, `delete_post` called on Generator |
-| `test_save_clears_meta_when_not_excluded` | Checkbox unticked → `delete_post_meta` called, Generator `delete_post` not called |
+| `test_save_clears_meta_when_not_excluded` | Checkbox unticked → `delete_post_meta` called, Generator `delete_post` not called; existing file left on disk |
 | `test_save_skips_autosave` | `DOING_AUTOSAVE` defined → no meta write |
 | `test_save_skips_revision` | `wp_is_post_revision` returns post ID → no meta write |
 | `test_save_does_nothing_with_invalid_nonce` | Bad nonce → no meta write |
 | `test_render_checkbox_checked_when_excluded` | Meta `'1'` → rendered output contains `checked` |
 | `test_render_checkbox_unchecked_when_not_excluded` | No meta → rendered output does not contain `checked` |
+
+**Note on render tests:** The `wp_nonce_field()` stub in `tests/mocks/wordpress-mocks.php` outputs only the nonce `<input>` (not the referer field). Render tests should assert against the checkbox and button elements specifically, not on full output equality, to avoid fragility against stub behaviour.
 
 ### Additions to `tests/Unit/Generator/GeneratorTest.php`
 
@@ -147,15 +159,14 @@ Defensive — the `.md` file should not exist — but guards against stale files
 
 | File | Change |
 |------|--------|
-| `src/Admin/MetaBox.php` | Add nonce + checkbox to `render()`; add `save()` method |
+| `src/Admin/MetaBox.php` | Add nonce + checkbox to `render()`; disable buttons when excluded; add `save()` method |
 | `src/Admin/Admin.php` | Add `handle_meta_box_save()` method |
-| `src/Core/Plugin.php` | Wire `save_post` → `Admin::handle_meta_box_save` |
+| `src/Core/Plugin.php` | Wire `save_post` → `Admin::handle_meta_box_save` at priority 5 |
 | `src/Generator/Generator.php` | Update `is_eligible()` and `on_save_post()` |
 | `src/Negotiate/Negotiator.php` | Add exclusion guard in `maybe_serve_markdown()` and `output_link_tag()` |
-| `tests/Unit/Admin/MetaBoxTest.php` | New test class (7 tests) |
-| `tests/Unit/Generator/GeneratorTest.php` | 2 new tests |
-| `tests/Unit/Negotiate/NegotiatorTest.php` | 2 new tests |
-| `tests/mocks/wordpress-mocks.php` | Add `get_post_meta` / `update_post_meta` / `delete_post_meta` stubs if not present |
+| `tests/Unit/Admin/MetaBoxTest.php` | Add 7 new tests to existing class |
+| `tests/Unit/Generator/GeneratorTest.php` | Add 2 new tests |
+| `tests/Unit/Negotiate/NegotiatorTest.php` | Add 2 new tests |
 
 ---
 
@@ -163,4 +174,4 @@ Defensive — the `.md` file should not exist — but guards against stale files
 
 - No WP-CLI flag for per-post exclusion (existing CLI bulk-generate already respects `is_eligible()`).
 - No taxonomy archive exclusion (separate feature if needed).
-- No REST API / Gutenberg sidebar panel (Option A `save_post` flow works for both editors).
+- No REST API / Gutenberg sidebar panel (`save_post` flow works for both editors).
