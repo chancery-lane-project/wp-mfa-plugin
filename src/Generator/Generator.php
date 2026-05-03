@@ -327,10 +327,11 @@ class Generator {
 		try {
 			update_post_meta( $post_id, '_markdown_for_agents_generating', '1' );
 
-			if ( 'publish' === $post->post_status && '' === $post->post_password ) {
+			if ( 'publish' === $post->post_status && '' === $post->post_password && ! get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
 				$this->generate_post( $post );
 			} elseif ( in_array( $post->post_status, array( 'trash', 'draft', 'pending', 'private' ), true )
-				|| ( 'publish' === $post->post_status && '' !== $post->post_password ) ) {
+				|| ( 'publish' === $post->post_status && '' !== $post->post_password )
+				|| get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
 				$this->delete_post( $post_id );
 			}
 		} catch ( \Throwable $e ) {
@@ -536,6 +537,7 @@ class Generator {
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
 		return in_array( $post->post_type, $enabled_types, true )
 			&& 'publish' === $post->post_status
-			&& '' === $post->post_password;
+			&& '' === $post->post_password
+			&& ! get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
 	}
 }
