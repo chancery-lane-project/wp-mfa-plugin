@@ -16,6 +16,8 @@ Markdown for Agents and Statistics converts your WordPress content to Markdown a
 to AI agents and language model tools that request it via HTTP content negotiation
 (`Accept: text/markdown`).
 
+The Chancery Lane Project is a charity that helps organisations reduce emissions using the power of legal documents and processes. We've published this plugin as we believe that making content more legible for AI Agents makes a meaningful difference to their energy usage - not only by reducing the amount of tokens required (by up to 90% over HTML) to consume the content, but also minimising the server resources required to render, process and display pages at source.
+
 **How it works:**
 
 1. Posts and taxonomy archive pages are converted to Markdown and saved as static
@@ -137,6 +139,10 @@ wp markdown-agents generate-taxonomies --dry-run
 
 = 1.4.1 =
 * Removed `llms.txt` index generation. The `LlmsTxtGenerator` class, its `--with-llmstxt` WP-CLI flag on `wp markdown-agents generate`, and the corresponding unit tests have been dropped.
+
+= 1.4.0 =
+* Add notices and copy around generating and regenerating content on install and updates to Settings
+* Add transient to store and note when content needs regenerating
 
 = 1.3.0 =
 * Optional hierarchy frontmatter fields (`parent`, `ancestors`, `children` IDs) for hierarchical post types (pages, etc.).
