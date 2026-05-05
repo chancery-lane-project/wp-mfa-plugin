@@ -7,10 +7,8 @@ namespace Tclp\WpMarkdownForAgents\Generator;
 /**
  * Extracts taxonomy terms for a post, ready for frontmatter.
  *
- * Adapted from wp-to-file AbstractProcessor::prepareTaxonomies() and
- * normalizeTaxonomyName(). Unlike wp-to-file, this class collects ALL
- * registered taxonomies for the post type rather than a configured allow-list,
- * and normalises names using well-known slug mappings.
+ * Collects ALL registered taxonomies for the post type and normalises names
+ * using well-known slug mappings.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator

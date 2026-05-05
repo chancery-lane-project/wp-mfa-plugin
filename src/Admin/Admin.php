@@ -179,6 +179,11 @@ class Admin {
 
 		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
 
+		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( sprintf( 'WP Markdown for Agents: generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
+		}
+
 		// Final batch for this post type — drop it from the pending-regen list.
 		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
 			$this->mark_post_type_regenerated( $post_type );
@@ -233,6 +238,11 @@ class Admin {
 		$limit  = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
 
 		$result = $this->taxonomy_generator->generate_batch( $offset, $limit );
+
+		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( sprintf( 'WP Markdown for Agents: taxonomy generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
+		}
 
 		wp_send_json_success( $result );
 		return;

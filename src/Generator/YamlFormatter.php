@@ -7,7 +7,6 @@ namespace Tclp\WpMarkdownForAgents\Generator;
 /**
  * Serialises a PHP array to a YAML front matter block.
  *
- * Extracted and adapted from wp-to-file AbstractProcessor YAML methods.
  * Handles strings, integers, booleans, and simple/nested arrays.
  * Does not depend on any external YAML library or WordPress functions.
  *

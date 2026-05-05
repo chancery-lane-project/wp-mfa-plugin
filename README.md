@@ -48,8 +48,11 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 ```bash
 git clone https://github.com/chancery-lane-project/wp-mfa-plugin.git markdown-for-agents
 cd markdown-for-agents
-composer install --no-dev
+composer install        # populates vendor-prefixed/ via Strauss
+composer install --no-dev   # then strip dev deps for release
 ```
+
+The first `composer install` runs [Strauss](https://github.com/BrianHenryIE/strauss) automatically to namespace-prefix `league/html-to-markdown` into `vendor-prefixed/`, isolating the plugin from any other plugin shipping the same library. The second pass with `--no-dev` removes Strauss and its build-time dependencies; `vendor/league/html-to-markdown/` is reinstalled at this point but is stripped from the SVN deploy via `.distignore` so only the prefixed copy ships.
 
 Upload to `wp-content/plugins/markdown-for-agents/` and activate through the WordPress Plugins screen.
 

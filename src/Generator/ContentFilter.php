@@ -7,8 +7,8 @@ namespace Tclp\WpMarkdownForAgents\Generator;
 /**
  * Cleans WordPress HTML content before Markdown conversion.
  *
- * Adapted from wp-to-file ContentFilter. This class deliberately does NOT
- * normalise URLs to relative paths — canonical absolute URLs are preserved.
+ * This class deliberately does NOT normalise URLs to relative paths —
+ * canonical absolute URLs are preserved.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator
