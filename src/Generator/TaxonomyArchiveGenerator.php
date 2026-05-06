@@ -233,6 +233,7 @@ class TaxonomyArchiveGenerator {
 		do {
 			$posts = get_posts( // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
 				[
+					'post_type'      => (array) ( $this->options['post_types'] ?? [ 'post' ] ),
 					'post_status'    => 'publish',
 					'posts_per_page' => $batch_size,
 					'offset'         => $offset,

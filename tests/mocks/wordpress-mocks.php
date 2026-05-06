@@ -347,6 +347,7 @@ if (!function_exists('delete_post_meta')) {
 if (!function_exists('get_posts')) {
     /** @return \WP_Post[] */
     function get_posts(array $args = []): array {
+        $GLOBALS['_mock_get_posts_args'] = $args;
         return $GLOBALS['_mock_posts'] ?? [];
     }
 }

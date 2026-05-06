@@ -540,8 +540,9 @@ class GeneratorTest extends TestCase {
         $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
         $gen->generate_post( $post );
 
+        $expected_url = 'https://example.com/wp-content/uploads/' . $this->export_subdir . '/taxonomy/category/news.md';
         $this->assertStringContainsString( '## Topics', $written );
-        $this->assertStringContainsString( '[News](taxonomy/category/news.md)', $written );
+        $this->assertStringContainsString( "[News]({$expected_url})", $written );
         $this->assertStringContainsString( 'Categories', $written );
     }
 

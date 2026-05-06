@@ -94,4 +94,21 @@ class Options {
 
 		return rtrim( $base . '/' . sanitize_file_name( (string) ( $options['export_dir'] ?? 'wp-mfa-exports' ) ), '/\\' );
 	}
+
+	/**
+	 * Return the public URL to the export base directory.
+	 *
+	 * Mirrors get_export_base() but uses the uploads URL rather than the filesystem path.
+	 *
+	 * @since  1.5.0
+	 * @param  array<string, mixed>|null $options Resolved options array, or null to fetch.
+	 * @return string URL without trailing slash.
+	 */
+	public static function get_export_base_url( ?array $options = null ): string {
+		$options    = $options ?? static::get();
+		$upload_dir = wp_upload_dir();
+		$base       = $upload_dir['baseurl'];
+
+		return rtrim( $base . '/' . sanitize_file_name( (string) ( $options['export_dir'] ?? 'wp-mfa-exports' ) ), '/' );
+	}
 }

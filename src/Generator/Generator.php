@@ -511,13 +511,15 @@ class Generator {
 				continue;
 			}
 
-			$links = array();
+			$links    = array();
+			$base_url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options );
+
 			foreach ( $terms as $term ) {
 				$name     = html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 				$tax_seg  = sanitize_file_name( $term->taxonomy );
 				$slug_seg = sanitize_file_name( $term->slug );
-				$path     = 'taxonomy/' . $tax_seg . '/' . $slug_seg . '.md';
-				$links[]  = "[{$name}]({$path})";
+				$url      = $base_url . '/taxonomy/' . $tax_seg . '/' . $slug_seg . '.md';
+				$links[]  = "[{$name}]({$url})";
 			}
 
 			$lines[] = '**' . wp_specialchars_decode( (string) $taxonomy->label, ENT_QUOTES ) . ':** ' . implode( ', ', $links );

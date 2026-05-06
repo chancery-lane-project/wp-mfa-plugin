@@ -212,6 +212,36 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $this->assertStringContainsString( 'Posts in this archive: 0', $captured );
     }
 
+    public function test_generate_term_queries_enabled_post_types(): void {
+        $GLOBALS['_mock_get_posts_args'] = null;
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $gen = $this->make_generator( ['post_types' => ['post', 'page', 'climate_contract']] );
+        $gen->generate_term( $this->make_term() );
+
+        $this->assertSame(
+            ['post', 'page', 'climate_contract'],
+            $GLOBALS['_mock_get_posts_args']['post_type'] ?? null
+        );
+    }
+
+    public function test_generate_term_defaults_to_post_type_when_option_absent(): void {
+        $GLOBALS['_mock_get_posts_args'] = null;
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $gen = $this->make_generator(); // no post_types key in options
+        $gen->generate_term( $this->make_term() );
+
+        $this->assertSame(
+            ['post'],
+            $GLOBALS['_mock_get_posts_args']['post_type'] ?? null
+        );
+    }
+
     // -----------------------------------------------------------------------
     // delete_term_file
     // -----------------------------------------------------------------------
