@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -136,6 +136,10 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+
+= 1.4.2 =
+* Fixed issue with private/draft posts being created as MD files and added checkbox to post edit pages to exclude posts from MD generation. Also fixes small issue in unusual taxonomy slugs prodducing incorrect URLs in Topics secion of MD body. Adds Strauss namespacing to html-to-markdown/Composer includes to avoid collisions.
 
 = 1.4.1 =
 * Removed `llms.txt` index generation. The `LlmsTxtGenerator` class, its `--with-llmstxt` WP-CLI flag on `wp markdown-agents generate`, and the corresponding unit tests have been dropped.

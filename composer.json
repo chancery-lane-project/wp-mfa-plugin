@@ -40,10 +40,12 @@
             "@php -r \"if (!is_dir('vendor-prefixed')) { mkdir('vendor-prefixed', 0755, true); }\""
         ],
         "post-install-cmd": [
-            "@php -r \"if (file_exists('vendor/bin/strauss')) { passthru('composer strauss', $rc); exit($rc); }\""
+            "@php -r \"if (file_exists('vendor/bin/strauss')) { passthru(PHP_BINARY . ' vendor/bin/strauss', $rc); exit($rc); }\"",
+            "@composer dump-autoload"
         ],
         "post-update-cmd": [
-            "@php -r \"if (file_exists('vendor/bin/strauss')) { passthru('composer strauss', $rc); exit($rc); }\""
+            "@php -r \"if (file_exists('vendor/bin/strauss')) { passthru(PHP_BINARY . ' vendor/bin/strauss', $rc); exit($rc); }\"",
+            "@composer dump-autoload"
         ]
     },
     "config": {
