@@ -9,7 +9,7 @@ composer.lock
 .gitignore
 .distignore
 vendor/bin/
-vendor/league/html-to-markdown/bin/
+vendor/league/html-to-markdown/
 vendor/phpunit/
 vendor/squizlabs/
 vendor/nikic/

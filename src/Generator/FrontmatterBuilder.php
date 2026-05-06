@@ -7,9 +7,8 @@ namespace Tclp\WpMarkdownForAgents\Generator;
 /**
  * Assembles the frontmatter array for a post.
  *
- * Adapted from wp-to-file AbstractProcessor::prepareMeta(). SSG-specific keys
- * (layout, eleventyComputed, file_type, relative permalink) are not included.
- * Permalink is the canonical absolute URL.
+ * SSG-specific keys (layout, eleventyComputed, file_type, relative permalink)
+ * are not included. Permalink is the canonical absolute URL.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator

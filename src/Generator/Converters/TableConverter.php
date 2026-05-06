@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator\Converters;
 
-use League\HTMLToMarkdown\Converter\ConverterInterface;
-use League\HTMLToMarkdown\ElementInterface;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Converter\ConverterInterface;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\ElementInterface;
 
 /**
  * Converts HTML tables to GFM-style Markdown tables.
- *
- * Adapted from wp-to-file TableConverter (namespace change only).
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator\Converters

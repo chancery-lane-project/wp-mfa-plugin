@@ -33,6 +33,11 @@ class ConverterTest extends TestCase {
         $this->assertStringContainsString( '**Bold text**', $output );
     }
 
+    public function test_converts_emphasis_to_single_underscore(): void {
+        $output = $this->converter->convert( '<p><em>Emphasised text</em></p>' );
+        $this->assertStringContainsString( '_Emphasised text_', $output );
+    }
+
     public function test_converts_link(): void {
         $output = $this->converter->convert( '<a href="https://example.com">Click here</a>' );
         $this->assertStringContainsString( '[Click here](https://example.com)', $output );

@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator\Converters;
 
-use League\HTMLToMarkdown\Converter\ConverterInterface;
-use League\HTMLToMarkdown\ElementInterface;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Converter\ConverterInterface;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\ElementInterface;
 
 /**
  * Converts WordPress Gutenberg code blocks to fenced Markdown code blocks.
- *
- * Adapted from wp-to-file CodeBlockConverter (namespace change only).
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator\Converters

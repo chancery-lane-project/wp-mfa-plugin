@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
-use League\HTMLToMarkdown\Environment;
-use League\HTMLToMarkdown\HtmlConverter;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Environment;
+use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\HtmlConverter;
 use Tclp\WpMarkdownForAgents\Generator\Converters\CodeBlockConverter;
 use Tclp\WpMarkdownForAgents\Generator\Converters\TableConverter;
 
 /**
  * Converts HTML to Markdown.
  *
- * Wraps league/html-to-markdown v5.x with custom converters from wp-to-file
+ * Wraps league/html-to-markdown v5.x with custom converters
  * (TableConverter, CodeBlockConverter) and WordPress-specific post-processing.
  *
  * @since  1.0.0
@@ -118,8 +118,6 @@ class Converter {
 
 	/**
 	 * Ensure images are followed by a blank line so text does not run on.
-	 *
-	 * Extracted from wp-to-file MarkdownProcessor::fixImageSpacing().
 	 *
 	 * @since  1.0.0
 	 * @param  string $content Markdown content.

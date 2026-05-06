@@ -42,6 +42,7 @@ Thumbs.db
 # ignore node/gulp dependency directories
 node_modules/
 vendor
+vendor-prefixed/
 
 #ignore fonts
 src/fonts/soehne
