@@ -525,7 +525,6 @@ class GeneratorTest extends TestCase {
         $GLOBALS['_mock_terms'][42]['category'] = [
             new \WP_Term( ['term_id' => 1, 'slug' => 'news', 'name' => 'News', 'taxonomy' => 'category'] ),
         ];
-        $GLOBALS['_mock_term_link'][1] = 'https://example.com/category/news/';
 
         $written = '';
         $this->frontmatter_builder->method( 'build' )->willReturn( [] );
@@ -542,7 +541,7 @@ class GeneratorTest extends TestCase {
         $gen->generate_post( $post );
 
         $this->assertStringContainsString( '## Topics', $written );
-        $this->assertStringContainsString( '[News](https://example.com/category/news/)', $written );
+        $this->assertStringContainsString( '[News](taxonomy/category/news.md)', $written );
         $this->assertStringContainsString( 'Categories', $written );
     }
 
