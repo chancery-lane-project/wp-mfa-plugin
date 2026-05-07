@@ -226,6 +226,14 @@ class TaxonomyArchiveGenerator {
 	 * @return \WP_Post[]
 	 */
 	private function get_term_posts( \WP_Term $term ): array {
+		// Restrict to the post types this taxonomy is actually registered against.
+		// Without this, get_posts() defaults to 'post', which misses CPTs like
+		// clause/guide/playbook and produces zero-count archives.
+		$tax_object = get_taxonomy( $term->taxonomy );
+		$post_types = ( $tax_object && ! empty( $tax_object->object_type ) )
+			? $tax_object->object_type
+			: 'any';
+
 		$batch_size = 100;
 		$offset     = 0;
 		$all_posts  = [];
@@ -233,6 +241,7 @@ class TaxonomyArchiveGenerator {
 		do {
 			$posts = get_posts( // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
 				[
+					'post_type'      => $post_types,
 					'post_status'    => 'publish',
 					'posts_per_page' => $batch_size,
 					'offset'         => $offset,
