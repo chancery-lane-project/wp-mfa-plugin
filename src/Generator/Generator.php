@@ -301,6 +301,37 @@ class Generator {
 	}
 
 	/**
+	 * Hook callback for transition_post_status — deletes the export file when
+	 * a post is moved to a non-public status.
+	 *
+	 * Registered unconditionally so files are cleaned up even when auto_generate
+	 * is disabled (e.g. files created via CLI or manual regeneration).
+	 *
+	 * @since  1.2.0
+	 * @param  string   $new_status New post status.
+	 * @param  string   $old_status Previous post status.
+	 * @param  \WP_Post $post       The post object.
+	 */
+	public function on_transition_post_status( string $new_status, string $old_status, \WP_Post $post ): void {
+		if ( $new_status === $old_status ) {
+			return;
+		}
+
+		if ( ! in_array( $new_status, array( 'trash', 'draft', 'pending', 'private' ), true ) ) {
+			return;
+		}
+
+		try {
+			$this->delete_post( $post->ID );
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+				error_log( 'WP Markdown for Agents: on_transition_post_status failed for post ' . $post->ID . ': ' . $e->getMessage() );
+			}
+		}
+	}
+
+	/**
 	 * Hook callback for save_post — generates or deletes the export file.
 	 *
 	 * Skips autosaves, revisions, and uses a post meta flag to prevent

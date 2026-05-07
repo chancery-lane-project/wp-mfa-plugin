@@ -107,6 +107,10 @@ class Plugin {
 
 		$this->loader->add_action( 'delete_term', $taxonomy_generator, 'on_delete_term', 10, 4 );
 
+		// Registered unconditionally so MD files are deleted whenever a post is
+		// moved to a non-public status, even if auto_generate is disabled.
+		$this->loader->add_action( 'transition_post_status', $generator, 'on_transition_post_status', 10, 3 );
+
 		if ( ! empty( $options['auto_generate'] ) ) {
 			$this->loader->add_action( 'save_post', $generator, 'on_save_post', 10, 2 );
 			$this->loader->add_action( 'before_delete_post', $generator, 'cache_post_terms', 10, 1 );
