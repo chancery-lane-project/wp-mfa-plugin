@@ -156,6 +156,10 @@ class Generator {
 				if ( is_callable( $progress ) ) {
 					$progress( $results['success'] + $results['failed'] + $results['skipped'] );
 				}
+
+				// Evict this post's caches so long runs over many posts don't
+				// inflate the object cache. Only clears entries for this post.
+				clean_post_cache( $post );
 			}
 
 			$offset += $batch_size;
@@ -218,6 +222,8 @@ class Generator {
 					'message' => $e->getMessage(),
 				);
 			}
+
+			clean_post_cache( $post );
 		}
 
 		return array(

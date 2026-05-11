@@ -408,6 +408,8 @@ class Commands {
 					if ( file_exists( $full_path ) ) {
 						$manifest->add_document( $post, $relative_path );
 					}
+
+					clean_post_cache( $post );
 				}
 
 				$offset += $batch_size;
@@ -481,6 +483,8 @@ class Commands {
 					if ( file_exists( $full_path ) ) {
 						$manifest->add_document( $post, $relative_path );
 					}
+
+					clean_post_cache( $post );
 				}
 
 				$offset += $batch_size;
