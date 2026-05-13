@@ -301,6 +301,61 @@ class Generator {
 	}
 
 	/**
+	 * Hook callback for save_post — deletes the export file when a published post
+	 * gains a password or is marked excluded via meta, regardless of auto_generate.
+	 *
+	 * Status-change deletions are handled by on_transition_post_status. This covers
+	 * the cases where post_status stays 'publish' but the file should be removed.
+	 *
+	 * @since  1.2.0
+	 * @param  int      $post_id The post ID.
+	 * @param  \WP_Post $post    The post object.
+	 */
+	public function on_save_post_cleanup( int $post_id, \WP_Post $post ): void {
+		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+			return;
+		}
+
+		if ( wp_is_post_revision( $post_id ) ) {
+			return;
+		}
+
+		$excluded = (bool) get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
+
+		if ( ( 'publish' === $post->post_status && '' !== $post->post_password ) || $excluded ) {
+			try {
+				$this->delete_post( $post_id );
+			} catch ( \Throwable $e ) {
+				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+					error_log( 'WP Markdown for Agents: on_save_post_cleanup failed for post ' . $post_id . ': ' . $e->getMessage() );
+				}
+			}
+		}
+	}
+
+	/**
+	 * Hook callback for before_delete_post — deletes the export file before the
+	 * post is permanently removed from the database.
+	 *
+	 * Registered unconditionally so files are cleaned up on hard-delete even when
+	 * auto_generate is disabled or the post bypassed the trash.
+	 *
+	 * @since  1.2.0
+	 * @param  int $post_id The post ID about to be deleted.
+	 */
+	public function on_before_delete_post( int $post_id ): void {
+		try {
+			$this->delete_post( $post_id );
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+				error_log( 'WP Markdown for Agents: on_before_delete_post failed for post ' . $post_id . ': ' . $e->getMessage() );
+			}
+		}
+	}
+
+	/**
 	 * Hook callback for transition_post_status — deletes the export file when
 	 * a post is moved to a non-public status.
 	 *
@@ -322,7 +377,19 @@ class Generator {
 		}
 
 		try {
-			$this->delete_post( $post->ID );
+			if ( 'trash' === $new_status ) {
+				// WordPress renames the slug to `{slug}__trashed(-N)?` inside wp_insert_post
+				// before this hook fires, so get_post() would return the wrong slug.
+				// Clone the post object and restore the original slug for path resolution.
+				$lookup            = clone $post;
+				$lookup->post_name = (string) preg_replace( '/__trashed(-\d+)?$/', '', $post->post_name );
+				$path              = $this->get_export_path( $lookup );
+				if ( $this->file_writer->delete( $path ) ) {
+					do_action( 'markdown_for_agents_file_deleted', $path, $post->ID );
+				}
+			} else {
+				$this->delete_post( $post->ID );
+			}
 		} catch ( \Throwable $e ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
