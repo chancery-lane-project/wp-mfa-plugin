@@ -107,7 +107,7 @@ class Negotiator {
 			$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
 
 			$this->access_logger->log_access( $post->ID, $agent, $access_method );
-			$this->send_markdown_file( $filepath, $via_accept );
+			$this->send_markdown_file( $filepath );
 			return;
 		}
 
@@ -133,7 +133,7 @@ class Negotiator {
 				return;
 			}
 
-			$this->send_markdown_file( $filepath, $via_accept );
+			$this->send_markdown_file( $filepath );
 		}
 	}
 
@@ -235,16 +235,22 @@ class Negotiator {
 	/**
 	 * Send HTTP headers and stream the Markdown file to the client.
 	 *
+	 * Emits cache-bypass headers so full-page caches (LiteSpeed, Varnish,
+	 * nginx fastcgi_cache) do not store the Markdown response and replay it
+	 * to subsequent HTML browser requests on the same URL.
+	 *
 	 * @since  1.1.0
-	 * @param  string $filepath   Absolute path to the .md file.
-	 * @param  bool   $via_accept True when negotiated via Accept header (adds Vary).
+	 * @param  string $filepath Absolute path to the .md file.
 	 */
-	private function send_markdown_file( string $filepath, bool $via_accept ): void {
+	private function send_markdown_file( string $filepath ): void {
 		header( 'Content-Type: text/markdown; charset=utf-8' );
 
-		if ( $via_accept ) {
-			header( 'Vary: Accept' );
-		}
+		// Prevent shared/full-page caches from storing the Markdown variant
+		// under the URL key and serving it back to HTML clients.
+		header( 'Cache-Control: private, no-store, max-age=0' );
+		header( 'X-LiteSpeed-Cache-Control: no-cache' );
+		header( 'X-Accel-Expires: 0' );
+		header( 'Vary: Accept, User-Agent' );
 
 		header( 'X-Markdown-Source: markdown-for-agents' );
 

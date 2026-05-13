@@ -583,6 +583,56 @@ class NegotiatorTest extends TestCase {
         unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] );
     }
 
+    public function test_emits_cache_bypass_headers_to_prevent_full_page_cache_poisoning(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertContains( 'Cache-Control: private, no-store, max-age=0', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-LiteSpeed-Cache-Control: no-cache', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-Accel-Expires: 0', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'Vary: Accept, User-Agent', $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public function test_cache_bypass_headers_sent_on_ua_branch_too(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $neg = $this->make_negotiator( [
+            'post_types'        => [ 'post' ],
+            'ua_force_enabled'  => true,
+            'ua_agent_strings'  => [ 'GPTBot' ],
+        ] );
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertContains( 'Cache-Control: private, no-store, max-age=0', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'X-LiteSpeed-Cache-Control: no-cache', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'Vary: Accept, User-Agent', $GLOBALS['_mock_sent_headers'] );
+    }
+
     public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
         $md_file = $this->tmp_dir . '/test-post.md';
         file_put_contents( $md_file, '# Test' );

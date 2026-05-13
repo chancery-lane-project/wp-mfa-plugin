@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.4.2
+Stable tag: 1.4.4
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -137,6 +137,11 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
+= 1.4.4 =
+* Fix: full-page caches (LiteSpeed, Varnish, nginx fastcgi_cache) could store the Markdown response under a page URL when an AI agent or `?output_format=md` request hit it first, then replay the `.md` body to subsequent HTML browser requests. Markdown responses now send `Cache-Control: private, no-store`, `X-LiteSpeed-Cache-Control: no-cache`, `X-Accel-Expires: 0`, and `Vary: Accept, User-Agent` unconditionally.
+
+= 1.4.3 =
+* Update to fix deleting posts on status change outside of auto-update flow
 
 = 1.4.2 =
 * Fixed issue with private/draft posts being created as MD files and added checkbox to post edit pages to exclude posts from MD generation. Also fixes small issue in unusual taxonomy slugs prodducing incorrect URLs in Topics secion of MD body. Adds Strauss namespacing to html-to-markdown/Composer includes to avoid collisions.
@@ -184,6 +189,15 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.4.4 =
+Fixes a cache-poisoning issue where full-page caches (e.g. LiteSpeed) could serve the Markdown variant to regular browsers. Recommended upgrade if you run any reverse-proxy or page cache. Purge your cache after upgrading.
+
+= 1.4.3 =
+* Update to fix deleting posts on status change outside of auto-update flow
+
+= 1.4.2 =
+* Fixed issue with private/draft posts being created as MD files and added checkbox to post edit pages to exclude posts from MD generation. Also fixes small issue in unusual taxonomy slugs prodducing incorrect URLs in Topics secion of MD body. Adds Strauss namespacing to html-to-markdown/Composer includes to avoid collisions.
 
 = 1.4.1 =
 Removes `llms.txt` index generation, including the `--with-llmstxt` WP-CLI flag. If you relied on this output, stay on 1.3.x or generate `llms.txt` externally.
