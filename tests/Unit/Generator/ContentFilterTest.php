@@ -68,4 +68,36 @@ class ContentFilterTest extends TestCase {
         $this->assertStringNotContainsString( '<!-- wp:', $output );
         $this->assertStringContainsString( '<div></div>', $output );
     }
+
+    public function test_strips_style_block_and_contents(): void {
+        $input  = '<p>Before</p><style>button.submit { width: 100%; }</style><p>After</p>';
+        $output = $this->filter->filter( $input );
+        $this->assertStringNotContainsString( '<style', $output );
+        $this->assertStringNotContainsString( 'width: 100%', $output );
+        $this->assertStringContainsString( '<p>Before</p>', $output );
+        $this->assertStringContainsString( '<p>After</p>', $output );
+    }
+
+    public function test_strips_script_block_and_contents(): void {
+        $input  = '<p>Body</p><script type="text/javascript">var x = 1; alert(x);</script>';
+        $output = $this->filter->filter( $input );
+        $this->assertStringNotContainsString( '<script', $output );
+        $this->assertStringNotContainsString( 'alert(x)', $output );
+        $this->assertStringContainsString( '<p>Body</p>', $output );
+    }
+
+    public function test_strips_multiline_style_block(): void {
+        $input  = "<style>\nbutton.submit {\n  width: 100%;\n}\n</style><p>Kept</p>";
+        $output = $this->filter->filter( $input );
+        $this->assertStringNotContainsString( '<style', $output );
+        $this->assertStringNotContainsString( 'width: 100%', $output );
+        $this->assertStringContainsString( '<p>Kept</p>', $output );
+    }
+
+    public function test_does_not_strip_styled_tag_name(): void {
+        // The \b word boundary must not let <style> match a tag like <styled-box>.
+        $input  = '<styled-box>Content</styled-box>';
+        $output = $this->filter->filter( $input );
+        $this->assertStringContainsString( '<styled-box>Content</styled-box>', $output );
+    }
 }

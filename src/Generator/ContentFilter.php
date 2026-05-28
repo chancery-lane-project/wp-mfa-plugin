@@ -18,9 +18,9 @@ class ContentFilter {
 	/**
 	 * Filter HTML content ready for Markdown conversion.
 	 *
-	 * Strips WordPress Gutenberg block editor comments from the HTML.
-	 * Other HTML (tags, attributes, inline styles) is left for the
-	 * HtmlConverter to process.
+	 * Strips WordPress Gutenberg block editor comments and <style>/<script>
+	 * blocks (tag and contents) from the HTML. Other HTML (tags, attributes,
+	 * inline styles) is left for the HtmlConverter to process.
 	 *
 	 * @since  1.0.0
 	 * @param  string $html Raw HTML from WordPress.
@@ -38,6 +38,11 @@ class ContentFilter {
 		// Strip WordPress block editor closing comments.
 		// Matches: <!-- /wp:block-name -->
 		$html = preg_replace( '/<!--\s*\/wp:[^\-]*?-->/s', '', $html ) ?? $html;
+
+		// Strip <style>/<script> blocks including their contents. HtmlConverter
+		// runs with strip_tags enabled, which removes the wrapper but keeps the
+		// inner CSS/JS as bare text — so these must be removed before conversion.
+		$html = preg_replace( '#<(style|script)\b[^>]*>.*?</\1>#is', '', $html ) ?? $html;
 
 		return $html;
 	}
