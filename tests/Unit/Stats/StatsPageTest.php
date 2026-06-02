@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Stats\StatsPage;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
+use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Stats\StatsPage
@@ -25,7 +26,8 @@ class StatsPageTest extends TestCase {
         $GLOBALS['_mock_current_user_can'] = true;
 
         $this->repository = $this->createMock( StatsRepository::class );
-        $this->page       = new StatsPage( $this->repository );
+        $detector         = new AgentDetector( [ 'ua_force_enabled' => true, 'ua_agent_strings' => [] ] );
+        $this->page       = new StatsPage( $this->repository, $detector );
     }
 
     protected function tearDown(): void {
@@ -148,7 +150,8 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'GPTBot', $output );
     }
 
-    public function test_render_page_hides_headline_table_without_date(): void {
+    public function test_render_page_hides_headline_table_for_all_time(): void {
+        $_GET['range'] = 'all';
         $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
         $this->repository->method( 'get_stats' )->willReturn( [] );
@@ -516,6 +519,118 @@ class StatsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringNotContainsString( 'pagination-links', $output );
+    }
+
+    public function test_render_page_renders_intent_chart_card(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'mfa-chart-card', $output );
+        $this->assertStringContainsString( '<svg', $output );
+        $this->assertStringContainsString( 'AI access by intent', $output );
+    }
+
+    public function test_render_page_shows_on_demand_headline_as_estimate(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'estimated AI-mediated human reads', $output );
+        // No single conflated grand total across categories.
+        $this->assertStringNotContainsString( 'Grand total', $output );
+    }
+
+    public function test_render_page_buckets_daily_totals_by_intent(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        $today = gmdate( 'Y-m-d' );
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => $today, 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 40 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // on-demand headline = 7, training card = 40, both rendered.
+        $this->assertMatchesRegularExpression( '/On-demand reads.*?>\s*7\s/s', $output );
+        $this->assertMatchesRegularExpression( '/Training crawls.*?>\s*40\s*</s', $output );
+    }
+
+    public function test_render_page_defaults_to_last_30_days(): void {
+        // No $_GET → "Last 30 days" is the active preset, not "All time".
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="current">Last 30 days', $output );
+        $this->assertStringNotContainsString( 'class="current">All time', $output );
+        // Default chart grain is daily.
+        $this->assertStringContainsString( 'daily', $output );
+    }
+
+    public function test_render_page_all_time_uses_range_param(): void {
+        $_GET['range'] = 'all';
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="current">All time', $output );
+        $this->assertStringNotContainsString( 'class="current">Last 30 days', $output );
+    }
+
+    public function test_render_page_uses_monthly_buckets_for_long_span(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // Span Jan→May 2026 (~125 days) → monthly grain.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-01-05', 'agent' => 'GPTBot', 'total' => 5 ],
+            (object) [ 'access_date' => '2026-05-10', 'agent' => 'ChatGPT-User', 'total' => 9 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'Jan 2026', $output );
+        $this->assertStringContainsString( 'May 2026', $output );
+        $this->assertStringContainsString( 'monthly', $output );
+    }
+
+    public function test_render_page_uses_yearly_buckets_beyond_five_years(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // ~7-year span → yearly grain; bars cover the whole window, no truncation.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2019-03-01', 'agent' => 'GPTBot', 'total' => 3 ],
+            (object) [ 'access_date' => '2026-03-01', 'agent' => 'ChatGPT-User', 'total' => 8 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'yearly', $output );
+        $this->assertStringContainsString( '2019', $output );
+        $this->assertStringNotContainsString( 'chart truncated', $output );
     }
 
     private function stub_empty_repository(): void {

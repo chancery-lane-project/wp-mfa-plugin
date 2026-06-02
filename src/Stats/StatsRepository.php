@@ -222,6 +222,32 @@ class StatsRepository {
 	}
 
 	/**
+	 * Return per-day, per-agent totals for the given filters.
+	 *
+	 * One row per (access_date, agent) so callers can bucket agents into intent
+	 * categories in PHP and build a daily time series. Ordered oldest-first.
+	 *
+	 * @since  1.5.0
+	 * @param  array<string, mixed> $filters Supports post_id, agent, access_method, date_from, date_to.
+	 * @return array<int, object>            Each object has access_date (string), agent (string), total (int).
+	 */
+	public function get_daily_agent_totals( array $filters = array() ): array {
+		$table  = self::get_table_name( $this->wpdb );
+		$clause = $this->build_where( $filters );
+
+		$where_sql = $clause['sql'];
+		$values    = $clause['values'];
+
+		$sql = "SELECT access_date, agent, SUM(`count`) AS total FROM {$table} {$where_sql} GROUP BY access_date, agent ORDER BY access_date ASC"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		if ( ! empty( $values ) ) {
+			$sql = $this->wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		}
+
+		return $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
 	 * Delete access stats records older than the given number of days.
 	 *
 	 * @since  1.2.0

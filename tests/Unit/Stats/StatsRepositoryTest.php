@@ -201,6 +201,35 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( 'access_date >=', $last['query'] );
     }
 
+    public function test_get_daily_agent_totals_builds_grouped_query(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_daily_agent_totals();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'GROUP BY access_date, agent', $last['query'] );
+        $this->assertStringContainsString( 'SUM', $last['query'] );
+        $this->assertStringContainsString( 'ORDER BY access_date ASC', $last['query'] );
+    }
+
+    public function test_get_daily_agent_totals_applies_date_filters(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_daily_agent_totals( [ 'date_from' => '2026-03-01', 'date_to' => '2026-03-31' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'access_date >=', $last['query'] );
+        $this->assertStringContainsString( 'access_date <=', $last['query'] );
+    }
+
+    public function test_get_daily_agent_totals_returns_mock_results(): void {
+        $this->wpdb->mock_get_results = [
+            (object) [ 'access_date' => '2026-03-05', 'agent' => 'GPTBot', 'total' => 12 ],
+        ];
+
+        $results = $this->repo->get_daily_agent_totals();
+        $this->assertCount( 1, $results );
+        $this->assertSame( 'GPTBot', $results[0]->agent );
+    }
+
     public function test_get_stats_with_access_method_filter(): void {
         $this->wpdb->mock_get_results = [];
         $this->repo->get_stats( [ 'access_method' => 'ua' ] );

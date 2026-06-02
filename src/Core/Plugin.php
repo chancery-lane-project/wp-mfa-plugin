@@ -171,7 +171,7 @@ class Plugin {
 		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 
 		global $wpdb;
-		$stats_page = new StatsPage( new StatsRepository( $wpdb ) );
+		$stats_page = new StatsPage( new StatsRepository( $wpdb ), new AgentDetector( $options ) );
 		$this->loader->add_action( 'admin_menu', $stats_page, 'add_page' );
 	}
 

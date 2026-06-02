@@ -88,6 +88,55 @@ class AgentDetector {
 	}
 
 	/**
+	 * Classify an agent label by the intent behind its fetch.
+	 *
+	 * Background crawlers (model training, search indexing) are not the same as
+	 * real-time, human-triggered reads. The category is derived at read time from
+	 * the stored agent substring — no schema change. Matching is case-insensitive
+	 * substring, mirroring detect_agent(); the first matching category wins, with
+	 * on-demand checked first so human-intent labels take precedence.
+	 *
+	 * @since  1.5.0
+	 * @param  string $agent The stored agent label (matched substring or product name).
+	 * @return string One of 'training', 'search', 'on-demand', or 'unknown'.
+	 */
+	public function categorise_agent( string $agent ): string {
+		$agent = trim( $agent );
+		if ( '' === $agent ) {
+			return 'unknown';
+		}
+
+		foreach ( $this->get_agent_categories() as $category => $substrings ) {
+			foreach ( (array) $substrings as $substring ) {
+				if ( '' !== $substring && false !== stripos( $agent, (string) $substring ) ) {
+					return (string) $category;
+				}
+			}
+		}
+
+		return 'unknown';
+	}
+
+	/**
+	 * Return the intent-category → substrings map, filtered.
+	 *
+	 * Categories are checked in array order, so on-demand (human-triggered) is
+	 * listed first. Override via the `markdown_for_agents_agent_categories` filter.
+	 *
+	 * @since  1.5.0
+	 * @return array<string, string[]>
+	 */
+	private function get_agent_categories(): array {
+		$defaults = array(
+			'on-demand' => array( 'ChatGPT-User', 'Claude-User', 'Claude-Web', 'Perplexity-User', 'Gemini-User' ),
+			'search'    => array( 'OAI-SearchBot', 'PerplexityBot', 'Applebot-Extended' ),
+			'training'  => array( 'GPTBot', 'ClaudeBot', 'CCBot', 'Google-Extended', 'Bytespider', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'anthropic-ai' ),
+		);
+
+		return (array) apply_filters( 'markdown_for_agents_agent_categories', $defaults );
+	}
+
+	/**
 	 * Return true if the given UA string contains a known agent substring.
 	 *
 	 * Note: this method inherits the ua_force_enabled guard from get_matched_agent()

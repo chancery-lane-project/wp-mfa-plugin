@@ -128,4 +128,55 @@ class AgentDetectorTest extends TestCase {
     public function test_normalise_ua_returns_empty_string_for_empty_input(): void {
         $this->assertSame( '', $this->make_detector()->normalise_ua( '' ) );
     }
+
+    // -----------------------------------------------------------------------
+    // categorise_agent
+    // -----------------------------------------------------------------------
+
+    public function test_categorise_agent_returns_training_for_crawler(): void {
+        $this->assertSame( 'training', $this->make_detector()->categorise_agent( 'GPTBot' ) );
+        $this->assertSame( 'training', $this->make_detector()->categorise_agent( 'ClaudeBot' ) );
+        $this->assertSame( 'training', $this->make_detector()->categorise_agent( 'CCBot' ) );
+    }
+
+    public function test_categorise_agent_returns_search_for_indexer(): void {
+        $this->assertSame( 'search', $this->make_detector()->categorise_agent( 'PerplexityBot' ) );
+        $this->assertSame( 'search', $this->make_detector()->categorise_agent( 'OAI-SearchBot' ) );
+    }
+
+    public function test_categorise_agent_returns_on_demand_for_human_triggered(): void {
+        $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'ChatGPT-User' ) );
+        $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'Claude-User' ) );
+        $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'Perplexity-User' ) );
+    }
+
+    public function test_categorise_agent_returns_unknown_for_unmapped_agent(): void {
+        $this->assertSame( 'unknown', $this->make_detector()->categorise_agent( 'SomeRandomBot' ) );
+    }
+
+    public function test_categorise_agent_returns_unknown_for_empty_string(): void {
+        $this->assertSame( 'unknown', $this->make_detector()->categorise_agent( '' ) );
+    }
+
+    public function test_categorise_agent_is_case_insensitive(): void {
+        $this->assertSame( 'training', $this->make_detector()->categorise_agent( 'gptbot' ) );
+        $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'chatgpt-user' ) );
+    }
+
+    public function test_categorise_agent_on_demand_takes_precedence_over_search(): void {
+        // Perplexity-User (on-demand) must not be swallowed by a PerplexityBot (search) substring rule.
+        $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'Perplexity-User' ) );
+    }
+
+    public function test_categorise_agent_respects_filter_override(): void {
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_categories'] = static fn( array $map ): array => array(
+            'training' => array( 'MyCustomBot' ),
+        );
+
+        $this->assertSame( 'training', $this->make_detector()->categorise_agent( 'MyCustomBot' ) );
+        // A default mapping is gone once the filter replaces the map.
+        $this->assertSame( 'unknown', $this->make_detector()->categorise_agent( 'GPTBot' ) );
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_categories'] );
+    }
 }
