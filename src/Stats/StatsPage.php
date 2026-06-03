@@ -41,9 +41,9 @@ class StatsPage {
 	/**
 	 * Intent categories shown as series/cards, with brand display colour.
 	 *
-	 * Drawn back→front (training widest, on-demand narrowest), so volume-heavy
-	 * background crawling sits behind in a muted navy tint while the headline
-	 * human-intent reads pop in brand magenta at the front.
+	 * Stacked bottom→top (training, search, on-demand), so volume-heavy
+	 * background crawling forms the base in a muted navy tint while the headline
+	 * human-intent reads pop in brand magenta on top of each daily bar.
 	 */
 	private const CATEGORY_COLORS = array(
 		'training'  => '#B3B8C8', // Navy tint (muted, back layer).
@@ -249,6 +249,7 @@ class StatsPage {
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
 				.mfa-caption { margin: 2px 0 10px; }
 				.postbox-header { padding-inline: 10px; }
+				.wp-list-table { margin-bottom: 20px; }
 				@media (max-width: 782px) { .mfa-stats { grid-template-columns: repeat(2, 1fr); } }
 			</style>
 
@@ -510,6 +511,7 @@ class StatsPage {
 				'series'     => $series,
 				'labels'     => array_values( $buckets ),
 				'labelEvery' => max( 1, (int) ceil( $count / 12 ) ),
+				'stacked'    => true,
 			),
 			'legend'     => $legend,
 			'totals'     => $totals,

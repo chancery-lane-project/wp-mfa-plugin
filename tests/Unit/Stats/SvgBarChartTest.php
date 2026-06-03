@@ -104,6 +104,53 @@ class SvgBarChartTest extends TestCase {
 		$this->assertStringNotContainsString( '=""', $svg );
 	}
 
+	public function test_stacked_bars_are_full_width_and_equal_across_series(): void {
+		$svg = SvgBarChart::render( [
+			'series'  => [
+				[ 'color' => '#aaaaaa', 'data' => [ 2 ] ],
+				[ 'color' => '#bbbbbb', 'data' => [ 2 ] ],
+			],
+			'stacked' => true,
+		] );
+
+		preg_match_all( '/width="([\d.]+)"/', $svg, $m );
+		$widths = array_unique( $m[1] );
+		// Unlike overlay mode, every stacked segment shares one full-slot width.
+		$this->assertCount( 1, $widths );
+	}
+
+	public function test_stacked_segments_sit_on_top_of_each_other(): void {
+		// max=10, inner height 320-16-28=276 → 1 unit = 27.6px.
+		$svg = SvgBarChart::render( [
+			'series'  => [
+				[ 'color' => '#aaaaaa', 'data' => [ 2 ] ],
+				[ 'color' => '#bbbbbb', 'data' => [ 3 ] ],
+			],
+			'stacked' => true,
+			'max'     => 10,
+		] );
+
+		// Base segment (v=2) sits on the baseline; top segment (v=3) starts where
+		// the base ends (y = 16 + 276 - 5/10*276 = 154).
+		$this->assertStringContainsString( 'height="55.2"', $svg );
+		$this->assertStringContainsString( 'y="154" width', $svg );
+		$this->assertStringContainsString( 'height="82.8"', $svg );
+	}
+
+	public function test_stacked_y_max_uses_column_totals(): void {
+		// Column total 3+4=7 → nice max 10 (overlay would peak at 4 → nice max 5).
+		$svg = SvgBarChart::render( [
+			'series'  => [
+				[ 'color' => '#aaaaaa', 'data' => [ 3 ] ],
+				[ 'color' => '#bbbbbb', 'data' => [ 4 ] ],
+			],
+			'stacked' => true,
+		] );
+
+		// Top axis label is the max; column-total max is 10 (overlay would be 5).
+		$this->assertStringContainsString( '>10<', $svg );
+	}
+
 	public function test_escapes_label_content(): void {
 		$svg = SvgBarChart::render( [
 			'series'     => [ [ 'color' => '#2fb62f', 'data' => [ 1 ] ] ],
