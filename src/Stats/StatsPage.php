@@ -511,7 +511,6 @@ class StatsPage {
 				'series'     => $series,
 				'labels'     => array_values( $buckets ),
 				'labelEvery' => max( 1, (int) ceil( $count / 12 ) ),
-				'stacked'    => true,
 			),
 			'legend'     => $legend,
 			'totals'     => $totals,

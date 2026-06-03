@@ -7,10 +7,9 @@ namespace Tclp\WpMarkdownForAgents\Stats;
 /**
  * Ultra-minimal, dependency-free SVG bar chart.
  *
- * Server-rendered port of the ~50-line "miniBars" function: an overlaid bar
- * chart where each later series is drawn narrower and centred on the same slot,
- * so several series can share one set of bars. Returns an SVG string sized by
- * its viewBox (the chart scales to its container). No JavaScript, no build step.
+ * Series are stacked into one full-width bar per slot (drawn bottom→top in
+ * array order). Returns an SVG string sized by its viewBox (the chart scales to
+ * its container). No JavaScript, no build step.
  *
  * @since  1.5.0
  * @package Tclp\WpMarkdownForAgents\Stats
@@ -24,7 +23,7 @@ class SvgBarChart {
 	 * @param  array<string, mixed> $o {
 	 *     Chart definition.
 	 *
-	 *     @type array<int, array{name?: string, color: string, data: array<int, int|float>}> $series  One or more series, drawn back→front.
+	 *     @type array<int, array{name?: string, color: string, data: array<int, int|float>}> $series  One or more series, stacked bottom→top in array order.
 	 *     @type array<int, string>                                                            $labels  X-axis labels, one per bar slot.
 	 *     @type int                                                                           $width   ViewBox width. Default 1200.
 	 *     @type int                                                                           $height  ViewBox height. Default 320.
@@ -32,8 +31,6 @@ class SvgBarChart {
 	 *     @type float                                                                         $max     Fixed y-max. Default a "nice" auto max.
 	 *     @type int                                                                           $ticks   Gridlines above the baseline. Default 2.
 	 *     @type float                                                                         $gap     Fraction of each slot left empty (0–1). Default 0.30.
-	 *     @type float                                                                         $narrow  How much each later series narrows (overlay mode only). Default 0.45.
-	 *     @type bool                                                                          $stacked Stack series into one full-width bar per slot. Default false (overlay).
 	 *     @type int                                                                           $labelEvery Show every Nth x-label. Default 2.
 	 * }
 	 * @return string SVG markup.
@@ -51,32 +48,20 @@ class SvgBarChart {
 			$o['pad'] ?? array()
 		);
 
-		$series  = array_values( $o['series'] ?? array() );
-		$n       = empty( $series ) ? 0 : count( $series[0]['data'] );
-		$stacked = (bool) ( $o['stacked'] ?? false );
+		$series = array_values( $o['series'] ?? array() );
+		$n      = empty( $series ) ? 0 : count( $series[0]['data'] );
 
 		$iw = $w - $pad['left'] - $pad['right'];
 		$ih = $h - $pad['top'] - $pad['bottom'];
 
-		// Y scale — round the peak up to a clean step. When stacked, the peak is
-		// the tallest column total; otherwise it is the tallest single bar.
-		$all_values = array();
-		if ( $stacked ) {
-			$sums = array_fill( 0, $n, 0.0 );
-			foreach ( $series as $ser ) {
-				foreach ( $ser['data'] as $i => $v ) {
-					$sums[ $i ] += (float) $v;
-				}
-			}
-			$all_values = $sums;
-		} else {
-			foreach ( $series as $ser ) {
-				foreach ( $ser['data'] as $v ) {
-					$all_values[] = (float) $v;
-				}
+		// Y scale — round the tallest column total up to a clean step.
+		$sums = array_fill( 0, $n, 0.0 );
+		foreach ( $series as $ser ) {
+			foreach ( $ser['data'] as $i => $v ) {
+				$sums[ $i ] += (float) $v;
 			}
 		}
-		$peak = empty( $all_values ) ? 1.0 : max( 1.0, ...$all_values );
+		$peak = empty( $sums ) ? 1.0 : max( 1.0, ...$sums );
 		$max  = isset( $o['max'] ) ? (float) $o['max'] : self::nice( $peak );
 		if ( $max <= 0 ) {
 			$max = 1.0;
@@ -84,11 +69,10 @@ class SvgBarChart {
 
 		$y = static fn( float $v ): float => $pad['top'] + $ih - ( $v / $max ) * $ih;
 
-		$slot   = $n > 0 ? $iw / $n : $iw;
-		$gap    = (float) ( $o['gap'] ?? 0.30 );
-		$narrow = (float) ( $o['narrow'] ?? 0.45 );
-		$every  = max( 1, (int) ( $o['labelEvery'] ?? 2 ) );
-		$ticks  = max( 1, (int) ( $o['ticks'] ?? 2 ) );
+		$slot  = $n > 0 ? $iw / $n : $iw;
+		$gap   = (float) ( $o['gap'] ?? 0.30 );
+		$every = max( 1, (int) ( $o['labelEvery'] ?? 2 ) );
+		$ticks = max( 1, (int) ( $o['ticks'] ?? 2 ) );
 
 		$svg = sprintf(
 			'<svg viewBox="0 0 %s %s" xmlns="http://www.w3.org/2000/svg" role="img">',
@@ -115,52 +99,26 @@ class SvgBarChart {
 			);
 		}
 
-		if ( $stacked ) {
-			// One full-width bar per slot; each series sits on the previous top.
-			$bw    = $slot * ( 1 - $gap );
-			$stack = array_fill( 0, $n, 0.0 );
-			foreach ( $series as $ser ) {
-				foreach ( $ser['data'] as $i => $v ) {
-					$v = (float) $v;
-					if ( $v <= 0 ) {
-						continue;
-					}
-					$top = $stack[ $i ] + $v;
-					$cx  = $pad['left'] + $slot * $i + $slot / 2;
-					$svg .= sprintf(
-						'<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>',
-						self::num( $cx - $bw / 2 ),
-						self::num( $y( $top ) ),
-						self::num( $bw ),
-						self::num( ( $v / $max ) * $ih ),
-						esc_attr( (string) ( $ser['color'] ?? '#1a9e1a' ) )
-					);
-					$stack[ $i ] = $top;
+		// Bars: one full-width bar per slot; each series sits on the previous top.
+		$bw    = $slot * ( 1 - $gap );
+		$stack = array_fill( 0, $n, 0.0 );
+		foreach ( $series as $ser ) {
+			foreach ( $ser['data'] as $i => $v ) {
+				$v = (float) $v;
+				if ( $v <= 0 ) {
+					continue;
 				}
-			}
-		} else {
-			// Overlay: each later series narrower and centred on the slot.
-			foreach ( $series as $si => $ser ) {
-				$bw = $slot * ( 1 - $gap ) * ( 1 - $si * $narrow );
-				if ( $bw < 0 ) {
-					$bw = 0.0;
-				}
-				foreach ( $ser['data'] as $i => $v ) {
-					$v = (float) $v;
-					if ( $v <= 0 ) {
-						continue;
-					}
-					$cx = $pad['left'] + $slot * $i + $slot / 2;
-					$bh = ( $v / $max ) * $ih;
-					$svg .= sprintf(
-						'<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>',
-						self::num( $cx - $bw / 2 ),
-						self::num( $y( $v ) ),
-						self::num( $bw ),
-						self::num( $bh ),
-						esc_attr( (string) ( $ser['color'] ?? '#1a9e1a' ) )
-					);
-				}
+				$top = $stack[ $i ] + $v;
+				$cx  = $pad['left'] + $slot * $i + $slot / 2;
+				$svg .= sprintf(
+					'<rect x="%s" y="%s" width="%s" height="%s" fill="%s"/>',
+					self::num( $cx - $bw / 2 ),
+					self::num( $y( $top ) ),
+					self::num( $bw ),
+					self::num( ( $v / $max ) * $ih ),
+					esc_attr( (string) ( $ser['color'] ?? '#1a9e1a' ) )
+				);
+				$stack[ $i ] = $top;
 			}
 		}
 

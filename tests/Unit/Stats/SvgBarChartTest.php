@@ -31,7 +31,7 @@ class SvgBarChartTest extends TestCase {
 		$this->assertSame( 2, substr_count( $svg, '<rect' ) );
 	}
 
-	public function test_overlays_multiple_series(): void {
+	public function test_stacks_multiple_series(): void {
 		$svg = SvgBarChart::render( [
 			'series' => [
 				[ 'color' => '#8a8f8a', 'data' => [ 4, 4 ] ],
@@ -41,7 +41,7 @@ class SvgBarChartTest extends TestCase {
 
 		$this->assertStringContainsString( 'fill="#8a8f8a"', $svg );
 		$this->assertStringContainsString( 'fill="#2fb62f"', $svg );
-		// 2 slots × 2 series, all non-zero → 4 bars.
+		// 2 slots × 2 series, all non-zero → 4 stacked segments.
 		$this->assertSame( 4, substr_count( $svg, '<rect' ) );
 	}
 
@@ -106,28 +106,26 @@ class SvgBarChartTest extends TestCase {
 
 	public function test_stacked_bars_are_full_width_and_equal_across_series(): void {
 		$svg = SvgBarChart::render( [
-			'series'  => [
+			'series' => [
 				[ 'color' => '#aaaaaa', 'data' => [ 2 ] ],
 				[ 'color' => '#bbbbbb', 'data' => [ 2 ] ],
 			],
-			'stacked' => true,
 		] );
 
 		preg_match_all( '/width="([\d.]+)"/', $svg, $m );
 		$widths = array_unique( $m[1] );
-		// Unlike overlay mode, every stacked segment shares one full-slot width.
+		// Every stacked segment shares one full-slot width.
 		$this->assertCount( 1, $widths );
 	}
 
 	public function test_stacked_segments_sit_on_top_of_each_other(): void {
 		// max=10, inner height 320-16-28=276 → 1 unit = 27.6px.
 		$svg = SvgBarChart::render( [
-			'series'  => [
+			'series' => [
 				[ 'color' => '#aaaaaa', 'data' => [ 2 ] ],
 				[ 'color' => '#bbbbbb', 'data' => [ 3 ] ],
 			],
-			'stacked' => true,
-			'max'     => 10,
+			'max'    => 10,
 		] );
 
 		// Base segment (v=2) sits on the baseline; top segment (v=3) starts where
@@ -137,17 +135,16 @@ class SvgBarChartTest extends TestCase {
 		$this->assertStringContainsString( 'height="82.8"', $svg );
 	}
 
-	public function test_stacked_y_max_uses_column_totals(): void {
-		// Column total 3+4=7 → nice max 10 (overlay would peak at 4 → nice max 5).
+	public function test_y_max_uses_column_totals(): void {
+		// Column total 3+4=7 → nice max 10 (the tallest single bar alone is 4).
 		$svg = SvgBarChart::render( [
-			'series'  => [
+			'series' => [
 				[ 'color' => '#aaaaaa', 'data' => [ 3 ] ],
 				[ 'color' => '#bbbbbb', 'data' => [ 4 ] ],
 			],
-			'stacked' => true,
 		] );
 
-		// Top axis label is the max; column-total max is 10 (overlay would be 5).
+		// Top axis label is the max; the stacked column total drives it to 10.
 		$this->assertStringContainsString( '>10<', $svg );
 	}
 
