@@ -147,7 +147,9 @@ class Generator {
 			);
 
 			foreach ( $posts as $post ) {
-				if ( $this->generate_post( $post ) ) {
+				if ( ! $this->is_eligible( $post ) ) {
+					++$results['skipped'];
+				} elseif ( $this->generate_post( $post ) ) {
 					++$results['success'];
 				} else {
 					++$results['failed'];

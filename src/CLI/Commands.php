@@ -341,9 +341,10 @@ class Commands {
 
 		\WP_CLI::success(
 			sprintf(
-				'%s: %d generated, %d failed.',
+				'%s: %d generated, %d skipped, %d failed.',
 				$post_type,
 				$results['success'],
+				$results['skipped'],
 				$results['failed']
 			)
 		);

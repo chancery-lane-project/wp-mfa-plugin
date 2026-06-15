@@ -433,6 +433,34 @@ class GeneratorTest extends TestCase {
         $this->assertArrayHasKey( 'skipped', $results );
     }
 
+    public function test_generate_post_type_counts_ineligible_as_skipped_not_failed(): void {
+        // post1: eligible, write succeeds -> success.
+        // post2: post_type not in options['post_types'] -> skipped (never written).
+        // post3: eligible, write fails -> failed.
+        $post1 = $this->make_post( [ 'ID' => 1, 'post_name' => 'a' ] );
+        $post2 = $this->make_post( [ 'ID' => 2, 'post_name' => 'b', 'post_type' => 'event' ] );
+        $post3 = $this->make_post( [ 'ID' => 3, 'post_name' => 'c' ] );
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '<p>x</p>' );
+        $this->converter->method( 'convert' )->willReturn( 'x' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+
+        // Only eligible posts reach write(): post1 (true), then post3 (false).
+        $this->file_writer->expects( $this->exactly( 2 ) )
+            ->method( 'write' )
+            ->willReturnOnConsecutiveCalls( true, false );
+
+        // Batch size is 100, so a single page of 3 ends pagination ( 3 < 100 ).
+        $GLOBALS['_mock_posts'] = [ $post1, $post2, $post3 ];
+
+        $results = $this->generator->generate_post_type( 'post' );
+
+        $this->assertSame( 1, $results['success'] );
+        $this->assertSame( 1, $results['skipped'] );
+        $this->assertSame( 1, $results['failed'] );
+    }
+
     // -----------------------------------------------------------------------
     // generate_batch()
     // -----------------------------------------------------------------------

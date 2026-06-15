@@ -361,6 +361,12 @@ if (!function_exists('get_post')) {
     }
 }
 
+if (!function_exists('clean_post_cache')) {
+    function clean_post_cache(int|\WP_Post $post): void {
+        $GLOBALS['_mock_cleaned_post_caches'][] = $post instanceof \WP_Post ? $post->ID : (int) $post;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // WP_Post stub
 // ---------------------------------------------------------------------------
