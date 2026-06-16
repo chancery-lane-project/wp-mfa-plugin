@@ -101,9 +101,10 @@ class Admin {
 			array(
 				'type'    => 'success',
 				'message' => sprintf(
-					/* translators: 1: success count, 2: failed count */
-					__( 'Generated %1$d files. Failed: %2$d.', 'markdown-for-agents-and-statistics' ),
+					/* translators: 1: success count, 2: skipped count, 3: failed count */
+					__( 'Generated %1$d files. Skipped: %2$d. Failed: %3$d.', 'markdown-for-agents-and-statistics' ),
 					$results['success'],
+					$results['skipped'],
 					$results['failed']
 				),
 			),
