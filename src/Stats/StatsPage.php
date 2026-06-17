@@ -248,8 +248,12 @@ class StatsPage {
 				.mfa-stat .lab { font-size: 13px; color: #50575e; }
 				.mfa-stat .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
-				.mfa-trend { display: block; font-size: 12px; font-weight: 600; margin-top: 6px; }
-				.mfa-trend .arrow { font-size: 11px; }
+				/* Direction arrow is a CSS border-triangle (currentColor), not a glyph, so
+				   it can't be re-flowed by WP's emoji replacement and stays aligned. */
+				.mfa-trend { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; margin-top: 6px; }
+				.mfa-trend.rising::before, .mfa-trend.falling::before { content: ""; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
+				.mfa-trend.rising::before { border-bottom: 6px solid currentColor; }
+				.mfa-trend.falling::before { border-top: 6px solid currentColor; }
 				.mfa-trend.rising { color: #1a7f37; }
 				.mfa-trend.falling { color: #b32d2e; }
 				.mfa-trend.none { color: #8c8f94; font-weight: 400; }
@@ -706,18 +710,16 @@ class StatsPage {
 		}
 
 		$rising = $r > 0;
-		$arrow  = $rising ? '▲' : '▼';
 		$class  = $rising ? 'rising' : 'falling';
 		$label  = $rising
 			? __( 'rising', 'markdown-for-agents-and-statistics' )
 			: __( 'falling', 'markdown-for-agents-and-statistics' );
 
 		return sprintf(
-			'<span class="mfa-trend %1$s" title="%2$s"><span class="arrow" aria-hidden="true">%3$s</span> r = %4$s</span>',
+			'<span class="mfa-trend %1$s" title="%2$s">r = %3$s</span>',
 			esc_attr( $class ),
 			/* translators: 1: trend direction (rising/falling), 2: correlation coefficient. */
 			esc_attr( sprintf( __( 'Trend %1$s · Pearson r = %2$s', 'markdown-for-agents-and-statistics' ), $label, number_format( $r, 2 ) ) ),
-			esc_html( $arrow ),
 			esc_html( number_format( $r, 2 ) )
 		);
 	}
