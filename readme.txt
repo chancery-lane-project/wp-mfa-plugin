@@ -71,6 +71,76 @@ No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
 
+= AI agents are getting HTML instead of Markdown. Why? =
+
+Almost always this is a CDN, firewall, or page cache sitting in front of
+WordPress — not the plugin. On many hosts (for example Cloudflare in front of WP
+Engine) the edge answers a request before it ever reaches the plugin: a full-page
+cache can return the cached HTML, or a bot/WAF rule can block a known AI crawler
+with a 403/429.
+
+The reliable route is the query parameter: append `?output_format=md` to any post
+or archive URL. Because that is a distinct URL, caches store it separately and
+firewalls treat it as an ordinary request, so it reaches the plugin even on a
+hardened stack. The plugin advertises this URL automatically via a
+`<link rel="alternate" type="text/markdown">` tag in each page's `<head>`, so
+agents that read the page can discover and follow it.
+
+The `Accept: text/markdown` header and User-Agent routes also work, but only if
+your CDN/cache is configured to let them through (see the next question).
+
+= How do I let my CDN or cache serve Markdown to agents? =
+
+This is host/CDN configuration, not a plugin setting. Two changes help:
+
+* **Page cache (WP Engine, LiteSpeed, Varnish, nginx):** exclude agent-shaped
+  requests from the full-page cache — any request whose `Accept` header contains
+  `text/markdown`, whose query string contains `output_format=md`, or whose
+  User-Agent is a known AI bot. Do **not** add User-Agent to the cache *key*; that
+  fragments the cache for every visitor. Exclude from caching, do not key on it.
+* **Firewall / bot rules (Cloudflare):** add a skip/allow rule for the AI
+  User-Agents you want to serve (for example GPTBot, ClaudeBot, PerplexityBot,
+  Google-Extended). Otherwise they receive a 403/429 and get nothing.
+
+If you skip this, nothing breaks — agents simply use the `?output_format=md` URL
+via discovery instead. The plugin already protects against the reverse problem:
+Markdown responses are sent with `Cache-Control: private, no-store` and
+`Vary: Accept, User-Agent`, so a shared cache cannot replay the Markdown to a
+human browser on the same URL.
+
+= How can I check what an agent actually receives? =
+
+Request a page the way an agent would and inspect the response headers:
+
+```
+# Query-param route (the reliable one)
+curl -sI 'https://example.com/your-post/?output_format=md'
+
+# Accept-header route
+curl -sI -H 'Accept: text/markdown' 'https://example.com/your-post/'
+```
+
+A genuine Markdown response from the plugin has `Content-Type: text/markdown` and
+an `X-Markdown-Source: markdown-for-agents` header. If you instead see
+`Content-Type: text/html`, the request was answered by a cache or firewall before
+reaching the plugin (see the previous questions). Note that running these from
+your own server may bypass your CDN; testing from an external network shows what
+real agents experience.
+
+= Should I publish an llms.txt file? =
+
+`llms.txt` is a proposed convention for a single Markdown index of your site at
+`https://example.com/llms.txt`, aimed at AI tools that look for a site-level
+manifest. It is an emerging community convention, not an official standard, and
+there is limited evidence that the major AI crawlers consume it yet — so treat it
+as low-cost, optional, and complementary to the per-page discovery this plugin
+already provides.
+
+This plugin does not generate `llms.txt` (the auto-generation feature was removed
+in 1.3.x). If you want one, publish a static file at your web root listing your
+key pages with their `?output_format=md` URLs, and keep it in sync with published
+and retired content or it will point agents at missing pages.
+
 = What are taxonomy archive files? =
 
 For every public taxonomy term (categories, tags, custom taxonomies) the plugin
