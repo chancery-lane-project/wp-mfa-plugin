@@ -13,24 +13,24 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 ## How it works
 
 1. Posts and taxonomy archive pages are converted to Markdown and saved as static files on disk inside `wp-content/uploads/`.
-2. When a request arrives with `Accept: text/markdown`, the `?output_format=md` query parameter, or a known AI User-Agent, WordPress serves the pre-generated `.md` file directly — no page render required.
+2. When a request arrives with `Accept: text/markdown`, the `?output_format=md` query parameter, or a known AI User-Agent, WordPress serves the pre-generated `.md` file directly - no page render required.
 3. A `<link rel="alternate" type="text/markdown">` tag is injected into each page's `<head>` so agents can discover Markdown versions automatically.
 
 ---
 
 ## Features
 
-- **Content negotiation** — serves Markdown on `Accept: text/markdown`, `?output_format=md`, or known AI User-Agent strings
-- **Taxonomy archive support** — category, tag, and custom taxonomy archives served as Markdown post listings
-- **Auto-generation** — files regenerated on post save; taxonomy archives regenerated when any post in the term changes
-- **Bulk generation** — generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
-- **Per-post-type field configuration** — choose which meta/ACF fields appear in frontmatter or body
-- **ACF support** — dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
-- **Manifest + incremental export** — content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
-- **Access statistics** — logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
-- **WP-CLI commands** — `generate`, `status`, `delete`, `generate-taxonomies`
-- **Filterable** — numerous WordPress filters to customise output, frontmatter, and serving behaviour
-- **Fully unit-tested** — PHPUnit 9.6 test suite
+- **Content negotiation** - serves Markdown on `Accept: text/markdown`, `?output_format=md`, or known AI User-Agent strings
+- **Taxonomy archive support** - category, tag, and custom taxonomy archives served as Markdown post listings
+- **Auto-generation** - files regenerated on post save; taxonomy archives regenerated when any post in the term changes
+- **Bulk generation** - generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
+- **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
+- **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
+- **Manifest + incremental export** - content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
+- **Access statistics** - logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
+- **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`
+- **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
+- **Fully unit-tested** - PHPUnit 9.6 test suite
 
 ---
 
@@ -130,7 +130,7 @@ description: "Posts about climate law and policy."
 
 Posts in this archive: 23
 
-- [Post Title One](https://example.com/post-title-one/) — Excerpt text here.
+- [Post Title One](https://example.com/post-title-one/) - Excerpt text here.
 - [Post Title Two](https://example.com/post-title-two/)
 ```
 
