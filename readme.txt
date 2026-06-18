@@ -136,8 +136,7 @@ there is limited evidence that the major AI crawlers consume it yet — so treat
 as low-cost, optional, and complementary to the per-page discovery this plugin
 already provides.
 
-This plugin does not generate `llms.txt` (the auto-generation feature was removed
-in 1.3.x). If you want one, publish a static file at your web root listing your
+This plugin does not generate `llms.txt`. If you want one, publish a static file at your web root listing your
 key pages with their `?output_format=md` URLs, and keep it in sync with published
 and retired content or it will point agents at missing pages.
 
