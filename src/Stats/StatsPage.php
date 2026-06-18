@@ -241,12 +241,22 @@ class StatsPage {
 				.mfa-chart svg { display: block; width: 100%; height: auto; --grid: #dcdcde; --muted: #646970; }
 				.mfa-legend { display: flex; gap: 16px; font-size: 13px; font-weight: 400; color: #50575e; padding-right: 12px; }
 				.mfa-legend i { display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; }
-				.mfa-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0 20px; }
+				.mfa-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0 20px; }
 				.mfa-stats .postbox { margin-bottom: 0; }
 				.mfa-stat.headline { border-left: 4px solid #D7288B; }
+				.mfa-stat.total { border-left: 4px solid #1C2B58; }
 				.mfa-stat .lab { font-size: 13px; color: #50575e; }
 				.mfa-stat .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
+				/* Direction arrow is a CSS border-triangle (currentColor), not a glyph, so
+				   it can't be re-flowed by WP's emoji replacement and stays aligned. */
+				.mfa-trend { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; margin-top: 6px; }
+				.mfa-trend.rising::before, .mfa-trend.falling::before { content: ""; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
+				.mfa-trend.rising::before { border-bottom: 6px solid currentColor; }
+				.mfa-trend.falling::before { border-top: 6px solid currentColor; }
+				.mfa-trend.rising { color: #1a7f37; }
+				.mfa-trend.falling { color: #b32d2e; }
+				.mfa-trend.none { color: #8c8f94; font-weight: 400; }
 				.mfa-caption { margin: 2px 0 10px; }
 				.postbox-header { padding-inline: 10px; }
 				.wp-list-table { margin-bottom: 20px; }
@@ -274,31 +284,50 @@ class StatsPage {
 			</div>
 
 			<div class="mfa-stats">
+				<div class="postbox mfa-stat total">
+					<div class="inside">
+						<div class="lab">📊 <?php esc_html_e( 'Total agent visits', 'markdown-for-agents-and-statistics' ); ?></div>
+						<div class="num">
+							<?php echo esc_html( number_format_i18n( $chart['totals']['total'] ) ); ?>
+							<?php echo $this->trend_indicator( $chart['trends']['total'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
+					</div>
+				</div>
 				<div class="postbox mfa-stat headline">
 					<div class="inside">
 						<div class="lab">👤 <?php esc_html_e( 'On-demand reads', 'markdown-for-agents-and-statistics' ); ?></div>
 						<div class="num">
 							<?php echo esc_html( number_format_i18n( $chart['totals']['on-demand'] ) ); ?>
 							<span class="est"><?php esc_html_e( 'estimated AI-mediated human reads', 'markdown-for-agents-and-statistics' ); ?></span>
+							<?php echo $this->trend_indicator( $chart['trends']['on-demand'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
 					</div>
 				</div>
 				<div class="postbox mfa-stat">
 					<div class="inside">
 						<div class="lab">🔎 <?php esc_html_e( 'Search', 'markdown-for-agents-and-statistics' ); ?></div>
-						<div class="num"><?php echo esc_html( number_format_i18n( $chart['totals']['search'] ) ); ?></div>
+						<div class="num">
+							<?php echo esc_html( number_format_i18n( $chart['totals']['search'] ) ); ?>
+							<?php echo $this->trend_indicator( $chart['trends']['search'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 					</div>
 				</div>
 				<div class="postbox mfa-stat">
 					<div class="inside">
 						<div class="lab">🤖 <?php esc_html_e( 'Training crawls', 'markdown-for-agents-and-statistics' ); ?></div>
-						<div class="num"><?php echo esc_html( number_format_i18n( $chart['totals']['training'] ) ); ?></div>
+						<div class="num">
+							<?php echo esc_html( number_format_i18n( $chart['totals']['training'] ) ); ?>
+							<?php echo $this->trend_indicator( $chart['trends']['training'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 					</div>
 				</div>
 				<div class="postbox mfa-stat">
 					<div class="inside">
 						<div class="lab">❔ <?php esc_html_e( 'Unknown', 'markdown-for-agents-and-statistics' ); ?></div>
-						<div class="num"><?php echo esc_html( number_format_i18n( $chart['totals']['unknown'] ) ); ?></div>
+						<div class="num">
+							<?php echo esc_html( number_format_i18n( $chart['totals']['unknown'] ) ); ?>
+							<?php echo $this->trend_indicator( $chart['trends']['unknown'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -504,6 +533,25 @@ class StatsPage {
 			$legend[ $cat ] = self::CATEGORY_COLORS[ $cat ];
 		}
 
+		// Combined total across all types, summed per bucket so it equals the
+		// sum of the four category cards exactly.
+		$total_series = array_fill_keys( $keys, 0 );
+		foreach ( array_keys( self::CATEGORY_COLORS ) as $cat ) {
+			foreach ( $by_cat[ $cat ] as $key => $value ) {
+				$total_series[ $key ] += $value;
+			}
+		}
+		$totals['total'] = array_sum( $totals );
+
+		// PMCC of each series against the evenly-spaced bucket index. Its sign
+		// matches the regression slope, so r > 0 reads as rising and r < 0 as
+		// falling; null (n < 2 or flat series) renders as a neutral indicator.
+		$trends = array();
+		foreach ( array_keys( self::CATEGORY_COLORS ) as $cat ) {
+			$trends[ $cat ] = $this->pmcc( array_values( $by_cat[ $cat ] ) );
+		}
+		$trends['total'] = $this->pmcc( array_values( $total_series ) );
+
 		$count = count( $keys );
 
 		return array(
@@ -514,6 +562,7 @@ class StatsPage {
 			),
 			'legend'     => $legend,
 			'totals'     => $totals,
+			'trends'     => $trends,
 			'caption'    => $this->window_caption( $start, $end, $grain, $truncated ),
 		);
 	}
@@ -597,6 +646,82 @@ class StatsPage {
 		}
 
 		return $caption;
+	}
+
+	/**
+	 * Pearson product-moment correlation coefficient of a series against time.
+	 *
+	 * The x-axis is the evenly-spaced bucket index (0, 1, 2, …), so the sign of
+	 * the result matches the sign of the least-squares trend slope: positive is
+	 * rising, negative is falling. Returns null when no trend is defined — fewer
+	 * than two buckets (no x-variance) or a perfectly flat series (no y-variance,
+	 * e.g. an all-zero category) — so callers can render a neutral indicator
+	 * rather than a NaN or a misleading arrow.
+	 *
+	 * @since  1.6.0
+	 * @param  array<int, int|float> $y Per-bucket counts in chronological order.
+	 * @return float|null PMCC in [-1, 1], or null when undefined.
+	 */
+	private function pmcc( array $y ): ?float {
+		$n = count( $y );
+		if ( $n < 2 ) {
+			return null;
+		}
+
+		$mean_x = ( $n - 1 ) / 2.0; // Mean of 0..n-1.
+		$mean_y = array_sum( $y ) / $n;
+
+		$sxy = 0.0;
+		$sxx = 0.0;
+		$syy = 0.0;
+		foreach ( array_values( $y ) as $i => $value ) {
+			$dx   = $i - $mean_x;
+			$dy   = $value - $mean_y;
+			$sxy += $dx * $dy;
+			$sxx += $dx * $dx;
+			$syy += $dy * $dy;
+		}
+
+		if ( $sxx <= 0.0 || $syy <= 0.0 ) {
+			return null;
+		}
+
+		return $sxy / sqrt( $sxx * $syy );
+	}
+
+	/**
+	 * Render a coloured rise/fall trend indicator for a PMCC value.
+	 *
+	 * Green (rising) for r > 0, red (falling) for r < 0, neutral grey dash when
+	 * the trend is undefined (null) or exactly flat.
+	 *
+	 * @since  1.6.0
+	 * @param  float|null $r PMCC from {@see self::pmcc()}.
+	 * @return string Escaped HTML for the indicator.
+	 */
+	private function trend_indicator( ?float $r ): string {
+		// Neutral when undefined or when it would round to 0.00 — so the colour
+		// (rising/falling) never contradicts the two-dp value shown beside it.
+		if ( null === $r || 0.0 === round( $r, 2 ) ) {
+			return sprintf(
+				'<span class="mfa-trend none" title="%s">—</span>',
+				esc_attr( __( 'No trend (too few data points or flat)', 'markdown-for-agents-and-statistics' ) )
+			);
+		}
+
+		$rising = $r > 0;
+		$class  = $rising ? 'rising' : 'falling';
+		$label  = $rising
+			? __( 'rising', 'markdown-for-agents-and-statistics' )
+			: __( 'falling', 'markdown-for-agents-and-statistics' );
+
+		return sprintf(
+			'<span class="mfa-trend %1$s" title="%2$s">r = %3$s</span>',
+			esc_attr( $class ),
+			/* translators: 1: trend direction (rising/falling), 2: correlation coefficient. */
+			esc_attr( sprintf( __( 'Trend %1$s · Pearson r = %2$s', 'markdown-for-agents-and-statistics' ), $label, number_format( $r, 2 ) ) ),
+			esc_html( number_format( $r, 2 ) )
+		);
 	}
 
 	/**

@@ -541,8 +541,134 @@ class StatsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringContainsString( 'estimated AI-mediated human reads', $output );
-        // No single conflated grand total across categories.
-        $this->assertStringNotContainsString( 'Grand total', $output );
+    }
+
+    public function test_render_page_shows_total_card_summing_all_categories(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // 40 training + 7 on-demand + 3 unknown = 50 across all types.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 40 ],
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => '2026-06-10', 'agent' => '', 'total' => 3 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'Total agent visits', $output );
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?>\s*50\s*</s', $output );
+    }
+
+    public function test_render_page_total_trend_rising_is_green(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // Rising day-on-day → positive PMCC → green "rising" trend.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 10 ],
+            (object) [ 'access_date' => '2026-06-11', 'agent' => 'GPTBot', 'total' => 20 ],
+            (object) [ 'access_date' => '2026-06-12', 'agent' => 'GPTBot', 'total' => 30 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?mfa-trend rising/s', $output );
+    }
+
+    public function test_render_page_total_trend_falling_is_red(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // Falling day-on-day → negative PMCC → red "falling" trend.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 30 ],
+            (object) [ 'access_date' => '2026-06-11', 'agent' => 'GPTBot', 'total' => 20 ],
+            (object) [ 'access_date' => '2026-06-12', 'agent' => 'GPTBot', 'total' => 10 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?mfa-trend falling/s', $output );
+    }
+
+    public function test_render_page_trend_neutral_for_zero_variance_category(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // Multi-bucket window, but the Unknown series is entirely zero →
+        // zero variance → neutral trend, never NaN nor a coloured arrow.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 10 ],
+            (object) [ 'access_date' => '2026-06-11', 'agent' => 'GPTBot', 'total' => 20 ],
+            (object) [ 'access_date' => '2026-06-12', 'agent' => 'GPTBot', 'total' => 30 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertMatchesRegularExpression( '/Unknown.*?mfa-trend none/s', $output );
+        $this->assertStringNotContainsString( 'NaN', $output );
+    }
+
+    public function test_render_page_trend_neutral_when_rounds_to_zero(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // r ≈ 0.0038 → rounds to 0.00. The shown number and colour must agree:
+        // neutral, not a green "▲ r = 0.00".
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 100 ],
+            (object) [ 'access_date' => '2026-06-11', 'agent' => 'GPTBot', 'total' => 200 ],
+            (object) [ 'access_date' => '2026-06-12', 'agent' => 'GPTBot', 'total' => 300 ],
+            (object) [ 'access_date' => '2026-06-13', 'agent' => 'GPTBot', 'total' => 200 ],
+            (object) [ 'access_date' => '2026-06-14', 'agent' => 'GPTBot', 'total' => 101 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?mfa-trend none/s', $output );
+        $this->assertStringNotContainsString( 'mfa-trend rising', $output );
+        $this->assertStringNotContainsString( 'mfa-trend falling', $output );
+    }
+
+    public function test_render_page_trend_neutral_for_single_bucket(): void {
+        $_GET['range'] = 'all';
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturn( 0 );
+        // Single day → n < 2 → no trend computable → neutral everywhere.
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( [
+            (object) [ 'access_date' => '2026-06-10', 'agent' => 'GPTBot', 'total' => 40 ],
+        ] );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?mfa-trend none/s', $output );
+        $this->assertStringNotContainsString( 'mfa-trend rising', $output );
+        $this->assertStringNotContainsString( 'mfa-trend falling', $output );
     }
 
     public function test_render_page_buckets_daily_totals_by_intent(): void {
