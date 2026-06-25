@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -188,8 +188,26 @@ Yes. Several filters are available:
 * `markdown_for_agents_taxonomy_frontmatter` — modify frontmatter fields for a taxonomy archive
 * `markdown_for_agents_serve_enabled` — enable/disable serving for a specific post
 * `markdown_for_agents_serve_taxonomies` — enable/disable serving for taxonomy archive pages
+* `markdown_for_agents_cache_headers` — override the cache-related headers sent with the Markdown response
 * `markdown_for_agents_file_generated` — action fired after a file is written
 * `markdown_for_agents_file_deleted` — action fired after a file is deleted
+
+= Can I let CDNs/full-page caches cache the Markdown responses? =
+
+By default the Markdown response is sent with `Cache-Control: private, no-store, max-age=0` (plus `X-LiteSpeed-Cache-Control`, `X-Accel-Expires` and `Vary: Accept, User-Agent`). This is deliberate: the Markdown is negotiated on the *same URL* as the HTML page, so a shared cache that ignores or normalises `Vary` could otherwise store the Markdown variant and replay it to ordinary browsers expecting HTML.
+
+If your CDN/cache layer honours `Vary` correctly (or you serve Markdown from distinct URLs), you can relax this with the `markdown_for_agents_cache_headers` filter. Map any header to an empty string to omit it entirely:
+
+```
+add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath ) {
+	$headers['Cache-Control']             = 'public, max-age=300';
+	$headers['X-LiteSpeed-Cache-Control'] = '';
+	$headers['X-Accel-Expires']           = '';
+	return $headers;
+}, 10, 2 );
+```
+
+Override with caution — incorrectly cached Markdown will be served to browsers.
 
 = How do I generate taxonomy archives via WP-CLI? =
 
@@ -206,6 +224,9 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.5.1 =
+* Add `markdown_for_agents_cache_headers` filter so the cache-related headers on Markdown responses can be customised (e.g. to allow CDN caching where `Vary` is honoured). Defaults are unchanged and remain cache-bypassing.
 
 = 1.5.0 =
 * Add new 'skipped' grouping on generating MD files to show those that have been skipped for good reason (password or draft etc) rather than failed.

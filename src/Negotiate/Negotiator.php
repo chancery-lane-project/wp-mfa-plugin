@@ -245,12 +245,36 @@ class Negotiator {
 	private function send_markdown_file( string $filepath ): void {
 		header( 'Content-Type: text/markdown; charset=utf-8' );
 
-		// Prevent shared/full-page caches from storing the Markdown variant
-		// under the URL key and serving it back to HTML clients.
-		header( 'Cache-Control: private, no-store, max-age=0' );
-		header( 'X-LiteSpeed-Cache-Control: no-cache' );
-		header( 'X-Accel-Expires: 0' );
-		header( 'Vary: Accept, User-Agent' );
+		/**
+		 * Filter the cache-related headers sent with the Markdown response.
+		 *
+		 * The defaults prevent shared/full-page caches from storing the
+		 * Markdown variant under the URL key and replaying it to HTML clients.
+		 * Override with caution: the Markdown is negotiated on the same URL as
+		 * the HTML page, so allowing it to be cached risks a cache layer that
+		 * ignores `Vary` serving Markdown to browsers. Map a header to an empty
+		 * string to omit it entirely.
+		 *
+		 * @since 1.5.1
+		 * @param array<string,string> $headers  Header name => value pairs.
+		 * @param string               $filepath Absolute path to the .md file.
+		 */
+		$cache_headers = apply_filters(
+			'markdown_for_agents_cache_headers',
+			array(
+				'Cache-Control'             => 'private, no-store, max-age=0',
+				'X-LiteSpeed-Cache-Control' => 'no-cache',
+				'X-Accel-Expires'           => '0',
+				'Vary'                      => 'Accept, User-Agent',
+			),
+			$filepath
+		);
+
+		foreach ( (array) $cache_headers as $name => $value ) {
+			if ( '' !== $value ) {
+				header( $name . ': ' . $value );
+			}
+		}
 
 		header( 'X-Markdown-Source: markdown-for-agents' );
 
