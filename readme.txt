@@ -207,6 +207,8 @@ add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, stri
 }, 10, 2 );
 ```
 
+This filter governs only the cache-related headers listed above. The `Content-Signal` and `X-Markdown-Source` headers are sent separately and are unaffected (`Content-Signal` has its own `markdown_for_agents_content_signal` filter).
+
 Override with caution — incorrectly cached Markdown will be served to browsers.
 
 = How do I generate taxonomy archives via WP-CLI? =
