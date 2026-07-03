@@ -86,6 +86,7 @@ class SettingsPage {
 		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_okf_compat', __( 'OKF compatibility mode', 'markdown-for-agents-and-statistics' ), array( $this, 'field_okf_compat' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -155,6 +156,7 @@ class SettingsPage {
 		$clean['include_author']          = ! empty( $input['include_author'] );
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
+		$clean['okf_compat']              = ! empty( $input['okf_compat'] );
 		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
@@ -390,6 +392,22 @@ class SettingsPage {
 			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[include_taxonomy_topics]"
 					value="1" <?php checked( $checked, true ); ?>>
 			<?php esc_html_e( 'Append a "## Topics" section with linked taxonomy terms to the Markdown body.', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php
+	}
+
+	/**
+	 * Render the OKF compatibility mode checkbox field.
+	 *
+	 * @since  1.6.0
+	 */
+	public function field_okf_compat(): void {
+		$checked = ! empty( $this->options['okf_compat'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[okf_compat]"
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Adds OKF frontmatter keys (timestamp, flat tags) and rewrites internal links to point at the Markdown file versions. Regenerate files after changing this.', 'markdown-for-agents-and-statistics' ); ?>
 		</label>
 		<?php
 	}

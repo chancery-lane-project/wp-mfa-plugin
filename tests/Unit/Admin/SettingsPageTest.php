@@ -127,6 +127,20 @@ class SettingsPageTest extends TestCase {
         $this->assertSame( [ 'GPTBot' ], $result['ua_agent_strings'] );
     }
 
+    public function test_register_adds_okf_compat_field(): void {
+        $this->make_page()->register();
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $this->assertContains( 'markdown_for_agents_okf_compat', $fields );
+    }
+
+    public function test_sanitize_okf_compat_cast_to_bool(): void {
+        $result = $this->make_page()->sanitize_options( [ 'okf_compat' => '1' ] );
+        $this->assertTrue( $result['okf_compat'] );
+
+        $result = $this->make_page()->sanitize_options( [] );
+        $this->assertFalse( $result['okf_compat'] );
+    }
+
     public function test_sanitize_flags_regen_when_post_type_configs_change(): void {
         $page = $this->make_page( [
             'post_types'        => [ 'post' ],
