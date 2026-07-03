@@ -107,7 +107,11 @@ class IndexGenerator {
 
 		// A CLI run calls generate_all() directly and then WP-CLI still fires
 		// shutdown; clearing here stops every index regenerating a second time.
-		$this->dirty = array();
+		// A dry-run writes nothing, so any dirty scopes are still owed a real
+		// regeneration and must survive for the eventual shutdown flush.
+		if ( ! $dry_run ) {
+			$this->dirty = array();
+		}
 
 		return array( 'written' => $written, 'skipped' => $skipped );
 	}

@@ -273,16 +273,19 @@ class IndexGeneratorTest extends TestCase {
         $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
     }
 
-    public function test_generate_all_dry_run_clears_dirty_set(): void {
+    public function test_generate_all_dry_run_preserves_dirty_set(): void {
         $this->touch_md( 'post', 'a.md' );
         $post = $this->make_post( [ 'post_type' => 'post' ] );
         $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
 
         $this->generator->generate_all( true );
+
+        // Dry-run wrote nothing, so the dirty scopes are still owed a real
+        // regeneration; a subsequent flush must still perform it.
         $this->generator->flush_dirty();
 
-        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
-        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
     }
 
     // -----------------------------------------------------------------------

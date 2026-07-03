@@ -362,6 +362,8 @@ class Commands {
 		$ok
 			? \WP_CLI::success( "Generated: {$post->post_name}" )
 			: \WP_CLI::warning( "Failed: {$post->post_name}" );
+
+		$this->rebuild_indexes();
 	}
 
 	/**
