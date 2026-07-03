@@ -73,4 +73,11 @@ class OptionsTest extends TestCase {
         $this->assertContains( 'ClaudeBot', $strings );
         $this->assertContains( 'PerplexityBot', $strings );
     }
+
+    public function test_defaults_include_okf_compat_disabled(): void {
+        $defaults = Options::get_defaults();
+
+        $this->assertArrayHasKey( 'okf_compat', $defaults );
+        $this->assertFalse( $defaults['okf_compat'] );
+    }
 }
