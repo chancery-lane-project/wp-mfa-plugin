@@ -633,6 +633,45 @@ class NegotiatorTest extends TestCase {
         $this->assertContains( 'Vary: Accept, User-Agent', $GLOBALS['_mock_sent_headers'] );
     }
 
+    public function test_cache_headers_filter_overrides_defaults_and_omits_empty_values(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $filter_filepath = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] = static function ( array $headers, string $filepath ) use ( &$filter_filepath ): array {
+            $filter_filepath = $filepath;
+            return array(
+                'Cache-Control'             => 'public, max-age=300',
+                'X-LiteSpeed-Cache-Control' => '',
+                'X-Accel-Expires'           => '',
+                'Vary'                      => 'Accept',
+            );
+        };
+
+        $neg = $this->make_negotiator();
+        try {
+            $neg->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( $md_file, $filter_filepath );
+        $this->assertContains( 'Cache-Control: public, max-age=300', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'Vary: Accept', $GLOBALS['_mock_sent_headers'] );
+        $this->assertNotContains( 'Cache-Control: private, no-store, max-age=0', $GLOBALS['_mock_sent_headers'] );
+        // Headers mapped to an empty string must be omitted entirely.
+        $this->assertNotContains( 'X-LiteSpeed-Cache-Control: ', $GLOBALS['_mock_sent_headers'] );
+        $this->assertNotContains( 'X-Accel-Expires: ', $GLOBALS['_mock_sent_headers'] );
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] );
+    }
+
     public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
         $md_file = $this->tmp_dir . '/test-post.md';
         file_put_contents( $md_file, '# Test' );
