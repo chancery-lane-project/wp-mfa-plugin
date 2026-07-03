@@ -254,4 +254,86 @@ class FrontmatterBuilderTest extends TestCase {
 
         $this->assertSame('https://example.com/wp-content/uploads/photo.jpg', $result['featured_image']);
     }
+
+    private function set_multi_taxonomy_terms(): void {
+        $GLOBALS['_mock_object_taxonomies']['post'] = [
+            'category' => (object) [ 'name' => 'category', 'label' => 'Categories' ],
+            'post_tag' => (object) [ 'name' => 'post_tag', 'label' => 'Tags' ],
+            'sector'   => (object) [ 'name' => 'sector', 'label' => 'Sector' ],
+        ];
+        $GLOBALS['_mock_terms'][42]['category'] = [
+            (object) [ 'term_id' => 1, 'name' => 'News', 'slug' => 'news' ],
+            (object) [ 'term_id' => 2, 'name' => 'Climate', 'slug' => 'climate' ],
+        ];
+        $GLOBALS['_mock_terms'][42]['post_tag'] = [
+            (object) [ 'term_id' => 3, 'name' => 'net-zero', 'slug' => 'net-zero' ],
+            (object) [ 'term_id' => 4, 'name' => 'Climate', 'slug' => 'climate-tag' ],
+        ];
+        $GLOBALS['_mock_terms'][42]['sector'] = [
+            (object) [ 'term_id' => 5, 'name' => 'Energy', 'slug' => 'energy' ],
+        ];
+    }
+
+    public function test_okf_compat_off_produces_no_timestamp_or_flat_tags_changes(): void {
+        $this->set_multi_taxonomy_terms();
+
+        $post   = $this->make_post();
+        $result = $this->make_builder( [ 'include_taxonomies' => true, 'okf_compat' => false ] )->build( $post );
+
+        $this->assertArrayNotHasKey( 'timestamp', $result );
+        $this->assertSame( [ 'net-zero', 'Climate' ], $result['tags'] );
+    }
+
+    public function test_okf_compat_on_adds_timestamp_mirroring_modified(): void {
+        $post   = $this->make_post();
+        $result = $this->make_builder( [ 'okf_compat' => true ] )->build( $post );
+
+        $this->assertArrayHasKey( 'timestamp', $result );
+        $this->assertSame( $result['modified'], $result['timestamp'] );
+        $this->assertSame( '2025-10-15T14:23:00Z', $result['timestamp'] );
+    }
+
+    public function test_okf_compat_on_no_timestamp_when_modified_empty(): void {
+        $post   = $this->make_post( [ 'post_modified_gmt' => '0000-00-00 00:00:00' ] );
+        $result = $this->make_builder( [ 'okf_compat' => true ] )->build( $post );
+
+        $this->assertArrayNotHasKey( 'timestamp', $result );
+    }
+
+    public function test_okf_compat_on_flat_tags_across_taxonomies_deduped(): void {
+        $this->set_multi_taxonomy_terms();
+
+        $post   = $this->make_post();
+        $result = $this->make_builder( [ 'include_taxonomies' => true, 'okf_compat' => true ] )->build( $post );
+
+        $this->assertSame( [ 'News', 'Climate', 'net-zero', 'Energy' ], $result['tags'] );
+        $this->assertSame( [ 'News', 'Climate' ], $result['categories'] );
+    }
+
+    public function test_okf_compat_on_builds_flat_tags_even_when_include_taxonomies_off(): void {
+        $this->set_multi_taxonomy_terms();
+
+        $post   = $this->make_post();
+        $result = $this->make_builder( [ 'include_taxonomies' => false, 'okf_compat' => true ] )->build( $post );
+
+        $this->assertArrayHasKey( 'tags', $result );
+        $this->assertSame( [ 'News', 'Climate', 'net-zero', 'Energy' ], $result['tags'] );
+        $this->assertArrayNotHasKey( 'categories', $result );
+    }
+
+    public function test_flat_tags_filter_applied(): void {
+        $this->set_multi_taxonomy_terms();
+
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_flat_tags'] = static function ( array $flat, \WP_Post $post ): array {
+            $flat[] = 'extra';
+            return $flat;
+        };
+
+        $post   = $this->make_post();
+        $result = $this->make_builder( [ 'include_taxonomies' => true, 'okf_compat' => true ] )->build( $post );
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_flat_tags'] );
+
+        $this->assertContains( 'extra', $result['tags'] );
+    }
 }
