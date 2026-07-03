@@ -539,8 +539,8 @@ if (!function_exists('get_post_types')) {
 if (!function_exists('get_post_type_object')) {
     function get_post_type_object(string $post_type): ?object {
         $objects = $GLOBALS['_mock_post_type_objects'] ?? [
-            'post' => (object) ['name' => 'post', 'label' => 'Posts'],
-            'page' => (object) ['name' => 'page', 'label' => 'Pages'],
+            'post' => (object) ['name' => 'post', 'label' => 'Posts', 'labels' => (object) ['name' => 'Posts']],
+            'page' => (object) ['name' => 'page', 'label' => 'Pages', 'labels' => (object) ['name' => 'Pages']],
         ];
         return $objects[$post_type] ?? null;
     }
@@ -1054,6 +1054,16 @@ if (!function_exists('is_tag')) {
 if (!function_exists('get_taxonomies')) {
     function get_taxonomies(array $args = [], string $output = 'names'): array {
         return $GLOBALS['_mock_taxonomies'] ?? ['category' => 'category', 'post_tag' => 'post_tag'];
+    }
+}
+
+if (!function_exists('get_taxonomy')) {
+    function get_taxonomy(string $taxonomy): object|false {
+        $objects = $GLOBALS['_mock_taxonomy_objects'] ?? [
+            'category' => (object) ['name' => 'category', 'label' => 'Categories', 'labels' => (object) ['name' => 'Categories']],
+            'post_tag' => (object) ['name' => 'post_tag', 'label' => 'Tags', 'labels' => (object) ['name' => 'Tags']],
+        ];
+        return $objects[$taxonomy] ?? false;
     }
 }
 
