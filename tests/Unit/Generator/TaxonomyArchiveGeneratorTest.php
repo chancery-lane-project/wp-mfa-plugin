@@ -243,6 +243,125 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // generate_term — body links (okf_compat)
+    // -----------------------------------------------------------------------
+
+    public function test_okf_compat_on_body_links_to_md_files(): void {
+        $GLOBALS['_mock_posts']     = [
+            new \WP_Post( ['ID' => 1, 'post_title' => 'Post One', 'post_excerpt' => '', 'post_name' => 'post-one', 'post_type' => 'post'] ),
+        ];
+        $GLOBALS['_mock_permalink'] = 'https://example.com/post-one/';
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $captured = null;
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$captured ) {
+                $captured = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['okf_compat' => true, 'post_types' => ['post']] );
+        $gen->generate_term( $this->make_term() );
+
+        $this->assertStringContainsString(
+            '- [Post One](https://example.com/wp-content/uploads/' . $this->export_subdir . '/post/post-one.md)',
+            $captured
+        );
+        $this->assertStringNotContainsString( 'https://example.com/post-one/', $captured );
+    }
+
+    public function test_okf_compat_off_body_keeps_permalinks(): void {
+        $GLOBALS['_mock_posts']     = [
+            new \WP_Post( ['ID' => 1, 'post_title' => 'Post One', 'post_excerpt' => 'About one.', 'post_name' => 'post-one', 'post_type' => 'post'] ),
+        ];
+        $GLOBALS['_mock_permalink'] = 'https://example.com/post-one/';
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $captured = null;
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$captured ) {
+                $captured = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['okf_compat' => false, 'post_types' => ['post']] );
+        $gen->generate_term( $this->make_term() );
+
+        $this->assertStringContainsString( '- [Post One](https://example.com/post-one/) — About one.', $captured );
+    }
+
+    public function test_okf_compat_on_keeps_permalink_for_non_enabled_post_type(): void {
+        $GLOBALS['_mock_posts']     = [
+            new \WP_Post( ['ID' => 1, 'post_title' => 'Other Type Post', 'post_excerpt' => '', 'post_name' => 'other-post', 'post_type' => 'climate_contract'] ),
+        ];
+        $GLOBALS['_mock_permalink'] = 'https://example.com/other-post/';
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $captured = null;
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$captured ) {
+                $captured = $content;
+                return true;
+            } );
+
+        // post_types enabled only includes 'post' — the fixture post is of type 'climate_contract'.
+        $gen = $this->make_generator( ['okf_compat' => true, 'post_types' => ['post']] );
+        $gen->generate_term( $this->make_term() );
+
+        $this->assertStringContainsString( '- [Other Type Post](https://example.com/other-post/)', $captured );
+    }
+
+    // -----------------------------------------------------------------------
+    // lifecycle actions
+    // -----------------------------------------------------------------------
+
+    public function test_generate_term_fires_generated_action(): void {
+        reset_mock_hooks();
+        $term = $this->make_term();
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $this->generator->generate_term( $term );
+
+        $fired = get_mock_fired_actions( 'markdown_for_agents_taxonomy_file_generated' );
+        $this->assertCount( 1, $fired );
+        $this->assertSame( $this->generator->get_export_path( $term ), $fired[0][0] );
+        $this->assertSame( $term, $fired[0][1] );
+    }
+
+    public function test_delete_term_file_fires_deleted_action(): void {
+        reset_mock_hooks();
+        $term = $this->make_term();
+        $path = $this->generator->get_export_path( $term );
+        $dir  = dirname( $path );
+        if ( ! is_dir( $dir ) ) {
+            mkdir( $dir, 0755, true );
+        }
+        file_put_contents( $path, '# Test' );
+
+        $this->file_writer->method( 'delete' )->willReturn( true );
+
+        $result = $this->generator->delete_term_file( $term );
+
+        $this->assertTrue( $result );
+        $fired = get_mock_fired_actions( 'markdown_for_agents_taxonomy_file_deleted' );
+        $this->assertCount( 1, $fired );
+        $this->assertSame( $path, $fired[0][0] );
+        $this->assertSame( $term, $fired[0][1] );
+    }
+
+    public function test_delete_term_file_does_not_fire_deleted_action_when_file_missing(): void {
+        reset_mock_hooks();
+        $term = $this->make_term();
+
+        $result = $this->generator->delete_term_file( $term );
+
+        $this->assertFalse( $result );
+        $this->assertSame( [], get_mock_fired_actions( 'markdown_for_agents_taxonomy_file_deleted' ) );
+    }
+
+    // -----------------------------------------------------------------------
     // delete_term_file
     // -----------------------------------------------------------------------
 

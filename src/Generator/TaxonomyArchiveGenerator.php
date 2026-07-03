@@ -84,7 +84,21 @@ class TaxonomyArchiveGenerator {
 		$body    = $this->build_body( $term, $posts );
 		$content = $yaml . "\n" . $body;
 
-		return $this->file_writer->write( $this->get_export_path( $term ), $content );
+		$path   = $this->get_export_path( $term );
+		$result = $this->file_writer->write( $path, $content );
+
+		if ( $result ) {
+			/**
+			 * Fired after a taxonomy archive Markdown file is successfully written.
+			 *
+			 * @since  1.6.0
+			 * @param  string   $path The filesystem path to the written file.
+			 * @param  \WP_Term $term The term.
+			 */
+			do_action( 'markdown_for_agents_taxonomy_file_generated', $path, $term );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -103,7 +117,20 @@ class TaxonomyArchiveGenerator {
 			return false;
 		}
 
-		return $this->file_writer->delete( $path );
+		$result = $this->file_writer->delete( $path );
+
+		if ( $result ) {
+			/**
+			 * Fired after a taxonomy archive Markdown file is deleted.
+			 *
+			 * @since  1.6.0
+			 * @param  string   $path The filesystem path of the deleted file.
+			 * @param  \WP_Term $term The term.
+			 */
+			do_action( 'markdown_for_agents_taxonomy_file_deleted', $path, $term );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -276,10 +303,20 @@ class TaxonomyArchiveGenerator {
 			'',
 		];
 
+		$okf_compat         = ! empty( $this->options['okf_compat'] );
+		$enabled_post_types = (array) ( $this->options['post_types'] ?? array( 'post' ) );
+
 		foreach ( $posts as $post ) {
 			$title   = wp_strip_all_tags( $post->post_title );
-			$url     = get_permalink( $post->ID );
 			$excerpt = wp_strip_all_tags( $post->post_excerpt );
+
+			if ( $okf_compat && in_array( $post->post_type, $enabled_post_types, true ) ) {
+				$url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options )
+					. '/' . sanitize_file_name( $post->post_type )
+					. '/' . sanitize_file_name( $post->post_name ) . '.md';
+			} else {
+				$url = get_permalink( $post->ID );
+			}
 
 			$line = '- [' . $title . '](' . $url . ')';
 

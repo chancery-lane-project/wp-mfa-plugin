@@ -46,8 +46,9 @@ $GLOBALS['_mock_localized_scripts']  = [];
 $GLOBALS['_mock_wp_query']           = null;
 
 function reset_mock_hooks(): void {
-    $GLOBALS['_mock_actions'] = [];
-    $GLOBALS['_mock_filters'] = [];
+    $GLOBALS['_mock_actions']       = [];
+    $GLOBALS['_mock_filters']       = [];
+    $GLOBALS['_mock_fired_actions'] = [];
 }
 
 function reset_mock_options(): void {
@@ -62,6 +63,11 @@ function get_mock_actions(): array {
 /** @return array<string, mixed> */
 function get_mock_filters(): array {
     return $GLOBALS['_mock_filters'];
+}
+
+/** @return list<array<int, mixed>> Argument lists for each recorded fire of $hook_name. */
+function get_mock_fired_actions(string $hook_name): array {
+    return $GLOBALS['_mock_fired_actions'][$hook_name] ?? [];
 }
 
 if (!function_exists('add_action')) {
@@ -92,7 +98,7 @@ if (!function_exists('apply_filters')) {
 
 if (!function_exists('do_action')) {
     function do_action(string $hook, mixed ...$args): void {
-        // No-op in tests.
+        $GLOBALS['_mock_fired_actions'][$hook][] = $args;
     }
 }
 
