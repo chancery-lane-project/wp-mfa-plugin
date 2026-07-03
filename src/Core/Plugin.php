@@ -93,6 +93,7 @@ class Plugin {
 		// Store for use by other methods.
 		$this->taxonomy_generator = $taxonomy_generator;
 
+		// Built once, outside the closure, so URL memoisation and the term-link map persist across every link resolved this request.
 		$url_resolver  = new InternalUrlResolver( $options );
 		$link_rewriter = new LinkRewriter(
 			fn( string $url ): ?string => $url_resolver->resolve( $url ),
