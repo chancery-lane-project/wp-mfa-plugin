@@ -227,6 +227,38 @@ class IndexGeneratorTest extends TestCase {
         $this->assertSame( [ 'written' => 1, 'skipped' => 1 ], $result );
     }
 
+    public function test_generate_all_on_fully_empty_export_base_still_writes_root(): void {
+        // No directories exist at all beyond the freshly-created base_dir.
+        $result = $this->generator->generate_all();
+
+        // 'post' and 'page' dirs are both missing -> 2 skipped; no taxonomy dir
+        // exists so the taxonomy root is never attempted; the bundle root is
+        // always generated.
+        $this->assertSame( [ 'written' => 1, 'skipped' => 2 ], $result );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
+
+        $content = file_get_contents( $this->base_dir . '/index.md' );
+        $this->assertStringContainsString( "# Content\n", $content );
+        $this->assertStringNotContainsString( '# Taxonomies', $content );
+    }
+
+    // -----------------------------------------------------------------------
+    // Cache hygiene
+    // -----------------------------------------------------------------------
+
+    public function test_generate_for_post_type_cleans_post_cache_and_skips_meta_cache_priming(): void {
+        $GLOBALS['_mock_cleaned_post_caches'] = [];
+        $GLOBALS['_mock_posts']               = [
+            $this->make_post( [ 'ID' => 5, 'post_title' => 'Alpha' ] ),
+            $this->make_post( [ 'ID' => 6, 'post_title' => 'Beta', 'post_name' => 'beta' ] ),
+        ];
+
+        $this->generator->generate_for_post_type( 'post' );
+
+        $this->assertSame( [ 5, 6 ], $GLOBALS['_mock_cleaned_post_caches'] );
+        $this->assertFalse( $GLOBALS['_mock_get_posts_args']['update_post_meta_cache'] ?? null );
+    }
+
     // -----------------------------------------------------------------------
     // Taxonomy root + per-taxonomy index
     // -----------------------------------------------------------------------
@@ -262,6 +294,19 @@ class IndexGeneratorTest extends TestCase {
             . "* [Zeta Term](zeta-term.md)\n";
 
         $this->assertSame( $expected, $content );
+    }
+
+    public function test_generate_for_taxonomy_strips_html_from_description(): void {
+        $GLOBALS['_mock_taxonomy_terms']['category'] = [
+            $this->make_term( [ 'name' => 'Alpha Term', 'slug' => 'alpha-term', 'description' => '<p>Bold <strong>text</strong>.</p>' ] ),
+        ];
+
+        $this->generator->generate_for_taxonomy( 'category' );
+        $content = file_get_contents( $this->base_dir . '/taxonomy/category/index.md' );
+
+        $this->assertStringContainsString( '- Bold text.', $content );
+        $this->assertStringNotContainsString( '<p>', $content );
+        $this->assertStringNotContainsString( '<strong>', $content );
     }
 
     public function test_generate_for_taxonomy_skips_when_term_slugged_index(): void {
@@ -324,6 +369,20 @@ class IndexGeneratorTest extends TestCase {
 
         $this->assertSame( 0, $count );
         $this->assertFileExists( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_delete_all_reserved_slug_check_uses_targeted_query_not_full_batch(): void {
+        $this->touch_md( 'post', 'index.md' );
+        $this->touch_md( 'page', 'index.md' );
+        $GLOBALS['_mock_posts'] = [];
+
+        $this->generator->delete_all();
+
+        // The last post-type check made ('page', per enabled_post_types order)
+        // should be a single narrow lookup, not a batch-of-100 full scan.
+        $args = $GLOBALS['_mock_get_posts_args'];
+        $this->assertSame( 'index', $args['name'] ?? null );
+        $this->assertSame( 1, $args['posts_per_page'] ?? null );
     }
 
     // -----------------------------------------------------------------------

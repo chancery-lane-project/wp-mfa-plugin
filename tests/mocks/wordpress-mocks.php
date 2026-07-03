@@ -366,7 +366,13 @@ if (!function_exists('get_posts')) {
     /** @return \WP_Post[] */
     function get_posts(array $args = []): array {
         $GLOBALS['_mock_get_posts_args'] = $args;
-        return $GLOBALS['_mock_posts'] ?? [];
+        $posts = $GLOBALS['_mock_posts'] ?? [];
+
+        if (isset($args['name']) && '' !== $args['name']) {
+            $posts = array_values(array_filter($posts, fn($p) => $p->post_name === $args['name']));
+        }
+
+        return $posts;
     }
 }
 
@@ -1076,7 +1082,13 @@ if (!function_exists('wp_get_post_terms')) {
 if (!function_exists('get_terms')) {
     function get_terms(array|string $args = []): array|\WP_Error {
         $taxonomy = is_array($args) ? ($args['taxonomy'] ?? '') : $args;
-        return $GLOBALS['_mock_taxonomy_terms'][$taxonomy] ?? [];
+        $terms    = $GLOBALS['_mock_taxonomy_terms'][$taxonomy] ?? [];
+
+        if (is_array($args) && isset($args['slug']) && '' !== $args['slug']) {
+            $terms = array_values(array_filter($terms, fn($t) => $t->slug === $args['slug']));
+        }
+
+        return $terms;
     }
 }
 

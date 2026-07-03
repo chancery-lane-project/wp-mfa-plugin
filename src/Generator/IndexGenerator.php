@@ -106,19 +106,20 @@ class IndexGenerator {
 		$entries = array();
 
 		foreach ( $posts as $post ) {
-			if ( '' !== $post->post_password ) {
-				continue;
+			$eligible = '' === $post->post_password
+				&& ! (bool) get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
+
+			if ( $eligible ) {
+				$entries[] = array(
+					'title'       => wp_strip_all_tags( $post->post_title ),
+					'target'      => sanitize_file_name( $post->post_name ) . '.md',
+					'description' => wp_strip_all_tags( $post->post_excerpt ),
+				);
 			}
 
-			if ( (bool) get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
-				continue;
-			}
-
-			$entries[] = array(
-				'title'       => wp_strip_all_tags( $post->post_title ),
-				'target'      => sanitize_file_name( $post->post_name ) . '.md',
-				'description' => wp_strip_all_tags( $post->post_excerpt ),
-			);
+			// Evict this post's caches so long runs over many posts don't
+			// inflate the object cache. Only clears entries for this post.
+			clean_post_cache( $post );
 		}
 
 		usort( $entries, static fn( array $a, array $b ): int => strcmp( $a['title'], $b['title'] ) );
@@ -254,7 +255,7 @@ class IndexGenerator {
 		$count = 0;
 
 		foreach ( $this->enabled_post_types() as $post_type ) {
-			if ( $this->has_reserved_post_slug( $this->fetch_published_posts( $post_type ) ) ) {
+			if ( $this->has_published_post_slugged_index( $post_type ) ) {
 				continue;
 			}
 
@@ -262,7 +263,7 @@ class IndexGenerator {
 		}
 
 		foreach ( $this->public_taxonomies() as $taxonomy ) {
-			if ( $this->has_reserved_term_slug( $this->fetch_terms( $taxonomy ) ) ) {
+			if ( $this->has_term_slugged_index( $taxonomy ) ) {
 				continue;
 			}
 
@@ -294,13 +295,16 @@ class IndexGenerator {
 		do {
 			$posts = get_posts( // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
 				array(
-					'post_type'      => $post_type,
-					'post_status'    => 'publish',
-					'posts_per_page' => $batch_size,
-					'offset'         => $offset,
-					'orderby'        => 'title',
-					'order'          => 'ASC',
-					'no_found_rows'  => true,
+					'post_type'              => $post_type,
+					'post_status'            => 'publish',
+					'posts_per_page'         => $batch_size,
+					'offset'                 => $offset,
+					'orderby'                => 'title',
+					'order'                  => 'ASC',
+					'no_found_rows'          => true,
+					// Only get_post_meta() for the exclusion flag is read per post below,
+					// so priming the full meta cache would be wasted work.
+					'update_post_meta_cache' => false,
 				)
 			);
 
@@ -326,6 +330,48 @@ class IndexGenerator {
 		}
 
 		return $terms;
+	}
+
+	/**
+	 * Targeted lookup for delete_all(): is there a published post slugged
+	 * "index" in this post type? Narrows the query instead of fetching every
+	 * published post just to scan for one slug.
+	 *
+	 * @since  1.6.0
+	 * @param  string $post_type The post type slug.
+	 * @return bool
+	 */
+	private function has_published_post_slugged_index( string $post_type ): bool {
+		$matches = get_posts(
+			array(
+				'post_type'      => $post_type,
+				'name'           => 'index',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				'no_found_rows'  => true,
+			)
+		);
+
+		return $this->has_reserved_post_slug( $matches );
+	}
+
+	/**
+	 * Targeted lookup for delete_all(): is there a term slugged "index" in
+	 * this taxonomy? Narrows the query instead of fetching every term just
+	 * to scan for one slug.
+	 *
+	 * @since  1.6.0
+	 * @param  string $taxonomy The taxonomy slug.
+	 * @return bool
+	 */
+	private function has_term_slugged_index( string $taxonomy ): bool {
+		$matches = get_terms( array( 'taxonomy' => $taxonomy, 'slug' => 'index', 'hide_empty' => false ) );
+
+		if ( is_wp_error( $matches ) || ! is_array( $matches ) ) {
+			return false;
+		}
+
+		return $this->has_reserved_term_slug( $matches );
 	}
 
 	/**
@@ -408,14 +454,16 @@ class IndexGenerator {
 	}
 
 	/**
-	 * Collapse a term description to a single line.
+	 * Strip HTML and collapse a term description to a single line.
 	 *
 	 * @since  1.6.0
 	 * @param  string $description Raw term description.
 	 * @return string
 	 */
 	private function collapse_description( string $description ): string {
-		return trim( str_replace( array( "\r\n", "\n", "\r" ), ' ', $description ) );
+		$stripped = wp_strip_all_tags( $description );
+
+		return trim( str_replace( array( "\r\n", "\n", "\r" ), ' ', $stripped ) );
 	}
 
 	/**
