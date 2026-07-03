@@ -300,6 +300,18 @@ if (!function_exists('trailingslashit')) {
     }
 }
 
+if (!function_exists('untrailingslashit')) {
+    function untrailingslashit(string $string): string {
+        return rtrim($string, '/\\');
+    }
+}
+
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url(string $url, int $component = -1): mixed {
+        return parse_url($url, $component); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+    }
+}
+
 if (!function_exists('wp_list_pluck')) {
     function wp_list_pluck(array $list, string $field): array {
         return array_column($list, $field);
@@ -358,6 +370,13 @@ if (!function_exists('get_post')) {
             return $post;
         }
         return $GLOBALS['_mock_post_objects'][(int) $post] ?? null;
+    }
+}
+
+if (!function_exists('url_to_postid')) {
+    function url_to_postid(string $url): int {
+        $GLOBALS['_mock_url_to_postid_calls'] = ($GLOBALS['_mock_url_to_postid_calls'] ?? 0) + 1;
+        return $GLOBALS['_mock_url_to_postid'][$url] ?? 0;
     }
 }
 

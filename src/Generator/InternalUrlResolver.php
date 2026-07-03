@@ -1,0 +1,140 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tclp\WpMarkdownForAgents\Generator;
+
+/**
+ * Resolves absolute site URLs to bundle-relative Markdown file paths.
+ *
+ * Posts resolve via url_to_postid(); taxonomy term archives via a lazily
+ * built map of term links. Results mirror the path logic used by
+ * Generator::get_export_path() and TaxonomyArchiveGenerator::get_export_path().
+ *
+ * @since  1.6.0
+ * @package Tclp\WpMarkdownForAgents\Generator
+ */
+class InternalUrlResolver {
+
+	/** @var array<string, string>|null Term link (untrailingslashed) → bundle path. */
+	private ?array $term_map = null;
+
+	/** @var array<string, string|null> Memoised results keyed by URL. */
+	private array $resolved = array();
+
+	/**
+	 * @since  1.6.0
+	 * @param  array<string, mixed> $options Plugin options.
+	 */
+	public function __construct( private readonly array $options ) {}
+
+	/**
+	 * Resolve a URL to a bundle-relative path, or null if not an exported document.
+	 *
+	 * @since  1.6.0
+	 * @param  string $url Absolute URL.
+	 * @return string|null e.g. `post/my-post.md` or `taxonomy/category/climate.md`.
+	 */
+	public function resolve( string $url ): ?string {
+		if ( array_key_exists( $url, $this->resolved ) ) {
+			return $this->resolved[ $url ];
+		}
+
+		$this->resolved[ $url ] = $this->do_resolve( $url );
+
+		return $this->resolved[ $url ];
+	}
+
+	/**
+	 * @since  1.6.0
+	 * @param  string $url Absolute URL.
+	 * @return string|null
+	 */
+	private function do_resolve( string $url ): ?string {
+		$host = wp_parse_url( $url, PHP_URL_HOST );
+
+		if ( empty( $host ) || strcasecmp( $host, (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) !== 0 ) {
+			return null;
+		}
+
+		$post_id = url_to_postid( $url );
+
+		if ( $post_id > 0 ) {
+			return $this->post_path( $post_id );
+		}
+
+		return $this->term_path( $url );
+	}
+
+	/**
+	 * @since  1.6.0
+	 * @param  int $post_id Post ID.
+	 * @return string|null
+	 */
+	private function post_path( int $post_id ): ?string {
+		$post = get_post( $post_id );
+
+		if ( ! $post instanceof \WP_Post ) {
+			return null;
+		}
+
+		$enabled = (array) ( $this->options['post_types'] ?? array() );
+
+		if ( ! in_array( $post->post_type, $enabled, true )
+			|| 'publish' !== $post->post_status
+			|| '' !== $post->post_password
+			|| get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+			return null;
+		}
+
+		return sanitize_file_name( $post->post_type ) . '/' . sanitize_file_name( $post->post_name ) . '.md';
+	}
+
+	/**
+	 * @since  1.6.0
+	 * @param  string $url Absolute URL.
+	 * @return string|null
+	 */
+	private function term_path( string $url ): ?string {
+		if ( null === $this->term_map ) {
+			$this->term_map = $this->build_term_map();
+		}
+
+		return $this->term_map[ untrailingslashit( $url ) ] ?? null;
+	}
+
+	/**
+	 * @since  1.6.0
+	 * @return array<string, string>
+	 */
+	private function build_term_map(): array {
+		$map = array();
+
+		foreach ( array_keys( get_taxonomies( array( 'public' => true ) ) ) as $tax ) {
+			$terms = get_terms(
+				array(
+					'taxonomy'   => $tax,
+					'hide_empty' => false,
+				)
+			);
+
+			if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
+				continue;
+			}
+
+			foreach ( $terms as $term ) {
+				$link = get_term_link( $term );
+
+				if ( is_wp_error( $link ) || ! is_string( $link ) ) {
+					continue;
+				}
+
+				$map[ untrailingslashit( $link ) ] = 'taxonomy/'
+					. sanitize_file_name( $term->taxonomy ) . '/'
+					. sanitize_file_name( $term->slug ) . '.md';
+			}
+		}
+
+		return $map;
+	}
+}
