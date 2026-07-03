@@ -60,8 +60,10 @@ class LinkRewriterTest extends TestCase {
 	}
 
 	public function test_unmatchable_urls_fail_safe_untouched(): void {
-		// URLs containing ')' or spaces don't match the link regex — they must
-		// pass through unchanged rather than being mangled.
+		// The ')' URL matches only up to the first ')', truncating the captured
+		// URL; the truncated string resolves to null so the match is returned
+		// verbatim (identity no-op). The space URL never matches at all. Either
+		// way the text passes through unchanged.
 		$r  = $this->rewriter( [ 'https://example.com/weird/' => 'post/weird.md' ] );
 		$md = '[a](https://example.com/x(1)/) [b](https://example.com/a b/)';
 

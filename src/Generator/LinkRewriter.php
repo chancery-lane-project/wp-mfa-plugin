@@ -11,6 +11,10 @@ namespace Tclp\WpMarkdownForAgents\Generator;
  * the class is fully unit-testable without WordPress. Relativisation for the
  * OKF bundle happens at bundle build time, not here.
  *
+ * Reference-style links (`[text][ref]`) are out of scope by design, as the
+ * Converter only ever emits inline links. Link text supports one level of
+ * nested brackets; deeper nesting is left un-rewritten as a safe pass-through.
+ *
  * @since  1.6.0
  * @package Tclp\WpMarkdownForAgents\Generator
  */
