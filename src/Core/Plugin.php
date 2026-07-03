@@ -16,6 +16,7 @@ use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\InternalUrlResolver;
 use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
@@ -129,6 +130,15 @@ class Plugin {
 			$this->loader->add_action( 'before_delete_post', $generator, 'cache_post_terms', 10, 1 );
 			$this->loader->add_action( 'after_delete_post',  $generator, 'regenerate_term_archives_after_delete', 10, 2 );
 		}
+
+		$index_generator = new IndexGenerator( $options, $this->file_writer );
+		$this->index_generator = $index_generator;
+
+		$this->loader->add_action( 'markdown_for_agents_file_generated', $index_generator, 'on_file_generated', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_file_deleted', $index_generator, 'on_file_deleted', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $index_generator, 'on_taxonomy_file_generated', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $index_generator, 'on_taxonomy_file_deleted', 10, 2 );
+		$this->loader->add_action( 'shutdown', $index_generator, 'flush_dirty' );
 	}
 
 	/**
@@ -216,4 +226,5 @@ class Plugin {
 	private Generator $generator;
 	private TaxonomyArchiveGenerator $taxonomy_generator;
 	private FileWriter $file_writer;
+	private IndexGenerator $index_generator;
 }

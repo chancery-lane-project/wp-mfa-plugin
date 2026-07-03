@@ -386,6 +386,94 @@ class IndexGeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // Dirty-set triggers + shutdown flush
+    // -----------------------------------------------------------------------
+
+    public function test_on_file_generated_marks_type_and_root_dirty_and_flush_regenerates_once(): void {
+        $this->touch_md( 'post', 'a.md' );
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
+
+        // Second flush must be a no-op (dirty set cleared by the first flush).
+        unlink( $this->base_dir . '/post/index.md' );
+        unlink( $this->base_dir . '/index.md' );
+
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    public function test_on_file_deleted_derives_type_from_path(): void {
+        $this->generator->on_file_deleted( $this->base_dir . '/post/gone.md', 42 );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_flush_dirty_is_idempotent(): void {
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
+
+        unlink( $this->base_dir . '/post/index.md' );
+        unlink( $this->base_dir . '/index.md' );
+
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    public function test_taxonomy_callbacks_mark_three_scopes(): void {
+        $term = $this->make_term();
+        $this->touch_md( 'taxonomy/category', 'climate-law.md' );
+
+        $this->generator->on_taxonomy_file_generated( $this->base_dir . '/taxonomy/category/climate-law.md', $term );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/taxonomy/category/index.md' );
+        $this->assertFileExists( $this->base_dir . '/taxonomy/index.md' );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
+    }
+
+    public function test_generate_all_clears_dirty_set(): void {
+        $this->touch_md( 'post', 'a.md' );
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+
+        $this->generator->generate_all();
+
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
+        $this->assertFileExists( $this->base_dir . '/index.md' );
+
+        unlink( $this->base_dir . '/post/index.md' );
+        unlink( $this->base_dir . '/index.md' );
+
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    public function test_flush_dirty_noop_when_empty(): void {
+        $generator = $this->make_generator();
+
+        $generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

@@ -31,6 +31,15 @@ class IndexGenerator {
 	private string $base;
 
 	/**
+	 * Set of dirty scopes awaiting regeneration, keyed by scope identifier
+	 * (`root`, `type:{post_type}`, `taxonomy-root`, `taxonomy:{taxonomy}`).
+	 *
+	 * @since  1.6.0
+	 * @var    array<string, bool>
+	 */
+	private array $dirty = array();
+
+	/**
 	 * @since  1.6.0
 	 * @param  array<string, mixed> $options     Plugin options.
 	 * @param  FileWriter           $file_writer Handles filesystem I/O.
@@ -84,6 +93,10 @@ class IndexGenerator {
 		}
 
 		$this->generate_root() ? ++$written : ++$skipped;
+
+		// A CLI run calls generate_all() directly and then WP-CLI still fires
+		// shutdown; clearing here stops every index regenerating a second time.
+		$this->dirty = array();
 
 		return array( 'written' => $written, 'skipped' => $skipped );
 	}
@@ -240,6 +253,94 @@ class IndexGenerator {
 		$content = $this->build_body( array( 'Taxonomies' => $lines ) );
 
 		return $this->write( 'taxonomy/index.md', $content );
+	}
+
+	/**
+	 * Handler for `markdown_for_agents_file_generated`. Marks the post's type
+	 * and the bundle root dirty.
+	 *
+	 * @since  1.6.0
+	 * @param  string   $path The absolute path to the generated file. Unused.
+	 * @param  \WP_Post $post The post that was generated.
+	 */
+	public function on_file_generated( string $path, \WP_Post $post ): void {
+		$this->dirty[ 'type:' . $post->post_type ] = true;
+		$this->dirty['root']                       = true;
+	}
+
+	/**
+	 * Handler for `markdown_for_agents_file_deleted`. The post may already be
+	 * gone by the time this fires, so the post type is derived from the
+	 * deleted file's parent directory name rather than a post lookup.
+	 *
+	 * @since  1.6.0
+	 * @param  string $path    The absolute path to the deleted file.
+	 * @param  int    $post_id The deleted post's ID. Unused.
+	 */
+	public function on_file_deleted( string $path, int $post_id ): void {
+		$this->dirty[ 'type:' . basename( dirname( $path ) ) ] = true;
+		$this->dirty['root']                                   = true;
+	}
+
+	/**
+	 * Handler for `markdown_for_agents_taxonomy_file_generated`. Marks the
+	 * term's taxonomy, the taxonomy root, and the bundle root dirty.
+	 *
+	 * @since  1.6.0
+	 * @param  string   $path The absolute path to the generated file. Unused.
+	 * @param  \WP_Term $term The term that was generated.
+	 */
+	public function on_taxonomy_file_generated( string $path, \WP_Term $term ): void {
+		$this->dirty[ 'taxonomy:' . $term->taxonomy ] = true;
+		$this->dirty['taxonomy-root']                 = true;
+		$this->dirty['root']                          = true;
+	}
+
+	/**
+	 * Handler for `markdown_for_agents_taxonomy_file_deleted`. Marks the
+	 * term's taxonomy, the taxonomy root, and the bundle root dirty.
+	 *
+	 * @since  1.6.0
+	 * @param  string   $path The absolute path to the deleted file. Unused.
+	 * @param  \WP_Term $term The term that was deleted.
+	 */
+	public function on_taxonomy_file_deleted( string $path, \WP_Term $term ): void {
+		$this->dirty[ 'taxonomy:' . $term->taxonomy ] = true;
+		$this->dirty['taxonomy-root']                 = true;
+		$this->dirty['root']                          = true;
+	}
+
+	/**
+	 * Regenerate every dirty scope's index.md exactly once, then clear the
+	 * dirty set. Hooked to `shutdown` so many changes in one request collapse
+	 * into a single regeneration per scope. Children (post types,
+	 * taxonomies) are regenerated before the taxonomy root, which is
+	 * regenerated before the bundle root, so parents reflect their children.
+	 *
+	 * @since  1.6.0
+	 */
+	public function flush_dirty(): void {
+		if ( array() === $this->dirty ) {
+			return;
+		}
+
+		foreach ( array_keys( $this->dirty ) as $scope ) {
+			if ( str_starts_with( $scope, 'type:' ) ) {
+				$this->generate_for_post_type( substr( $scope, 5 ) );
+			} elseif ( str_starts_with( $scope, 'taxonomy:' ) ) {
+				$this->generate_for_taxonomy( substr( $scope, 9 ) );
+			}
+		}
+
+		if ( isset( $this->dirty['taxonomy-root'] ) ) {
+			$this->generate_taxonomy_root();
+		}
+
+		if ( isset( $this->dirty['root'] ) ) {
+			$this->generate_root();
+		}
+
+		$this->dirty = array();
 	}
 
 	/**
