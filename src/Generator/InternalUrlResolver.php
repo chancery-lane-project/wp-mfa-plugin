@@ -46,6 +46,8 @@ class InternalUrlResolver {
 	}
 
 	/**
+	 * Check the host, then try post resolution before falling back to terms.
+	 *
 	 * @since  1.6.0
 	 * @param  string $url Absolute URL.
 	 * @return string|null
@@ -67,6 +69,8 @@ class InternalUrlResolver {
 	}
 
 	/**
+	 * Build the bundle path for a post, or null if it is not an exported document.
+	 *
 	 * @since  1.6.0
 	 * @param  int $post_id Post ID.
 	 * @return string|null
@@ -91,6 +95,8 @@ class InternalUrlResolver {
 	}
 
 	/**
+	 * Look up a URL in the lazily built term-link map.
+	 *
 	 * @since  1.6.0
 	 * @param  string $url Absolute URL.
 	 * @return string|null
@@ -104,6 +110,13 @@ class InternalUrlResolver {
 	}
 
 	/**
+	 * Build the full term-link → bundle-path map across all public taxonomies.
+	 *
+	 * Eagerly built once per resolver instance (i.e. once per request), rather
+	 * than cached across requests: acceptable at modest term counts, but
+	 * revisit with a transient cache if profiling shows cost on sites with
+	 * large taxonomies.
+	 *
 	 * @since  1.6.0
 	 * @return array<string, string>
 	 */

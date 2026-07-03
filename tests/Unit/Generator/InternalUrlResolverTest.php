@@ -158,6 +158,15 @@ class InternalUrlResolverTest extends TestCase {
 		$this->assertSame( 1, $GLOBALS['_mock_url_to_postid_calls'] );
 	}
 
+	public function test_null_result_is_also_memoised(): void {
+		$r = $this->resolver();
+
+		$r->resolve( 'https://example.com/nowhere/' );
+		$r->resolve( 'https://example.com/nowhere/' );
+
+		$this->assertSame( 1, $GLOBALS['_mock_url_to_postid_calls'] );
+	}
+
 	public function test_term_map_is_built_once_across_multiple_lookups(): void {
 		$term1 = $this->make_term();
 		$term2 = $this->make_term( [ 'term_id' => 11, 'slug' => 'net-zero' ] );
