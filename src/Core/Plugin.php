@@ -16,6 +16,8 @@ use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\InternalUrlResolver;
+use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
@@ -91,6 +93,12 @@ class Plugin {
 		// Store for use by other methods.
 		$this->taxonomy_generator = $taxonomy_generator;
 
+		$url_resolver  = new InternalUrlResolver( $options );
+		$link_rewriter = new LinkRewriter(
+			fn( string $url ): ?string => $url_resolver->resolve( $url ),
+			Options::get_export_base_url( $options )
+		);
+
 		$generator = new Generator(
 			$options,
 			new FrontmatterBuilder( $field_resolver, new TaxonomyCollector(), $options ),
@@ -100,6 +108,7 @@ class Plugin {
 			$this->file_writer,
 			$field_resolver,
 			$taxonomy_generator,
+			$link_rewriter,
 		);
 
 		// Store on object so other methods can access it.

@@ -26,6 +26,7 @@ class Generator {
 	 * @param  FileWriter                     $file_writer          Handles filesystem I/O.
 	 * @param  FieldResolver                  $field_resolver       Resolves custom field values.
 	 * @param  TaxonomyArchiveGenerator|null  $taxonomy_generator   Optional taxonomy archive generator.
+	 * @param  LinkRewriter|null              $link_rewriter        Optional internal link rewriter (OKF compat).
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -36,6 +37,7 @@ class Generator {
 		private readonly FileWriter $file_writer,
 		private readonly FieldResolver $field_resolver,
 		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
+		private readonly ?LinkRewriter $link_rewriter = null,
 	) {}
 
 	/**
@@ -61,6 +63,10 @@ class Generator {
 			if ( '' !== $topics ) {
 				$markdown .= "\n\n" . $topics;
 			}
+		}
+
+		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
 		$yaml    = $this->yaml_formatter->format( $frontmatter );
@@ -107,6 +113,10 @@ class Generator {
 			if ( '' !== $topics ) {
 				$markdown .= "\n\n" . $topics;
 			}
+		}
+
+		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
 		$yaml = $this->yaml_formatter->format( $frontmatter );
