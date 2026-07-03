@@ -287,7 +287,13 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $gen = $this->make_generator( ['okf_compat' => false, 'post_types' => ['post']] );
         $gen->generate_term( $this->make_term() );
 
-        $this->assertStringContainsString( '- [Post One](https://example.com/post-one/) — About one.', $captured );
+        // Byte-level regression: yaml_formatter is stubbed to '', so the full written
+        // content is exactly "\n" + build_body()'s output — heading, count, post line
+        // with permalink and excerpt, trailing newline.
+        $expected = "\n# Climate Law\n\nPosts in this archive: 1\n\n"
+            . "- [Post One](https://example.com/post-one/) — About one.\n";
+
+        $this->assertSame( $expected, $captured );
     }
 
     public function test_okf_compat_on_keeps_permalink_for_non_enabled_post_type(): void {

@@ -230,7 +230,7 @@ class GeneratorTest extends TestCase {
         $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
         $this->file_writer->method( 'write' )->willReturn( true );
 
-        // do_action is a no-op stub in tests — just confirm no exception.
+        // do_action stub records fires; this test only confirms no exception.
         $result = $this->generator->generate_post( $post );
         $this->assertTrue( $result );
     }
