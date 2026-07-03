@@ -27,8 +27,10 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
 - **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
 - **Manifest + incremental export** - content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
+- **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
+- **OKF compatibility mode** - optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
 - **Access statistics** - logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
-- **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`
+- **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`, `generate-indexes`
 - **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
 - **Fully unit-tested** - PHPUnit 9.6 test suite
 
@@ -73,6 +75,7 @@ Navigate to **Settings → Markdown for Agents**.
 | Auto-generate | Regenerate files automatically on post save |
 | User-Agent detection | Force Markdown serving for specific AI User-Agent strings |
 | Field configuration | Per-post-type frontmatter and content field mappings |
+| OKF compatibility mode | Adds OKF frontmatter keys (`timestamp`, flat `tags`) and rewrites internal links to the `.md` file versions (off by default) |
 
 ---
 
@@ -80,12 +83,16 @@ Navigate to **Settings → Markdown for Agents**.
 
 ```
 wp-content/uploads/{export_dir}/
+  index.md                     ← OKF root index (declares okf_version)
   {post-type}/
+    index.md                   ← directory listing (title + excerpt per post)
     {slug}.md                  ← singular post file
     manifest.json              ← content hashes + change tracking
     changes.json               ← delta since last export (for RAG sync)
   taxonomy/
+    index.md                   ← taxonomy directory listing
     {taxonomy}/
+      index.md                 ← term listing for this taxonomy
       {term-slug}.md           ← taxonomy archive file
 ```
 
@@ -136,6 +143,26 @@ Posts in this archive: 23
 
 ---
 
+## OKF (Open Knowledge Format)
+
+The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog) conventions so agents can discover and traverse the corpus.
+
+**Always on:** `index.md` directory listings (see file structure above) are generated at the export root and in every post-type and taxonomy directory, and regenerated automatically when files change. The root index declares `okf_version: "0.1"`.
+
+**Behind the "OKF compatibility mode" toggle (off by default):**
+
+- Frontmatter gains `timestamp` (mirrors `modified`) and `tags` — a flat, deduplicated list of term names across **all** taxonomies. With the toggle on, `tags` replaces the previous post_tag-only value; per-taxonomy keys (`categories`, custom slugs) are unchanged. New `markdown_for_agents_flat_tags` filter.
+- Internal links in post bodies and taxonomy archive listings are rewritten to absolute `.md` upload URLs (e.g. `https://site/wp-content/uploads/{export_dir}/post/other-slug.md`), so cross-links work whether the file is fetched from the uploads tree or served via content negotiation. Regenerate files after changing the toggle.
+
+**Limitations:**
+
+- Links inside fenced code blocks are rewritten like any other link.
+- A post relocated via the `markdown_for_agents_export_path` filter is not seen by the link resolver, so links to it point at the default path (OKF §5.3 tolerates broken links).
+- A post or term slugged `index` keeps its existing export file — the directory listing for that location is skipped, and such a corpus cannot be fully OKF §9-conformant (reserved filenames, §3.1). Posts slugged `log` similarly shadow the reserved `log.md` name.
+- Rewritten links are domain-absolute; a corpus copied to another domain needs regeneration. Offline-traversable relative links are planned for the future `.tar.gz` bundle distribution, which will rewrite them at build time.
+
+---
+
 ## WP-CLI
 
 ```bash
@@ -163,6 +190,12 @@ wp markdown-agents generate-taxonomies --taxonomy=category
 # Dry run taxonomy generation
 wp markdown-agents generate-taxonomies --dry-run
 
+# Rebuild all index.md directory listings
+wp markdown-agents generate-indexes
+
+# Preview which indexes would be written
+wp markdown-agents generate-indexes --dry-run
+
 # Show status
 wp markdown-agents status
 
@@ -184,6 +217,8 @@ wp markdown-agents delete --all --yes
 | `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
 | `markdown_for_agents_post_convert` | `(string $markdown, WP_Post $post)` | Filter Markdown after conversion |
 | `markdown_for_agents_content_signal` | `(string $signal)` | Modify the `Content-Signal` header value |
+| `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list (OKF compatibility mode) |
+| `markdown_for_agents_index_content` | `(string $content, string $relative_path)` | Modify an `index.md` body before it is written |
 
 ---
 
@@ -193,6 +228,8 @@ wp markdown-agents delete --all --yes
 |---|---|
 | `markdown_for_agents_file_generated` | Fired after a `.md` file is written |
 | `markdown_for_agents_file_deleted` | Fired after a `.md` file is deleted |
+| `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
+| `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
 
 ---
 
