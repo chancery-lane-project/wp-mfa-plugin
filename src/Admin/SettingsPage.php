@@ -227,6 +227,7 @@ class SettingsPage {
 		$changed =
 			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
 			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
+			|| ! empty( $old['okf_compat'] ) !== ! empty( $new['okf_compat'] )
 			|| $old_pt !== $new_pt
 			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
 

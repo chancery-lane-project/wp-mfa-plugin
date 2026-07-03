@@ -159,6 +159,20 @@ class SettingsPageTest extends TestCase {
         $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
     }
 
+    public function test_sanitize_flags_regen_when_okf_compat_changes(): void {
+        $page = $this->make_page( [
+            'post_types' => [ 'post' ],
+            'okf_compat' => false,
+        ] );
+
+        $page->sanitize_options( [
+            'post_types' => [ 'post' ],
+            'okf_compat' => '1',
+        ] );
+
+        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
     public function test_sanitize_does_not_flag_regen_when_unrelated_settings_change(): void {
         $page = $this->make_page( [
             'post_types'         => [ 'post' ],
