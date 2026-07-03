@@ -243,6 +243,49 @@ class IndexGeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // generate_all() dry-run
+    // -----------------------------------------------------------------------
+
+    public function test_generate_all_dry_run_reports_counts_without_writing(): void {
+        $this->touch_md( 'post', 'a.md' );
+        $GLOBALS['_mock_posts'] = [ $this->make_post() ];
+        $generator = $this->make_generator( [ 'post_types' => [ 'post' ] ] );
+
+        $result = $generator->generate_all( true );
+
+        // 'post' type index would be written, plus the bundle root.
+        $this->assertSame( [ 'written' => 2, 'skipped' => 0 ], $result );
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    public function test_generate_all_dry_run_still_counts_reserved_name_skip(): void {
+        $this->touch_md( 'post', 'a.md' );
+        $GLOBALS['_mock_posts'] = [
+            $this->make_post( [ 'ID' => 1, 'post_title' => 'Index Page', 'post_name' => 'index' ] ),
+        ];
+        $generator = $this->make_generator( [ 'post_types' => [ 'post' ] ] );
+
+        $result = $generator->generate_all( true );
+
+        // 'post' type index is skipped (reserved slug); bundle root still written.
+        $this->assertSame( [ 'written' => 1, 'skipped' => 1 ], $result );
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_generate_all_dry_run_clears_dirty_set(): void {
+        $this->touch_md( 'post', 'a.md' );
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+
+        $this->generator->generate_all( true );
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+    }
+
+    // -----------------------------------------------------------------------
     // Cache hygiene
     // -----------------------------------------------------------------------
 

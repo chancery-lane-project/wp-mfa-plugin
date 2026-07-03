@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\CLI;
 
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
@@ -29,6 +30,7 @@ class Commands {
 	 * @param  FileWriter|null            $file_writer        FileWriter for manifest I/O.
 	 * @param  TaxonomyArchiveGenerator|null $taxonomy_generator Optional taxonomy archive generator.
 	 * @param  StatsRepository|null       $stats_repository  Optional stats repository for prune-stats.
+	 * @param  IndexGenerator|null        $index_generator   Optional index generator for generate-indexes.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -36,6 +38,7 @@ class Commands {
 		private readonly ?FileWriter $file_writer = null,
 		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
 		private readonly ?StatsRepository $stats_repository = null,
+		private readonly ?IndexGenerator $index_generator = null,
 	) {}
 
 	/**
@@ -103,6 +106,10 @@ class Commands {
 					: \WP_CLI::warning( 'manifest.json generation failed.' );
 			}
 		}
+
+		if ( ! $dry_run ) {
+			$this->rebuild_indexes();
+		}
 	}
 
 	/**
@@ -125,11 +132,9 @@ class Commands {
 		foreach ( $post_types as $type ) {
 			$total = (int) wp_count_posts( $type )->publish; // phpcs:ignore WordPress.WP.PostsPerPage
 
-			// Count .md files in the export directory.
-			$type_dir  = $export_base . '/' . $type;
-			$generated = is_dir( $type_dir )
-				? count( glob( $type_dir . '/*.md' ) ?: array() )
-				: 0;
+			// Count .md files in the export directory, excluding index.md
+			// (an OKF directory listing, not a generated post).
+			$generated = $this->count_post_files( $export_base . '/' . $type );
 
 			$rows[] = array(
 				'post_type' => $type,
@@ -140,6 +145,8 @@ class Commands {
 		}
 
 		\WP_CLI\Utils\format_items( 'table', $rows, array( 'post_type', 'published', 'generated', 'missing' ) );
+
+		\WP_CLI::log( sprintf( 'Index files: %d', $this->count_index_files( $export_base ) ) );
 	}
 
 	/**
@@ -176,6 +183,12 @@ class Commands {
 			foreach ( $types as $type ) {
 				$this->delete_type( $type );
 			}
+
+			if ( $this->index_generator ) {
+				$deleted = $this->index_generator->delete_all();
+				\WP_CLI::log( sprintf( 'Index files deleted: %d', $deleted ) );
+			}
+
 			\WP_CLI::success( 'All Markdown files deleted.' );
 			return;
 		}
@@ -247,6 +260,40 @@ class Commands {
 				$results['success'],
 				$results['failed']
 			)
+		);
+
+		$this->rebuild_indexes();
+	}
+
+	/**
+	 * Generate OKF `index.md` directory listings for posts and taxonomies.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Report what would be generated without writing files.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents generate-indexes
+	 *   wp markdown-agents generate-indexes --dry-run
+	 *
+	 * @since  1.6.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function generate_indexes( array $args, array $assoc_args ): void {
+		if ( null === $this->index_generator ) {
+			\WP_CLI::error( 'IndexGenerator is not available.' );
+			return;
+		}
+
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$results = $this->index_generator->generate_all( $dry_run );
+
+		$verb = $dry_run ? 'Would write' : 'Written';
+		\WP_CLI::success(
+			sprintf( 'Indexes: %s %d, skipped %d.', $verb, $results['written'], $results['skipped'] )
 		);
 	}
 
@@ -499,6 +546,77 @@ class Commands {
 		}
 
 		return $success;
+	}
+
+	/**
+	 * Count the .md files directly inside a directory, excluding index.md
+	 * (an OKF directory listing, not a generated post).
+	 *
+	 * @since  1.6.0
+	 * @param  string $dir Absolute directory path.
+	 * @return int
+	 */
+	private function count_post_files( string $dir ): int {
+		if ( ! is_dir( $dir ) ) {
+			return 0;
+		}
+
+		$files = glob( $dir . '/*.md' );
+		$files = false === $files ? array() : $files;
+
+		return count(
+			array_filter( $files, static fn( string $file ): bool => 'index.md' !== basename( $file ) )
+		);
+	}
+
+	/**
+	 * Regenerate every index.md after a bulk generate run and print the counts.
+	 * No-op when the index generator was not wired up.
+	 *
+	 * @since  1.6.0
+	 */
+	private function rebuild_indexes(): void {
+		if ( null === $this->index_generator ) {
+			return;
+		}
+
+		$results = $this->index_generator->generate_all();
+
+		\WP_CLI::log( sprintf( 'Indexes: %d written, %d skipped.', $results['written'], $results['skipped'] ) );
+	}
+
+	/**
+	 * Count every index.md file under the export base: the bundle root, each
+	 * post type directory, the taxonomy root, and each taxonomy directory.
+	 *
+	 * @since  1.6.0
+	 * @param  string $export_base Absolute path to the export base directory.
+	 * @return int
+	 */
+	private function count_index_files( string $export_base ): int {
+		$count = 0;
+
+		if ( file_exists( $export_base . '/index.md' ) ) {
+			++$count;
+		}
+
+		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $type ) {
+			if ( file_exists( $export_base . '/' . $type . '/index.md' ) ) {
+				++$count;
+			}
+		}
+
+		if ( file_exists( $export_base . '/taxonomy/index.md' ) ) {
+			++$count;
+		}
+
+		foreach ( array_keys( get_taxonomies( array( 'public' => true ) ) ) as $taxonomy ) {
+			if ( file_exists( $export_base . '/taxonomy/' . $taxonomy . '/index.md' ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
 	}
 
 	/**

@@ -55,9 +55,12 @@ class IndexGenerator {
 	 * Generate every index.md the plugin manages.
 	 *
 	 * @since  1.6.0
+	 * @param  bool $dry_run If true, report what would be written without
+	 *                       writing any files. Reserved-slug skips are still
+	 *                       honoured so the dry-run count matches a real run.
 	 * @return array{written: int, skipped: int}
 	 */
-	public function generate_all(): array {
+	public function generate_all( bool $dry_run = false ): array {
 		$written = 0;
 		$skipped = 0;
 
@@ -67,7 +70,7 @@ class IndexGenerator {
 				continue;
 			}
 
-			if ( $this->generate_for_post_type( $post_type ) ) {
+			if ( $dry_run ? $this->would_generate_for_post_type( $post_type ) : $this->generate_for_post_type( $post_type ) ) {
 				++$written;
 			} else {
 				++$skipped;
@@ -81,7 +84,7 @@ class IndexGenerator {
 				continue;
 			}
 
-			if ( $this->generate_for_taxonomy( $taxonomy ) ) {
+			if ( $dry_run ? $this->would_generate_for_taxonomy( $taxonomy ) : $this->generate_for_taxonomy( $taxonomy ) ) {
 				++$written;
 			} else {
 				++$skipped;
@@ -89,16 +92,50 @@ class IndexGenerator {
 		}
 
 		if ( $any_taxonomy_dir ) {
-			$this->generate_taxonomy_root() ? ++$written : ++$skipped;
+			if ( $dry_run ? true : $this->generate_taxonomy_root() ) {
+				++$written;
+			} else {
+				++$skipped;
+			}
 		}
 
-		$this->generate_root() ? ++$written : ++$skipped;
+		if ( $dry_run ? true : $this->generate_root() ) {
+			++$written;
+		} else {
+			++$skipped;
+		}
 
 		// A CLI run calls generate_all() directly and then WP-CLI still fires
 		// shutdown; clearing here stops every index regenerating a second time.
 		$this->dirty = array();
 
 		return array( 'written' => $written, 'skipped' => $skipped );
+	}
+
+	/**
+	 * Dry-run equivalent of generate_for_post_type(): only checks the
+	 * reserved-slug guard, since that is the only way a real run would report
+	 * a skip instead of a write.
+	 *
+	 * @since  1.6.0
+	 * @param  string $post_type The post type slug.
+	 * @return bool True if a real run would write, false if it would skip.
+	 */
+	private function would_generate_for_post_type( string $post_type ): bool {
+		return ! $this->has_reserved_post_slug( $this->fetch_published_posts( $post_type ) );
+	}
+
+	/**
+	 * Dry-run equivalent of generate_for_taxonomy(): only checks the
+	 * reserved-slug guard, since that is the only way a real run would report
+	 * a skip instead of a write.
+	 *
+	 * @since  1.6.0
+	 * @param  string $taxonomy The taxonomy slug.
+	 * @return bool True if a real run would write, false if it would skip.
+	 */
+	private function would_generate_for_taxonomy( string $taxonomy ): bool {
+		return ! $this->has_reserved_term_slug( $this->fetch_terms( $taxonomy ) );
 	}
 
 	/**

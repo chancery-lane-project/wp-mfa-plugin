@@ -210,7 +210,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
+			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ), $this->index_generator )
 		);
 	}
 
