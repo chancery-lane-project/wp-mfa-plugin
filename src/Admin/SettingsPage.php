@@ -514,7 +514,7 @@ class SettingsPage {
 			<?php esc_html_e( 'To publish this catalog, create /.well-known/ai-catalog.json at your web root containing the JSON above — either paste it in directly or symlink to a file you manage yourself.', 'markdown-for-agents-and-statistics' ); ?>
 		</p>
 		<p class="description">
-			<?php esc_html_e( 'The content above is deliberately stable across bundle rebuilds, so a manual copy will not go stale.', 'markdown-for-agents-and-statistics' ); ?>
+			<?php esc_html_e( 'The content above is deliberately stable across bundle rebuilds, so you only need to copy it once.', 'markdown-for-agents-and-statistics' ); ?>
 		</p>
 		<p class="description">
 			<?php esc_html_e( 'The plugin never serves this path itself: no routes or rewrite rules are registered for /.well-known/.', 'markdown-for-agents-and-statistics' ); ?>
