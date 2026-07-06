@@ -169,6 +169,46 @@ class BundleGenerator {
 	}
 
 	/**
+	 * Hook callback: mark the bundle stale and schedule a debounced rebuild.
+	 *
+	 * No-op unless `bundle_enabled`. Deletes the stored tree-state hash
+	 * (a cheap stale marker — `is_stale()` then returns true) and, unless a
+	 * rebuild is already pending, schedules one five minutes out. Because a
+	 * pending event blocks scheduling another, a burst of edits within that
+	 * window collapses to a single rebuild.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function mark_stale_and_schedule(): void {
+		if ( empty( $this->options['bundle_enabled'] ) ) {
+			return;
+		}
+
+		delete_option( self::HASH_OPTION );
+
+		if ( ! wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) ) {
+			wp_schedule_single_event( time() + 300, 'markdown_for_agents_rebuild_bundle' );
+		}
+	}
+
+	/**
+	 * Cron callback: rebuild the bundle.
+	 *
+	 * No-op unless `bundle_enabled`.
+	 *
+	 * @since  1.6.0
+	 * @return void
+	 */
+	public function on_rebuild_bundle(): void {
+		if ( empty( $this->options['bundle_enabled'] ) ) {
+			return;
+		}
+
+		$this->build();
+	}
+
+	/**
 	 * Compute a stat-only hash representing the current state of the export tree.
 	 *
 	 * @since  1.6.0

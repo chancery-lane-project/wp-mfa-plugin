@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\CLI\Commands;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
 use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
@@ -139,6 +140,15 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $index_generator, 'on_taxonomy_file_generated', 10, 2 );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $index_generator, 'on_taxonomy_file_deleted', 10, 2 );
 		$this->loader->add_action( 'shutdown', $index_generator, 'flush_dirty' );
+
+		$bundle_generator       = new BundleGenerator( $options );
+		$this->bundle_generator = $bundle_generator;
+
+		$this->loader->add_action( 'markdown_for_agents_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_rebuild_bundle', $bundle_generator, 'on_rebuild_bundle' );
 	}
 
 	/**
@@ -227,4 +237,5 @@ class Plugin {
 	private TaxonomyArchiveGenerator $taxonomy_generator;
 	private FileWriter $file_writer;
 	private IndexGenerator $index_generator;
+	private BundleGenerator $bundle_generator;
 }

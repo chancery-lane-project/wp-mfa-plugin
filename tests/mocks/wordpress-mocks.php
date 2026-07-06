@@ -55,6 +55,8 @@ function reset_mock_options(): void {
     $GLOBALS['_mock_options'] = [];
 }
 
+
+
 /** @return array<string, mixed> */
 function get_mock_actions(): array {
     return $GLOBALS['_mock_actions'];
@@ -133,6 +135,34 @@ if (!function_exists('delete_option')) {
     function delete_option(string $option): bool {
         unset($GLOBALS['_mock_options'][$option]);
         return true;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cron API
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_scheduled_events'] = [];
+
+function reset_mock_scheduled_events(): void {
+    $GLOBALS['_mock_scheduled_events'] = [];
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool {
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args];
+        return true;
+    }
+}
+
+if (!function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled(string $hook, array $args = []) {
+        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
+            if ($e['hook'] === $hook) {
+                return $e['timestamp'];
+            }
+        }
+        return false;
     }
 }
 

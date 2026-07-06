@@ -19,6 +19,7 @@ class BundleGeneratorTest extends TestCase {
 
     protected function setUp(): void {
         reset_mock_options();
+        reset_mock_scheduled_events();
 
         $this->uploads_dir = sys_get_temp_dir() . '/wp-mfa-bundle-uploads-' . uniqid();
         $this->export_dir  = 'wp-mfa-exports';
@@ -267,5 +268,61 @@ class BundleGeneratorTest extends TestCase {
 
     public function test_delete_returns_false_when_no_bundle_exists(): void {
         $this->assertFalse( $this->generator->delete() );
+    }
+
+    // -----------------------------------------------------------------------
+    // mark_stale_and_schedule() / on_rebuild_bundle()
+    // -----------------------------------------------------------------------
+
+    public function test_mark_stale_and_schedule_deletes_hash_and_schedules_when_enabled(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+        $generator->build();
+
+        $this->assertFalse( $generator->is_stale() );
+
+        $generator->mark_stale_and_schedule();
+
+        $this->assertTrue( $generator->is_stale() );
+        $this->assertNotFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
+    public function test_mark_stale_and_schedule_only_schedules_once_across_repeated_calls(): void {
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+
+        $generator->mark_stale_and_schedule();
+        $generator->mark_stale_and_schedule();
+        $generator->mark_stale_and_schedule();
+
+        $this->assertCount( 1, $GLOBALS['_mock_scheduled_events'] );
+    }
+
+    public function test_mark_stale_and_schedule_noop_when_bundle_disabled(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => false ] );
+        $generator->build();
+
+        $generator->mark_stale_and_schedule();
+
+        $this->assertFalse( $generator->is_stale() );
+        $this->assertSame( [], $GLOBALS['_mock_scheduled_events'] );
+    }
+
+    public function test_on_rebuild_bundle_builds_when_enabled(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+
+        $generator->on_rebuild_bundle();
+
+        $this->assertFileExists( $generator->bundle_path() );
+    }
+
+    public function test_on_rebuild_bundle_noop_when_disabled(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => false ] );
+
+        $generator->on_rebuild_bundle();
+
+        $this->assertFileDoesNotExist( $generator->bundle_path() );
     }
 }
