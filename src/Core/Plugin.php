@@ -178,7 +178,7 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
-		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator );
+		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before
@@ -220,7 +220,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ), $this->index_generator )
+			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ), $this->index_generator, $this->bundle_generator )
 		);
 	}
 

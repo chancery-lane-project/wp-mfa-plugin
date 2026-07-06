@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -21,13 +22,16 @@ class Admin {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed> $options   Current plugin options.
-	 * @param  Generator            $generator Generator instance.
+	 * @param  array<string, mixed>  $options          Current plugin options.
+	 * @param  Generator             $generator        Generator instance.
+	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
+	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
+		private readonly ?BundleGenerator $bundle_generator = null,
 	) {
 		$this->settings_page = new SettingsPage( $options, $generator );
 		$this->meta_box      = new MetaBox( $options, $generator );
@@ -188,6 +192,7 @@ class Admin {
 		// Final batch for this post type — drop it from the pending-regen list.
 		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
 			$this->mark_post_type_regenerated( $post_type );
+			$this->maybe_rebuild_bundle();
 		}
 
 		wp_send_json_success( $result );
@@ -245,8 +250,27 @@ class Admin {
 			error_log( sprintf( 'WP Markdown for Agents: taxonomy generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
 		}
 
+		// Final batch — rebuild the bundle, mirroring handle_generate_batch_ajax().
+		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
+			$this->maybe_rebuild_bundle();
+		}
+
 		wp_send_json_success( $result );
 		return;
+	}
+
+	/**
+	 * Rebuild the OKF `.tar.gz` bundle when enabled and a generator is wired
+	 * up. Called from the final batch of both AJAX bulk-generation handlers.
+	 *
+	 * @since  1.6.0
+	 */
+	private function maybe_rebuild_bundle(): void {
+		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
+			return;
+		}
+
+		$this->bundle_generator->build();
 	}
 
 	/**
