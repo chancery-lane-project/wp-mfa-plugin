@@ -261,7 +261,13 @@ class Admin {
 
 	/**
 	 * Rebuild the OKF `.tar.gz` bundle when enabled and a generator is wired
-	 * up. Called from the final batch of both AJAX bulk-generation handlers.
+	 * up. Called from the final batch of both AJAX bulk-generation handlers —
+	 * synchronous is acceptable here because the user is already waiting on
+	 * the final batch's response. Gated on is_stale() so that clicking
+	 * "Generate" repeatedly with no content changes in between doesn't
+	 * re-tar/gzip the whole export tree each time; any real change already
+	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
+	 * bundle here means there is genuinely nothing new to package.
 	 *
 	 * @since  1.6.0
 	 */
@@ -270,7 +276,14 @@ class Admin {
 			return;
 		}
 
-		$this->bundle_generator->build();
+		if ( ! $this->bundle_generator->is_stale() ) {
+			return;
+		}
+
+		if ( ! $this->bundle_generator->build() && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
+		}
 	}
 
 	/**

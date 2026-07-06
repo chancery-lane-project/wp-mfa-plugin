@@ -238,7 +238,30 @@ class AdminAjaxTest extends TestCase {
         $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
 
         $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
         $bundle_generator->expects( $this->once() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+    }
+
+    public function test_final_post_batch_does_not_build_bundle_when_fresh(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( false );
+        $bundle_generator->expects( $this->never() )->method( 'build' );
 
         $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
 
@@ -323,6 +346,7 @@ class AdminAjaxTest extends TestCase {
         $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
 
         $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
         $bundle_generator->expects( $this->once() )->method( 'build' );
 
         $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
