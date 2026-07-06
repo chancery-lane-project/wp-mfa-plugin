@@ -27,7 +27,7 @@ class CommandsTest extends TestCase {
 
     protected function setUp(): void {
         reset_mock_scheduled_events();
-        $this->bundle_path = sys_get_temp_dir() . '/wp-mfa-commands-test-' . uniqid() . '.tar.gz';
+        $this->bundle_path = sys_get_temp_dir() . '/wp-mfa-commands-test-' . uniqid() . '.zip';
     }
 
     protected function tearDown(): void {

@@ -263,7 +263,7 @@ class Admin {
 	}
 
 	/**
-	 * Rebuild the OKF `.tar.gz` bundle when enabled and a generator is wired
+	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
 	 * up. Called from the final batch of both AJAX bulk-generation handlers —
 	 * synchronous is acceptable here because the user is already waiting on
 	 * the final batch's response. Gated on is_stale() so that clicking

@@ -47,7 +47,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * **Export preview** — preview generated Markdown inline in the post editor without writing to disk
 * **OKF directory indexes** — `index.md` listings at the export root and in every post-type and taxonomy directory (Open Knowledge Format), kept current automatically
 * **OKF compatibility mode** — optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
-* **Downloadable OKF bundle** — optional `.tar.gz` of the export tree with bundle-absolute internal links, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
+* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with bundle-absolute internal links, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
 * **ARD catalog generation** — optional `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories
 * WP-CLI commands: `generate`, `generate-taxonomies`, `generate-indexes`, `prune-stats`, `status`, `delete`, `bundle`
 * Fully unit-tested
@@ -235,7 +235,7 @@ wp markdown-agents generate-taxonomies --dry-run
 * Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.
 * Add optional OKF compatibility mode (Settings → Markdown for Agents): adds `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewrites internal links in Markdown bodies and taxonomy archives to point at the `.md` file versions. Off by default — existing output is unchanged unless enabled.
 * New filters `markdown_for_agents_flat_tags` and `markdown_for_agents_index_content`; new actions `markdown_for_agents_taxonomy_file_generated` and `markdown_for_agents_taxonomy_file_deleted`.
-* Add optional downloadable OKF bundle (Settings → Markdown for Agents → "Build downloadable bundle"): packages the export tree into a `.tar.gz` with internal links rewritten to bundle-absolute form, so an extracted bundle is traversable offline. Rebuilt synchronously after bulk generation and on a debounced WP-Cron schedule after individual saves; also available via `wp markdown-agents bundle`. Off by default.
+* Add optional downloadable OKF bundle (Settings → Markdown for Agents → "Build downloadable bundle"): packages the export tree into a `.zip` archive with internal links rewritten to bundle-absolute form, so an extracted bundle is traversable offline. Rebuilt synchronously after bulk generation and on a debounced WP-Cron schedule after individual saves; also available via `wp markdown-agents bundle`. Off by default.
 * Add optional ARD catalog display (Settings → Markdown for Agents → "ARD catalog"): generates an `ai-catalog.json` document for manual deployment to `/.well-known/ai-catalog.json`. The plugin never serves this path itself. Requires the bundle toggle. New filter `markdown_for_agents_ai_catalog`.
 
 = 1.5.1 =

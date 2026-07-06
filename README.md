@@ -76,7 +76,7 @@ Navigate to **Settings → Markdown for Agents**.
 | User-Agent detection | Force Markdown serving for specific AI User-Agent strings |
 | Field configuration | Per-post-type frontmatter and content field mappings |
 | OKF compatibility mode | Adds OKF frontmatter keys (`timestamp`, flat `tags`) and rewrites internal links to the `.md` file versions (off by default) |
-| Build downloadable bundle | Maintains a `.tar.gz` of the export tree with bundle-absolute links (off by default; requires OKF compatibility mode) |
+| Build downloadable bundle | Maintains a `.zip` of the export tree with bundle-absolute links (off by default; requires OKF compatibility mode) |
 | ARD catalog | Displays a generated `ai-catalog.json` document for manual deployment to `/.well-known/` (off by default; requires the bundle toggle) |
 
 ---
@@ -161,11 +161,11 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 - Links inside fenced code blocks are rewritten like any other link.
 - A post relocated via the `markdown_for_agents_export_path` filter is not seen by the link resolver, so links to it point at the default path (OKF §5.3 tolerates broken links).
 - A post or term slugged `index` keeps its existing export file — the directory listing for that location is skipped, and such a corpus cannot be fully OKF §9-conformant (reserved filenames, §3.1). Posts slugged `log` similarly shadow the reserved `log.md` name.
-- Rewritten links are domain-absolute; a corpus copied to another domain needs regeneration. The `.tar.gz` bundle (below) rewrites links to bundle-absolute form instead, so an extracted bundle is traversable offline regardless of domain.
+- Rewritten links are domain-absolute; a corpus copied to another domain needs regeneration. The `.zip` bundle (below) rewrites links to bundle-absolute form instead, so an extracted bundle is traversable offline regardless of domain.
 
-### Bundle (.tar.gz)
+### Bundle (.zip)
 
-**Behind the "Build downloadable bundle" toggle (off by default; requires OKF compatibility mode on):** the plugin packages the entire export tree into a single gzipped tarball at `wp-content/uploads/{export_dir}.tar.gz`.
+**Behind the "Build downloadable bundle" toggle (off by default; requires OKF compatibility mode on):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{export_dir}.zip`.
 
 - **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json` when present.
 - **Links:** internal links inside bundled `.md` files are rewritten from absolute upload URLs to OKF §5.1 bundle-absolute form (e.g. `](/post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain.
@@ -179,7 +179,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 
 The plugin *generates* an [ARD](https://github.com/agent-readable/agent-readable-directory) catalog document (`ai-catalog.json`) and displays it as read-only JSON on the settings page, but it never serves it itself: no routes or rewrite rules are registered for `/.well-known/`. To publish it, copy the JSON into a `/.well-known/ai-catalog.json` file at your web root yourself (or symlink to a file you manage). The catalog content is deliberately stable across bundle rebuilds — it omits the ARD-optional `updatedAt` and `version` fields — so a one-time copy stays valid; you don't need to re-copy it after every rebuild.
 
-The catalog entry's `type` and `mediaType` use `application/okf-bundle+gzip`, a de-facto media type value (registration is pending upstream, tracked in [knowledge-catalog#111](https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/111)).
+The catalog entry's `type` and `mediaType` use `application/okf-bundle+zip`, a de-facto media type value (registration is pending upstream, tracked in [knowledge-catalog#111](https://github.com/GoogleCloudPlatform/knowledge-catalog/issues/111)).
 
 ---
 
@@ -222,7 +222,7 @@ wp markdown-agents status
 # Delete all generated files
 wp markdown-agents delete --all --yes
 
-# Build the OKF bundle (.tar.gz) — requires the bundle toggle enabled
+# Build the OKF bundle (.zip) — requires the bundle toggle enabled
 wp markdown-agents bundle
 
 # Only rebuild the bundle if it is stale

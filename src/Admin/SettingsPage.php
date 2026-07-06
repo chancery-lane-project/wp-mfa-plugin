@@ -98,7 +98,7 @@ class SettingsPage {
 		);
 
 		add_settings_field( 'markdown_for_agents_okf_compat', __( 'OKF compatibility mode', 'markdown-for-agents-and-statistics' ), array( $this, 'field_okf_compat' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
-		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.tar.gz)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
 		add_settings_field( 'markdown_for_agents_ard_enabled', __( 'ARD catalog for /.well-known/', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ard_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
 
 		// Per-post-type field configuration sections.
@@ -457,7 +457,7 @@ class SettingsPage {
 		<label>
 			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[bundle_enabled]"
 					value="1" <?php checked( $checked, true ); ?> <?php disabled( $disabled, true ); ?>>
-			<?php esc_html_e( 'Build downloadable bundle (.tar.gz)', 'markdown-for-agents-and-statistics' ); ?>
+			<?php esc_html_e( 'Build downloadable bundle (.zip)', 'markdown-for-agents-and-statistics' ); ?>
 		</label>
 		<?php if ( $disabled ) : ?>
 			<p class="description"><?php esc_html_e( 'Enable OKF compatibility mode first.', 'markdown-for-agents-and-statistics' ); ?></p>

@@ -7,10 +7,10 @@ namespace Tclp\WpMarkdownForAgents\Generator;
 use Tclp\WpMarkdownForAgents\Core\Options;
 
 /**
- * Builds, maintains, and tears down the OKF `.tar.gz` bundle.
+ * Builds, maintains, and tears down the OKF `.zip` bundle.
  *
  * Packages the export tree (minus sync/administrative files) into a single
- * gzipped tarball, rewriting `.md` internal links from absolute upload URLs
+ * zip archive (deflated entries), rewriting `.md` internal links from absolute upload URLs
  * to OKF bundle-absolute form (`/post/slug.md`) on the way in. The archive
  * is built at a process-unique temporary path and atomically renamed into
  * place so a concurrent download never observes a partial file.
@@ -54,7 +54,7 @@ class BundleGenerator {
 	public function bundle_path(): string {
 		$base = Options::get_export_base( $this->options );
 
-		return dirname( $base ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.tar.gz';
+		return dirname( $base ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.zip';
 	}
 
 	/**
@@ -66,7 +66,7 @@ class BundleGenerator {
 	public function bundle_url(): string {
 		$base_url = Options::get_export_base_url( $this->options );
 
-		return dirname( $base_url ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.tar.gz';
+		return dirname( $base_url ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.zip';
 	}
 
 	/**
@@ -84,11 +84,13 @@ class BundleGenerator {
 		}
 
 		$bundle_path = $this->bundle_path();
-		$tmp_tar     = $bundle_path . '.tmp-' . getmypid() . '.tar';
-		$tmp_gz      = $tmp_tar . '.gz';
+		// ZIP rather than tar: PharData's tar writer is ustar-only, capping
+		// filenames at 100 characters — real post slugs exceed that. OKF §3
+		// permits zip explicitly, and PharData zip has no such limit.
+		$tmp_zip = $bundle_path . '.tmp-' . getmypid() . '.zip';
 
 		try {
-			$phar     = new \PharData( $tmp_tar );
+			$phar     = new \PharData( $tmp_zip );
 			$base_url = Options::get_export_base_url( $this->options );
 
 			foreach ( $this->iterate_export_tree( $base ) as $relative_path => $absolute_path ) {
@@ -101,17 +103,13 @@ class BundleGenerator {
 				$phar->addFromString( $relative_path, $content );
 			}
 
-			$phar->compress( \Phar::GZ );
+			$phar->compressFiles( \Phar::GZ );
 			unset( $phar );
 
-			if ( file_exists( $tmp_tar ) ) {
-				unlink( $tmp_tar ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			}
-
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- Suppressed: a failed rename (cross-filesystem, permissions, disk full) is an expected, handled outcome, not a bug to surface as a PHP warning.
-			if ( ! @rename( $tmp_gz, $bundle_path ) ) {
-				if ( file_exists( $tmp_gz ) ) {
-					unlink( $tmp_gz ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			if ( ! @rename( $tmp_zip, $bundle_path ) ) {
+				if ( file_exists( $tmp_zip ) ) {
+					unlink( $tmp_zip ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 				}
 				return false;
 			}
@@ -120,11 +118,8 @@ class BundleGenerator {
 
 			return true;
 		} catch ( \Throwable $e ) {
-			if ( file_exists( $tmp_tar ) ) {
-				unlink( $tmp_tar ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
-			}
-			if ( file_exists( $tmp_gz ) ) {
-				unlink( $tmp_gz ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+			if ( file_exists( $tmp_zip ) ) {
+				unlink( $tmp_zip ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
 
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {

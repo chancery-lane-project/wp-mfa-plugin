@@ -53,8 +53,8 @@ class ArdCatalog {
 					'description' => 'OKF-structured Markdown export of site content, packaged as a downloadable bundle.',
 					// Same unregistered value in both fields: ard-spec#27 field-name
 					// workaround (Decision 6) — consumers reading either field find it.
-					'type'        => 'application/okf-bundle+gzip',
-					'mediaType'   => 'application/okf-bundle+gzip',
+					'type'        => 'application/okf-bundle+zip',
+					'mediaType'   => 'application/okf-bundle+zip',
 					'url'         => $this->bundle_generator->bundle_url(),
 				),
 			),

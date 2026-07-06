@@ -52,7 +52,7 @@ class ArdCatalogTest extends TestCase {
 
         $this->assertSame( 'urn:air:example.com:knowledge:markdown-bundle', $entry['identifier'] );
         $this->assertSame( 'The Chancery Lane Project Markdown knowledge bundle', $entry['displayName'] );
-        $this->assertSame( 'application/okf-bundle+gzip', $entry['type'] );
+        $this->assertSame( 'application/okf-bundle+zip', $entry['type'] );
         $this->assertSame( $entry['type'], $entry['mediaType'] );
     }
 

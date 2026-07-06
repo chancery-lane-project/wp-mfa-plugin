@@ -38,7 +38,7 @@ class SettingsPageTest extends TestCase {
 
     private function make_ard_catalog( array $options = [] ): ArdCatalog {
         $bundle_generator = $this->createMock( BundleGenerator::class );
-        $bundle_generator->method( 'bundle_url' )->willReturn( 'https://example.test/wp-content/uploads/wp-mfa-exports.tar.gz' );
+        $bundle_generator->method( 'bundle_url' )->willReturn( 'https://example.test/wp-content/uploads/wp-mfa-exports.zip' );
 
         return new ArdCatalog( array_merge( Options::get_defaults(), $options ), $bundle_generator );
     }

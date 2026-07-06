@@ -118,7 +118,7 @@ class Commands {
 	}
 
 	/**
-	 * Build the OKF `.tar.gz` bundle from the current export tree.
+	 * Build the OKF `.zip` bundle from the current export tree.
 	 *
 	 * ## OPTIONS
 	 *
@@ -654,7 +654,7 @@ class Commands {
 	}
 
 	/**
-	 * Rebuild the OKF `.tar.gz` bundle after a bulk generate run, when enabled.
+	 * Rebuild the OKF `.zip` bundle after a bulk generate run, when enabled.
 	 * No-op unless the bundle generator was wired up and `bundle_enabled` is on.
 	 *
 	 * @since  1.6.0

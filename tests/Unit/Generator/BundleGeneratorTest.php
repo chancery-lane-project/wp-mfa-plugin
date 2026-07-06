@@ -97,12 +97,12 @@ class BundleGeneratorTest extends TestCase {
     // -----------------------------------------------------------------------
 
     public function test_bundle_path_is_sibling_tar_gz_of_export_dir(): void {
-        $this->assertSame( $this->uploads_dir . '/' . $this->export_dir . '.tar.gz', $this->generator->bundle_path() );
+        $this->assertSame( $this->uploads_dir . '/' . $this->export_dir . '.zip', $this->generator->bundle_path() );
     }
 
     public function test_bundle_url_mirrors_bundle_path(): void {
         $this->assertSame(
-            'https://example.com/wp-content/uploads/' . $this->export_dir . '.tar.gz',
+            'https://example.com/wp-content/uploads/' . $this->export_dir . '.zip',
             $this->generator->bundle_url()
         );
     }
@@ -126,6 +126,20 @@ class BundleGeneratorTest extends TestCase {
         $this->assertArrayHasKey( 'index.md', $entries );
         $this->assertArrayHasKey( 'post/hello.md', $entries );
         $this->assertArrayHasKey( 'manifest.json', $entries );
+    }
+
+    public function test_build_handles_filenames_beyond_the_ustar_100_char_limit(): void {
+        // Regression: PharData's tar writer is ustar-only and rejects names
+        // over 100 characters — real clause slugs exceed that, which is why
+        // the bundle is a zip. This slug is 108 characters like the one that
+        // broke the first live build.
+        $long_slug = 'using-legal-contracts-to-mitigate-nature-related-risks-and-promote-nature-positive-action-across-industries';
+        $this->write_file( 'post/' . $long_slug . '.md', "# Long\n" );
+
+        $this->assertTrue( $this->generator->build() );
+
+        $entries = $this->read_archive_entries( $this->generator->bundle_path() );
+        $this->assertArrayHasKey( 'post/' . $long_slug . '.md', $entries );
     }
 
     public function test_build_excludes_changes_json_and_ai_catalog_json(): void {
