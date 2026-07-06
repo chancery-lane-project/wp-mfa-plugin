@@ -40,6 +40,8 @@ class Options {
 			'relative_image_paths'      => false,
 			'include_taxonomy_topics'   => false,
 			'okf_compat'                => false,
+			'bundle_enabled'            => false,
+			'ard_enabled'               => false,
 			'post_type_configs'         => array(),
 			'frontmatter_format'        => 'yaml',
 			'delete_files_on_uninstall' => false,

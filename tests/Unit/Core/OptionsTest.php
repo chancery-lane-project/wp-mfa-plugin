@@ -80,4 +80,13 @@ class OptionsTest extends TestCase {
         $this->assertArrayHasKey( 'okf_compat', $defaults );
         $this->assertFalse( $defaults['okf_compat'] );
     }
+
+    public function test_defaults_include_bundle_and_ard_disabled(): void {
+        $defaults = Options::get_defaults();
+
+        $this->assertArrayHasKey( 'bundle_enabled', $defaults );
+        $this->assertFalse( $defaults['bundle_enabled'] );
+        $this->assertArrayHasKey( 'ard_enabled', $defaults );
+        $this->assertFalse( $defaults['ard_enabled'] );
+    }
 }
