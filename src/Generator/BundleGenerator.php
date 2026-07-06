@@ -108,7 +108,7 @@ class BundleGenerator {
 				unlink( $tmp_tar ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			}
 
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- Suppressed: a failed rename (cross-filesystem, permissions, disk full) is an expected, handled outcome, not a bug to surface as a PHP warning.
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- Suppressed: a failed rename (cross-filesystem, permissions, disk full) is an expected, handled outcome, not a bug to surface as a PHP warning.
 			if ( ! @rename( $tmp_gz, $bundle_path ) ) {
 				if ( file_exists( $tmp_gz ) ) {
 					unlink( $tmp_gz ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
