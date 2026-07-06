@@ -82,16 +82,11 @@ class InternalUrlResolver {
 			return null;
 		}
 
-		$enabled = (array) ( $this->options['post_types'] ?? array() );
-
-		if ( ! in_array( $post->post_type, $enabled, true )
-			|| 'publish' !== $post->post_status
-			|| '' !== $post->post_password
-			|| get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+		if ( ! ExportPolicy::is_eligible( $post, $this->options ) ) {
 			return null;
 		}
 
-		return sanitize_file_name( $post->post_type ) . '/' . sanitize_file_name( $post->post_name ) . '.md';
+		return ExportPolicy::post_relative_path( $post );
 	}
 
 	/**
@@ -142,9 +137,7 @@ class InternalUrlResolver {
 					continue;
 				}
 
-				$map[ untrailingslashit( $link ) ] = 'taxonomy/'
-					. sanitize_file_name( $term->taxonomy ) . '/'
-					. sanitize_file_name( $term->slug ) . '.md';
+				$map[ untrailingslashit( $link ) ] = ExportPolicy::term_relative_path( $term->taxonomy, $term->slug );
 			}
 		}
 

@@ -80,7 +80,7 @@ class IndexGenerator {
 		$any_taxonomy_dir = is_dir( $this->base . '/taxonomy' );
 
 		foreach ( $this->public_taxonomies() as $taxonomy ) {
-			if ( ! is_dir( $this->base . '/taxonomy/' . sanitize_file_name( $taxonomy ) ) ) {
+			if ( ! is_dir( $this->base . '/' . ExportPolicy::TAXONOMY_DIR . '/' . sanitize_file_name( $taxonomy ) ) ) {
 				continue;
 			}
 
@@ -160,10 +160,7 @@ class IndexGenerator {
 		$entries = array();
 
 		foreach ( $posts as $post ) {
-			$eligible = '' === $post->post_password
-				&& ! (bool) get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
-
-			if ( $eligible ) {
+			if ( ExportPolicy::is_eligible( $post, $this->options ) ) {
 				$entries[] = array(
 					'title'       => wp_strip_all_tags( $post->post_title ),
 					'target'      => sanitize_file_name( $post->post_name ) . '.md',
@@ -223,7 +220,7 @@ class IndexGenerator {
 			$entries
 		);
 
-		$relative_path = 'taxonomy/' . sanitize_file_name( $taxonomy ) . '/index.md';
+		$relative_path = ExportPolicy::TAXONOMY_DIR . '/' . sanitize_file_name( $taxonomy ) . '/index.md';
 		$content       = $this->build_body( array( $label => $lines ) );
 
 		return $this->write( $relative_path, $content );
@@ -277,7 +274,7 @@ class IndexGenerator {
 		$lines = array();
 
 		foreach ( $this->public_taxonomies() as $taxonomy ) {
-			$dir = $this->base . '/taxonomy/' . sanitize_file_name( $taxonomy );
+			$dir = $this->base . '/' . ExportPolicy::TAXONOMY_DIR . '/' . sanitize_file_name( $taxonomy );
 
 			if ( ! is_dir( $dir ) ) {
 				continue;
@@ -293,7 +290,7 @@ class IndexGenerator {
 
 		$content = $this->build_body( array( 'Taxonomies' => $lines ) );
 
-		return $this->write( 'taxonomy/index.md', $content );
+		return $this->write( ExportPolicy::TAXONOMY_DIR . '/index.md', $content );
 	}
 
 	/**
@@ -409,10 +406,10 @@ class IndexGenerator {
 				continue;
 			}
 
-			$count += $this->delete_if_exists( 'taxonomy/' . sanitize_file_name( $taxonomy ) . '/index.md' );
+			$count += $this->delete_if_exists( ExportPolicy::TAXONOMY_DIR . '/' . sanitize_file_name( $taxonomy ) . '/index.md' );
 		}
 
-		$count += $this->delete_if_exists( 'taxonomy/index.md' );
+		$count += $this->delete_if_exists( ExportPolicy::TAXONOMY_DIR . '/index.md' );
 		$count += $this->delete_if_exists( 'index.md' );
 
 		return $count;
@@ -562,7 +559,7 @@ class IndexGenerator {
 	 * @return string[]
 	 */
 	private function enabled_post_types(): array {
-		return (array) ( $this->options['post_types'] ?? array( 'post' ) );
+		return ExportPolicy::enabled_post_types( $this->options );
 	}
 
 	/**

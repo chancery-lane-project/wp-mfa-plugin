@@ -290,10 +290,8 @@ class Generator {
 			$post = get_post( $post );
 		}
 
-		$base      = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
-		$post_type = sanitize_file_name( $post->post_type );
-		$slug      = sanitize_file_name( $post->post_name );
-		$path      = $base . DIRECTORY_SEPARATOR . $post_type . DIRECTORY_SEPARATOR . $slug . '.md';
+		$base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		$path = $base . DIRECTORY_SEPARATOR . str_replace( '/', DIRECTORY_SEPARATOR, ExportPolicy::post_relative_path( $post ) );
 
 		/**
 		 * Override the export file path for a given post.
@@ -631,11 +629,9 @@ class Generator {
 			$base_url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options );
 
 			foreach ( $terms as $term ) {
-				$name     = html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-				$tax_seg  = sanitize_file_name( $term->taxonomy );
-				$slug_seg = sanitize_file_name( $term->slug );
-				$url      = $base_url . '/taxonomy/' . $tax_seg . '/' . $slug_seg . '.md';
-				$links[]  = "[{$name}]({$url})";
+				$name    = html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+				$url     = $base_url . '/' . ExportPolicy::term_relative_path( $term->taxonomy, $term->slug );
+				$links[] = "[{$name}]({$url})";
 			}
 
 			$lines[] = '**' . wp_specialchars_decode( (string) $taxonomy->label, ENT_QUOTES ) . ':** ' . implode( ', ', $links );
@@ -656,10 +652,6 @@ class Generator {
 	 * @return bool
 	 */
 	private function is_eligible( \WP_Post $post ): bool {
-		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
-		return in_array( $post->post_type, $enabled_types, true )
-			&& 'publish' === $post->post_status
-			&& '' === $post->post_password
-			&& ! get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
+		return ExportPolicy::is_eligible( $post, $this->options );
 	}
 }

@@ -227,7 +227,11 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         );
     }
 
-    public function test_generate_term_defaults_to_post_type_when_option_absent(): void {
+    public function test_generate_term_queries_no_types_when_option_absent(): void {
+        // Unified via ExportPolicy::enabled_post_types(): an absent post_types
+        // option means no enabled types, consistent with every other consumer.
+        // Options::get() always merges real defaults, so this only arises in
+        // artificially constructed options arrays.
         $GLOBALS['_mock_get_posts_args'] = null;
 
         $this->yaml_formatter->method( 'format' )->willReturn( '' );
@@ -237,7 +241,7 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $gen->generate_term( $this->make_term() );
 
         $this->assertSame(
-            ['post'],
+            [],
             $GLOBALS['_mock_get_posts_args']['post_type'] ?? null
         );
     }

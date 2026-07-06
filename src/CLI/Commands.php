@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\CLI;
 
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
@@ -88,7 +89,7 @@ class Commands {
 
 		$types = null !== $post_type
 			? array( $post_type )
-			: (array) ( $this->options['post_types'] ?? array() );
+			: ExportPolicy::enabled_post_types( $this->options );
 
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
@@ -124,7 +125,7 @@ class Commands {
 	 * @param  array<string, string> $assoc_args
 	 */
 	public function status( array $args, array $assoc_args ): void {
-		$post_types  = (array) ( $this->options['post_types'] ?? array() );
+		$post_types  = ExportPolicy::enabled_post_types( $this->options );
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
 		$rows = array();
@@ -179,7 +180,7 @@ class Commands {
 		if ( isset( $assoc_args['all'] ) ) {
 			\WP_CLI::confirm( 'Delete all generated Markdown files?', $assoc_args );
 
-			$types = (array) ( $this->options['post_types'] ?? array() );
+			$types = ExportPolicy::enabled_post_types( $this->options );
 			foreach ( $types as $type ) {
 				$this->delete_type( $type );
 			}
@@ -602,18 +603,18 @@ class Commands {
 			++$count;
 		}
 
-		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $type ) {
+		foreach ( ExportPolicy::enabled_post_types( $this->options ) as $type ) {
 			if ( file_exists( $export_base . '/' . $type . '/index.md' ) ) {
 				++$count;
 			}
 		}
 
-		if ( file_exists( $export_base . '/taxonomy/index.md' ) ) {
+		if ( file_exists( $export_base . '/' . ExportPolicy::TAXONOMY_DIR . '/index.md' ) ) {
 			++$count;
 		}
 
 		foreach ( array_keys( get_taxonomies( array( 'public' => true ) ) ) as $taxonomy ) {
-			if ( file_exists( $export_base . '/taxonomy/' . $taxonomy . '/index.md' ) ) {
+			if ( file_exists( $export_base . '/' . ExportPolicy::TAXONOMY_DIR . '/' . $taxonomy . '/index.md' ) ) {
 				++$count;
 			}
 		}
