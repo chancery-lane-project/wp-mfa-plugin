@@ -205,6 +205,9 @@ class BundleGenerator {
 			return;
 		}
 
+		// A clean false from build() (e.g. missing export tree) is absorbed
+		// silently here — nobody watches a cron tick. The condition surfaces
+		// through is_stale() and the CLI status output instead.
 		$this->build();
 	}
 

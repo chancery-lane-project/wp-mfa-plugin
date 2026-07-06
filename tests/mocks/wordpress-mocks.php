@@ -55,8 +55,6 @@ function reset_mock_options(): void {
     $GLOBALS['_mock_options'] = [];
 }
 
-
-
 /** @return array<string, mixed> */
 function get_mock_actions(): array {
     return $GLOBALS['_mock_actions'];
