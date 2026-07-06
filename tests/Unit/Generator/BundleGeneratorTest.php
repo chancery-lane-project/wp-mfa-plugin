@@ -189,6 +189,23 @@ class BundleGeneratorTest extends TestCase {
         $this->assertSame( [], $leftovers );
     }
 
+    public function test_build_cleans_up_gz_temp_when_rename_fails(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+
+        // Pre-create the rename target as a non-empty directory: rename() over
+        // a non-empty directory fails on every platform, giving a deterministic
+        // failure path without touching permissions/filesystem boundaries.
+        mkdir( $this->generator->bundle_path(), 0755, true );
+        file_put_contents( $this->generator->bundle_path() . '/blocker.txt', 'x' );
+
+        $result = $this->generator->build();
+
+        $this->assertFalse( $result );
+
+        $leftovers = glob( $this->generator->bundle_path() . '.tmp-*' );
+        $this->assertSame( [], $leftovers, 'No .tmp-* temp files (tar or gz) should remain after a failed rename.' );
+    }
+
     // -----------------------------------------------------------------------
     // is_stale() / tree_hash()
     // -----------------------------------------------------------------------
