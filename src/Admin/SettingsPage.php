@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 
 /**
@@ -33,12 +34,14 @@ class SettingsPage {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed> $options   Current plugin options.
-	 * @param  Generator            $generator Generator instance for bulk generate actions.
+	 * @param  array<string, mixed> $options     Current plugin options.
+	 * @param  Generator            $generator   Generator instance for bulk generate actions.
+	 * @param  ArdCatalog|null      $ard_catalog Optional ARD catalog builder for the discovery panel.
 	 */
 	public function __construct(
 		private array $options,
-		private readonly Generator $generator
+		private readonly Generator $generator,
+		private readonly ?ArdCatalog $ard_catalog = null
 	) {}
 
 	/**
@@ -86,7 +89,17 @@ class SettingsPage {
 		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
 		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_okf_compat', __( 'OKF compatibility mode', 'markdown-for-agents-and-statistics' ), array( $this, 'field_okf_compat' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+
+		add_settings_section(
+			'markdown_for_agents_discovery',
+			__( 'Agent discovery (OKF / ARD)', 'markdown-for-agents-and-statistics' ),
+			array( $this, 'section_discovery_intro' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field( 'markdown_for_agents_okf_compat', __( 'OKF compatibility mode', 'markdown-for-agents-and-statistics' ), array( $this, 'field_okf_compat' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.tar.gz)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_ard_enabled', __( 'ARD catalog for /.well-known/', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ard_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -157,6 +170,8 @@ class SettingsPage {
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
 		$clean['okf_compat']              = ! empty( $input['okf_compat'] );
+		$clean['bundle_enabled']          = $clean['okf_compat'] && ! empty( $input['bundle_enabled'] );
+		$clean['ard_enabled']             = $clean['bundle_enabled'] && ! empty( $input['ard_enabled'] );
 		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
@@ -228,6 +243,7 @@ class SettingsPage {
 			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
 			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
 			|| ! empty( $old['okf_compat'] ) !== ! empty( $new['okf_compat'] )
+			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $new['bundle_enabled'] )
 			|| $old_pt !== $new_pt
 			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
 
@@ -398,6 +414,19 @@ class SettingsPage {
 	}
 
 	/**
+	 * Render the introductory text for the "Agent discovery" section.
+	 *
+	 * Explains the three-level progression: OKF compatibility mode builds
+	 * spec-aligned Markdown; the bundle packages it as a downloadable
+	 * archive; the ARD catalog advertises the bundle for discovery.
+	 *
+	 * @since  1.6.0
+	 */
+	public function section_discovery_intro(): void {
+		echo '<p>' . esc_html__( 'These three toggles are cumulative: OKF compatibility mode produces spec-aligned Markdown files; the bundle packages them into a single downloadable archive; the ARD catalog advertises that bundle for automated discovery. Each level requires the one before it.', 'markdown-for-agents-and-statistics' ) . '</p>';
+	}
+
+	/**
 	 * Render the OKF compatibility mode checkbox field.
 	 *
 	 * @since  1.6.0
@@ -410,6 +439,86 @@ class SettingsPage {
 					value="1" <?php checked( $checked, true ); ?>>
 			<?php esc_html_e( 'Adds OKF frontmatter keys (timestamp, flat tags) and rewrites internal links to point at the Markdown file versions. Regenerate files after changing this.', 'markdown-for-agents-and-statistics' ); ?>
 		</label>
+		<?php
+	}
+
+	/**
+	 * Render the bundle-build checkbox field.
+	 *
+	 * Gated on OKF compatibility mode (Decision 3): disabled with an
+	 * explanatory hint when the prerequisite level is off.
+	 *
+	 * @since  1.6.0
+	 */
+	public function field_bundle_enabled(): void {
+		$checked  = ! empty( $this->options['bundle_enabled'] );
+		$disabled = empty( $this->options['okf_compat'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[bundle_enabled]"
+					value="1" <?php checked( $checked, true ); ?> <?php disabled( $disabled, true ); ?>>
+			<?php esc_html_e( 'Build downloadable bundle (.tar.gz)', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php if ( $disabled ) : ?>
+			<p class="description"><?php esc_html_e( 'Enable OKF compatibility mode first.', 'markdown-for-agents-and-statistics' ); ?></p>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * Render the ARD catalog checkbox field.
+	 *
+	 * Gated on the bundle level (Decision 3). When enabled, additionally
+	 * renders the generated `ai-catalog.json` document and deployment
+	 * instructions for the site owner to copy it into a manually managed
+	 * `/.well-known/ai-catalog.json` (Decisions 1 and 2 — the plugin never
+	 * writes or serves this file itself).
+	 *
+	 * @since  1.6.0
+	 */
+	public function field_ard_enabled(): void {
+		$checked  = ! empty( $this->options['ard_enabled'] );
+		$disabled = empty( $this->options['bundle_enabled'] );
+		?>
+		<label>
+			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[ard_enabled]"
+					value="1" <?php checked( $checked, true ); ?> <?php disabled( $disabled, true ); ?>>
+			<?php esc_html_e( 'ARD catalog for /.well-known/', 'markdown-for-agents-and-statistics' ); ?>
+		</label>
+		<?php if ( $disabled ) : ?>
+			<p class="description"><?php esc_html_e( 'Enable the bundle first.', 'markdown-for-agents-and-statistics' ); ?></p>
+		<?php endif; ?>
+		<?php
+		if ( $checked ) {
+			$this->render_ard_panel();
+		}
+	}
+
+	/**
+	 * Render the ARD catalog JSON panel and deployment instructions.
+	 *
+	 * @since  1.6.0
+	 */
+	private function render_ard_panel(): void {
+		if ( null === $this->ard_catalog ) {
+			?>
+			<p class="description"><?php esc_html_e( 'The ARD catalog could not be built. Regenerate the bundle and reload this page.', 'markdown-for-agents-and-statistics' ); ?></p>
+			<?php
+			return;
+		}
+		?>
+		<p>
+			<textarea readonly rows="18" style="width:100%;font-family:monospace;"><?php echo esc_textarea( $this->ard_catalog->to_json() ); ?></textarea>
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'To publish this catalog, create /.well-known/ai-catalog.json at your web root containing the JSON above — either paste it in directly or symlink to a file you manage yourself.', 'markdown-for-agents-and-statistics' ); ?>
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'The content above is deliberately stable across bundle rebuilds, so a manual copy will not go stale.', 'markdown-for-agents-and-statistics' ); ?>
+		</p>
+		<p class="description">
+			<?php esc_html_e( 'The plugin never serves this path itself: no routes or rewrite rules are registered for /.well-known/.', 'markdown-for-agents-and-statistics' ); ?>
+		</p>
 		<?php
 	}
 

@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\CLI\Commands;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
@@ -178,7 +179,8 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
-		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator );
+		$ard_catalog = new ArdCatalog( $options, $this->bundle_generator );
+		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before

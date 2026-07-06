@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
@@ -26,14 +27,16 @@ class Admin {
 	 * @param  Generator             $generator        Generator instance.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
 	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
+	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly ?BundleGenerator $bundle_generator = null,
+		private readonly ?ArdCatalog $ard_catalog = null,
 	) {
-		$this->settings_page = new SettingsPage( $options, $generator );
+		$this->settings_page = new SettingsPage( $options, $generator, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
 	}
 
