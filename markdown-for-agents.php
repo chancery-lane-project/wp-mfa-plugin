@@ -27,6 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'MARKDOWN_FOR_AGENTS_VERSION', '1.6.0' );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
 require_once MARKDOWN_FOR_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';
 

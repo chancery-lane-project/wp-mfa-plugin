@@ -437,4 +437,25 @@ class Admin {
 			esc_html__( 'Regenerate now', 'markdown-for-agents-and-statistics' )
 		);
 	}
+
+	/**
+	 * Add a "Settings" link to this plugin's action links on the Plugins screen
+	 * (shown as "Settings | Deactivate"). Hooked to the plugin-specific
+	 * `plugin_action_links_{basename}` filter.
+	 *
+	 * @since  1.6.0
+	 * @param  string[] $links Existing action links.
+	 * @return string[]
+	 */
+	public function add_action_links( array $links ): array {
+		$settings = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'options-general.php?page=markdown-for-agents' ) ),
+			esc_html__( 'Settings', 'markdown-for-agents-and-statistics' )
+		);
+
+		array_unshift( $links, $settings );
+
+		return $links;
+	}
 }
