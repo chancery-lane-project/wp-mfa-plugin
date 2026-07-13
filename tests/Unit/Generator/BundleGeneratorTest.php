@@ -97,14 +97,25 @@ class BundleGeneratorTest extends TestCase {
     // -----------------------------------------------------------------------
 
     public function test_bundle_path_is_sibling_tar_gz_of_export_dir(): void {
-        $this->assertSame( $this->uploads_dir . '/' . $this->export_dir . '.zip', $this->generator->bundle_path() );
+        $this->assertSame( $this->uploads_dir . '/' . $this->export_dir . '-okf.zip', $this->generator->bundle_path() );
     }
 
     public function test_bundle_url_mirrors_bundle_path(): void {
         $this->assertSame(
-            'https://example.com/wp-content/uploads/' . $this->export_dir . '.zip',
+            'https://example.com/wp-content/uploads/' . $this->export_dir . '-okf.zip',
             $this->generator->bundle_url()
         );
+    }
+
+    public function test_bundle_filename_uses_sanitized_site_name_when_set(): void {
+        $GLOBALS['_mock_bloginfo']['name'] = 'The Chancery Lane Project';
+
+        $this->assertSame(
+            $this->uploads_dir . '/The-Chancery-Lane-Project-okf.zip',
+            $this->generator->bundle_path()
+        );
+
+        unset( $GLOBALS['_mock_bloginfo'] );
     }
 
     // -----------------------------------------------------------------------

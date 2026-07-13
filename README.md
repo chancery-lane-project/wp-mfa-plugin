@@ -165,7 +165,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 
 ### Bundle (.zip)
 
-**Behind the "Build downloadable bundle" toggle (off by default; requires OKF compatibility mode on):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{export_dir}.zip`.
+**Behind the "Build downloadable bundle" toggle (off by default; requires OKF compatibility mode on):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{site-name}-okf.zip`, where `{site-name}` is the site's title (`sanitize_file_name(get_bloginfo('name'))`), falling back to `{export_dir}` if the site name sanitizes to an empty string.
 
 - **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json` when present.
 - **Links:** internal links inside bundled `.md` files are rewritten from absolute upload URLs to paths relative to each linking file (OKF §5.2, e.g. `](../post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain. Relative form is used rather than root-absolute (`](/post/…)`) because many consumers treat a leading `/` as an external link and drop it.

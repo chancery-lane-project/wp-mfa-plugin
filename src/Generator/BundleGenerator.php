@@ -54,7 +54,7 @@ class BundleGenerator {
 	public function bundle_path(): string {
 		$base = Options::get_export_base( $this->options );
 
-		return dirname( $base ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.zip';
+		return dirname( $base ) . '/' . $this->bundle_filename();
 	}
 
 	/**
@@ -66,7 +66,26 @@ class BundleGenerator {
 	public function bundle_url(): string {
 		$base_url = Options::get_export_base_url( $this->options );
 
-		return dirname( $base_url ) . '/' . sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) ) . '.zip';
+		return dirname( $base_url ) . '/' . $this->bundle_filename();
+	}
+
+	/**
+	 * Return the bundle's filename, derived from the site name.
+	 *
+	 * Falls back to `export_dir` if the site name sanitizes to an empty
+	 * string (e.g. a non-Latin name stripped entirely by `sanitize_file_name()`).
+	 *
+	 * @since  1.6.0
+	 * @return string
+	 */
+	private function bundle_filename(): string {
+		$site_name = sanitize_file_name( (string) get_bloginfo( 'name' ) );
+
+		if ( '' === $site_name ) {
+			$site_name = sanitize_file_name( (string) ( $this->options['export_dir'] ?? 'wp-mfa-exports' ) );
+		}
+
+		return $site_name . '-okf.zip';
 	}
 
 	/**
