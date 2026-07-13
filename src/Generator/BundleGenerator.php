@@ -11,7 +11,7 @@ use Tclp\WpMarkdownForAgents\Core\Options;
  *
  * Packages the export tree (minus sync/administrative files) into a single
  * zip archive (deflated entries), rewriting `.md` internal links from absolute upload URLs
- * to OKF bundle-absolute form (`/post/slug.md`) on the way in. The archive
+ * to paths relative to each linking file (`../post/slug.md`) on the way in. The archive
  * is built at a process-unique temporary path and atomically renamed into
  * place so a concurrent download never observes a partial file.
  *
@@ -97,7 +97,7 @@ class BundleGenerator {
 				$content = (string) file_get_contents( $absolute_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 
 				if ( str_ends_with( $relative_path, '.md' ) ) {
-					$content = str_replace( '](' . $base_url . '/', '](/', $content );
+					$content = $this->rewrite_to_relative_links( $content, $relative_path, $base_url );
 				}
 
 				$phar->addFromString( $relative_path, $content );
@@ -229,6 +229,69 @@ class BundleGenerator {
 		sort( $lines );
 
 		return md5( implode( "\n", $lines ) );
+	}
+
+	/**
+	 * Rewrite absolute upload-URL `.md` links in a bundle file to paths
+	 * relative to that file's own position in the bundle tree.
+	 *
+	 * Root-absolute bundle paths (`/post/slug.md`) were tried first but many
+	 * extractors (incl. Google's) treat a leading `/` as an external/root
+	 * link and drop it, so no graph edge is built. True relative paths
+	 * (`../post/slug.md`) are the OKF §3 norm and work everywhere.
+	 *
+	 * @since  1.6.1
+	 * @param  string $content       Markdown file content.
+	 * @param  string $relative_path This file's own path within the bundle.
+	 * @param  string $base_url      Export base URL, no trailing slash.
+	 * @return string
+	 */
+	private function rewrite_to_relative_links( string $content, string $relative_path, string $base_url ): string {
+		$from_dir = dirname( $relative_path );
+		$from_dir = ( '.' === $from_dir ) ? '' : $from_dir;
+
+		$pattern = '/\]\(' . preg_quote( $base_url, '/' ) . '\/([^)\s]+)\)/';
+
+		return (string) preg_replace_callback(
+			$pattern,
+			function ( array $matches ) use ( $from_dir ): string {
+				$target   = $matches[1];
+				$fragment = '';
+
+				$hash = strpos( $target, '#' );
+				if ( false !== $hash ) {
+					$fragment = substr( $target, $hash );
+					$target   = substr( $target, 0, $hash );
+				}
+
+				return '](' . $this->relative_path( $from_dir, $target ) . $fragment . ')';
+			},
+			$content
+		);
+	}
+
+	/**
+	 * Compute a relative path from a directory to a bundle-root-relative
+	 * target path.
+	 *
+	 * @since  1.6.1
+	 * @param  string $from_dir Directory of the linking file, relative to
+	 *                          bundle root; empty string for the root itself.
+	 * @param  string $to_path  Target file path, relative to bundle root.
+	 * @return string
+	 */
+	private function relative_path( string $from_dir, string $to_path ): string {
+		$from_parts = ( '' === $from_dir ) ? array() : explode( '/', $from_dir );
+		$to_parts   = explode( '/', $to_path );
+
+		$i = 0;
+		while ( $i < count( $from_parts ) && $i < count( $to_parts ) - 1 && $from_parts[ $i ] === $to_parts[ $i ] ) {
+			++$i;
+		}
+
+		$ups = array_fill( 0, count( $from_parts ) - $i, '..' );
+
+		return implode( '/', array_merge( $ups, array_slice( $to_parts, $i ) ) );
 	}
 
 	/**

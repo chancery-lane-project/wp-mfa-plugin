@@ -170,8 +170,39 @@ class BundleGeneratorTest extends TestCase {
         $entries = $this->read_archive_entries( $this->generator->bundle_path() );
         $rewritten = $entries['post/hello.md'];
 
-        $this->assertStringContainsString( '[other](/post/other.md)', $rewritten );
+        $this->assertStringContainsString( '[other](other.md)', $rewritten );
         $this->assertStringContainsString( 'permalink: ' . $base_url . "/post/other.md", $rewritten );
+    }
+
+    public function test_build_rewrites_md_links_relative_across_directories(): void {
+        $base_url = 'https://example.com/wp-content/uploads/' . $this->export_dir;
+
+        $this->write_file( 'taxonomy/jurisdiction/england-wales.md', "# Term\n" );
+        $this->write_file(
+            'post/hello.md',
+            'See [clause](' . $base_url . "/clause/foo.md) and [tax](" . $base_url . "/taxonomy/jurisdiction/england-wales.md) and [self](" . $base_url . "/post/other.md).\n"
+        );
+
+        $this->generator->build();
+
+        $entries    = $this->read_archive_entries( $this->generator->bundle_path() );
+        $rewritten  = $entries['post/hello.md'];
+
+        $this->assertStringContainsString( '[clause](../clause/foo.md)', $rewritten );
+        $this->assertStringContainsString( '[tax](../taxonomy/jurisdiction/england-wales.md)', $rewritten );
+        $this->assertStringContainsString( '[self](other.md)', $rewritten );
+    }
+
+    public function test_build_rewrites_md_links_relative_from_root_index(): void {
+        $base_url = 'https://example.com/wp-content/uploads/' . $this->export_dir;
+
+        $this->write_file( 'index.md', 'See [clause](' . $base_url . "/clause/foo.md).\n" );
+
+        $this->generator->build();
+
+        $entries = $this->read_archive_entries( $this->generator->bundle_path() );
+
+        $this->assertStringContainsString( '[clause](clause/foo.md)', $entries['index.md'] );
     }
 
     public function test_build_includes_manifest_json_verbatim(): void {
