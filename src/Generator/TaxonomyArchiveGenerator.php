@@ -200,6 +200,13 @@ class TaxonomyArchiveGenerator {
 			try {
 				if ( $this->generate_term( $term ) ) {
 					++$processed;
+				} else {
+					// generate_term() has no skip path, so a false return means
+					// the filesystem write failed.
+					$errors[] = [
+						'term_id' => $term->term_id,
+						'message' => 'Failed to write Markdown archive to disk; check export directory permissions.',
+					];
 				}
 			} catch ( \Throwable $e ) {
 				$errors[] = [

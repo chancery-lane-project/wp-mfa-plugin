@@ -559,6 +559,29 @@ class GeneratorTest extends TestCase {
         $this->assertSame( [], $result['errors'] );
     }
 
+    public function test_generate_batch_records_error_when_write_fails(): void {
+        // Eligible post whose filesystem write fails must surface as an error,
+        // not vanish as a silent skip.
+        $post = $this->make_post( [ 'ID' => 40, 'post_name' => 'post-40' ] );
+
+        $GLOBALS['_mock_wp_query']     = fn( array $args ): array => [ [ 40 ], 1 ];
+        $GLOBALS['_mock_post_objects'] = [ 40 => $post ];
+
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )->willReturn( false );
+
+        $result = $this->generator->generate_batch( 'post', 0, 10 );
+
+        $this->assertSame( 1, $result['total'] );
+        $this->assertSame( 0, $result['processed'] );
+        $this->assertCount( 1, $result['errors'] );
+        $this->assertSame( 40, $result['errors'][0]['post_id'] );
+        $this->assertStringContainsString( 'write', $result['errors'][0]['message'] );
+    }
+
     // -----------------------------------------------------------------------
     // Topics section (include_taxonomy_topics option)
     // -----------------------------------------------------------------------

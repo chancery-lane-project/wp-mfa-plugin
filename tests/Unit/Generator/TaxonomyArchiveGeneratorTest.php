@@ -398,6 +398,22 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $this->assertIsArray( $result['errors'] );
     }
 
+    public function test_generate_batch_records_error_when_write_fails(): void {
+        // A failed filesystem write must surface as an error, not vanish.
+        $term = $this->make_term( [ 'term_id' => 7 ] );
+        $GLOBALS['_mock_taxonomy_terms']['category'] = [ $term ];
+
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+        $this->file_writer->method( 'write' )->willReturn( false );
+
+        $result = $this->generator->generate_batch( 0, 10 );
+
+        $this->assertSame( 0, $result['processed'] );
+        $this->assertCount( 1, $result['errors'] );
+        $this->assertSame( 7, $result['errors'][0]['term_id'] );
+        $this->assertStringContainsString( 'write', $result['errors'][0]['message'] );
+    }
+
     public function test_generate_batch_with_zero_limit_returns_empty(): void {
         $result = $this->generator->generate_batch( 0, 0 );
         $this->assertSame( ['total' => 0, 'processed' => 0, 'errors' => []], $result );
