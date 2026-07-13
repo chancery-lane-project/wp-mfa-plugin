@@ -300,6 +300,19 @@ class SettingsPageTest extends TestCase {
         $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
     }
 
+    public function test_render_page_includes_generate_everything_button(): void {
+        $page = $this->make_page( [ 'post_types' => [ 'post', 'page' ] ] );
+        ob_start();
+        $page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'data-generate-all="1"', $output );
+        $this->assertStringContainsString( 'Generate everything', $output );
+        // Per-type and taxonomy buttons remain alongside it.
+        $this->assertStringContainsString( 'data-post-type="post"', $output );
+        $this->assertStringContainsString( 'data-action="mfa_generate_taxonomy_batch"', $output );
+    }
+
     public function test_field_bundle_enabled_disabled_when_okf_compat_off(): void {
         $page = $this->make_page( [ 'okf_compat' => false ] );
         ob_start();

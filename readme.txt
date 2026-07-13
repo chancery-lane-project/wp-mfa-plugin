@@ -58,7 +58,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 2. Activate the plugin through the Plugins screen in WordPress.
 3. Visit **Settings → Markdown for Agents** and choose which post types and taxonomies to generate.
 4. Enable **Auto-generate on save** so files stay in sync as you publish or edit content (optional).
-5. Click **Generate All** to create Markdown for your existing content. On large sites you can also run `wp markdown-agents generate` and `wp markdown-agents generate-taxonomies` from WP-CLI.
+5. Click **Generate everything** to create Markdown for your existing content. On large sites you can also run `wp markdown-agents generate` and `wp markdown-agents generate-taxonomies` from WP-CLI.
 6. Verify by appending `?output_format=md` to any post URL (or using an AI User-Agent) to confirm Markdown is served.
 
 == Frequently Asked Questions ==
