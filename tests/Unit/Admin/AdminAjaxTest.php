@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -230,6 +231,153 @@ class AdminAjaxTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // Bundle rebuild on final batch
+    // -----------------------------------------------------------------------
+
+    public function test_final_post_batch_builds_bundle_when_enabled(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
+        $bundle_generator->expects( $this->once() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+    }
+
+    public function test_final_post_batch_does_not_build_bundle_when_fresh(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( false );
+        $bundle_generator->expects( $this->never() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+    }
+
+    public function test_non_final_post_batch_does_not_build_bundle(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->expects( $this->never() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+    }
+
+    public function test_final_post_batch_does_not_build_bundle_when_disabled(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => false ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->expects( $this->never() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+    }
+
+    public function test_final_post_batch_does_not_build_bundle_when_no_generator(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        // No BundleGenerator wired up — must not error.
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, null );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $this->generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+
+        $admin->handle_generate_batch_ajax();
+
+        $response = $GLOBALS['_mock_json_response'];
+        $this->assertTrue( $response['success'] );
+    }
+
+    public function test_final_taxonomy_batch_builds_bundle_when_enabled(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
+        $bundle_generator->expects( $this->once() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $this->taxonomy_generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 10, 'processed' => 10, 'errors' => [] ] );
+
+        $_POST['offset'] = '0';
+        $_POST['limit']  = '10';
+
+        $admin->handle_generate_taxonomy_batch_ajax();
+    }
+
+    public function test_non_final_taxonomy_batch_does_not_build_bundle(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->expects( $this->never() )->method( 'build' );
+
+        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+
+        $this->taxonomy_generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
+
+        $_POST['offset'] = '0';
+        $_POST['limit']  = '10';
+
+        $admin->handle_generate_taxonomy_batch_ajax();
+    }
+
+    // -----------------------------------------------------------------------
     // handle_preview_post_ajax()
     // -----------------------------------------------------------------------
 
@@ -302,6 +450,9 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 'markdownForAgentsBulkGenerate', $localised['object'] );
         $this->assertArrayHasKey( 'nonce', $localised['data'] );
         $this->assertArrayHasKey( 'ajaxurl', $localised['data'] );
+
+        $this->assertArrayHasKey( 'mfa-discovery-toggles', $GLOBALS['_mock_enqueued_scripts'] );
+        $this->assertStringContainsString( 'discovery-toggles.js', $GLOBALS['_mock_enqueued_scripts']['mfa-discovery-toggles'] );
     }
 
     public function test_enqueue_scripts_skips_other_pages(): void {

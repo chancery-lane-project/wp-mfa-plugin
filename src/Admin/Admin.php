@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -21,15 +23,20 @@ class Admin {
 
 	/**
 	 * @since  1.0.0
-	 * @param  array<string, mixed> $options   Current plugin options.
-	 * @param  Generator            $generator Generator instance.
+	 * @param  array<string, mixed>  $options          Current plugin options.
+	 * @param  Generator             $generator        Generator instance.
+	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
+	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
+	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
+		private readonly ?BundleGenerator $bundle_generator = null,
+		private readonly ?ArdCatalog $ard_catalog = null,
 	) {
-		$this->settings_page = new SettingsPage( $options, $generator );
+		$this->settings_page = new SettingsPage( $options, $generator, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
 	}
 
@@ -188,6 +195,7 @@ class Admin {
 		// Final batch for this post type — drop it from the pending-regen list.
 		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
 			$this->mark_post_type_regenerated( $post_type );
+			$this->maybe_rebuild_bundle();
 		}
 
 		wp_send_json_success( $result );
@@ -245,8 +253,40 @@ class Admin {
 			error_log( sprintf( 'WP Markdown for Agents: taxonomy generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
 		}
 
+		// Final batch — rebuild the bundle, mirroring handle_generate_batch_ajax().
+		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
+			$this->maybe_rebuild_bundle();
+		}
+
 		wp_send_json_success( $result );
 		return;
+	}
+
+	/**
+	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
+	 * up. Called from the final batch of both AJAX bulk-generation handlers —
+	 * synchronous is acceptable here because the user is already waiting on
+	 * the final batch's response. Gated on is_stale() so that clicking
+	 * "Generate" repeatedly with no content changes in between doesn't
+	 * re-tar/gzip the whole export tree each time; any real change already
+	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
+	 * bundle here means there is genuinely nothing new to package.
+	 *
+	 * @since  1.6.0
+	 */
+	private function maybe_rebuild_bundle(): void {
+		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
+			return;
+		}
+
+		if ( ! $this->bundle_generator->is_stale() ) {
+			return;
+		}
+
+		if ( ! $this->bundle_generator->build() && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
+		}
 	}
 
 	/**
@@ -310,6 +350,16 @@ class Admin {
 					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				)
+			);
+
+			// Live cumulative gating for the agent-discovery toggles, so
+			// enabling a level unlocks the next in the same form submit.
+			wp_enqueue_script(
+				'mfa-discovery-toggles',
+				MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/discovery-toggles.js',
+				array(),
+				MARKDOWN_FOR_AGENTS_VERSION,
+				true
 			);
 		}
 

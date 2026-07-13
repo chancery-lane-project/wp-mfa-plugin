@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\CLI;
 
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
@@ -29,6 +32,8 @@ class Commands {
 	 * @param  FileWriter|null            $file_writer        FileWriter for manifest I/O.
 	 * @param  TaxonomyArchiveGenerator|null $taxonomy_generator Optional taxonomy archive generator.
 	 * @param  StatsRepository|null       $stats_repository  Optional stats repository for prune-stats.
+	 * @param  IndexGenerator|null        $index_generator   Optional index generator for generate-indexes.
+	 * @param  BundleGenerator|null       $bundle_generator  Optional bundle generator for the `bundle` subcommand.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -36,6 +41,8 @@ class Commands {
 		private readonly ?FileWriter $file_writer = null,
 		private readonly ?TaxonomyArchiveGenerator $taxonomy_generator = null,
 		private readonly ?StatsRepository $stats_repository = null,
+		private readonly ?IndexGenerator $index_generator = null,
+		private readonly ?BundleGenerator $bundle_generator = null,
 	) {}
 
 	/**
@@ -85,7 +92,7 @@ class Commands {
 
 		$types = null !== $post_type
 			? array( $post_type )
-			: (array) ( $this->options['post_types'] ?? array() );
+			: ExportPolicy::enabled_post_types( $this->options );
 
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
@@ -103,6 +110,59 @@ class Commands {
 					: \WP_CLI::warning( 'manifest.json generation failed.' );
 			}
 		}
+
+		if ( ! $dry_run ) {
+			$this->rebuild_indexes();
+			$this->rebuild_bundle();
+		}
+	}
+
+	/**
+	 * Build the OKF `.zip` bundle from the current export tree.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--if-stale]
+	 * : Only rebuild when the bundle is missing or out of date; skip otherwise.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents bundle
+	 *   wp markdown-agents bundle --if-stale
+	 *
+	 * @since  1.6.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function bundle( array $args, array $assoc_args ): void {
+		if ( null === $this->bundle_generator ) {
+			\WP_CLI::error( 'BundleGenerator is not available.' );
+			return;
+		}
+
+		if ( empty( $this->options['bundle_enabled'] ) ) {
+			\WP_CLI::error( 'Bundle generation is disabled. Enable "bundle_enabled" in settings first.' );
+			return;
+		}
+
+		if ( isset( $assoc_args['if-stale'] ) && ! $this->bundle_generator->is_stale() ) {
+			\WP_CLI::log( 'Bundle is up to date; skipping.' );
+			return;
+		}
+
+		if ( ! $this->bundle_generator->build() ) {
+			\WP_CLI::error( 'Bundle build failed.' );
+			return;
+		}
+
+		$path = $this->bundle_generator->bundle_path();
+		$size = file_exists( $path ) ? filesize( $path ) : false;
+
+		\WP_CLI::success(
+			false !== $size
+				? sprintf( 'Bundle built: %s (%d bytes).', $path, $size )
+				: sprintf( 'Bundle built: %s.', $path )
+		);
 	}
 
 	/**
@@ -117,7 +177,7 @@ class Commands {
 	 * @param  array<string, string> $assoc_args
 	 */
 	public function status( array $args, array $assoc_args ): void {
-		$post_types  = (array) ( $this->options['post_types'] ?? array() );
+		$post_types  = ExportPolicy::enabled_post_types( $this->options );
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
 		$rows = array();
@@ -125,11 +185,9 @@ class Commands {
 		foreach ( $post_types as $type ) {
 			$total = (int) wp_count_posts( $type )->publish; // phpcs:ignore WordPress.WP.PostsPerPage
 
-			// Count .md files in the export directory.
-			$type_dir  = $export_base . '/' . $type;
-			$generated = is_dir( $type_dir )
-				? count( glob( $type_dir . '/*.md' ) ?: array() )
-				: 0;
+			// Count .md files in the export directory, excluding index.md
+			// (an OKF directory listing, not a generated post).
+			$generated = $this->count_post_files( $export_base . '/' . $type );
 
 			$rows[] = array(
 				'post_type' => $type,
@@ -140,6 +198,12 @@ class Commands {
 		}
 
 		\WP_CLI\Utils\format_items( 'table', $rows, array( 'post_type', 'published', 'generated', 'missing' ) );
+
+		\WP_CLI::log( sprintf( 'Index files: %d', $this->count_index_files( $export_base ) ) );
+
+		if ( ! empty( $this->options['bundle_enabled'] ) && null !== $this->bundle_generator ) {
+			\WP_CLI::log( $this->bundle_status_line() );
+		}
 	}
 
 	/**
@@ -172,10 +236,23 @@ class Commands {
 		if ( isset( $assoc_args['all'] ) ) {
 			\WP_CLI::confirm( 'Delete all generated Markdown files?', $assoc_args );
 
-			$types = (array) ( $this->options['post_types'] ?? array() );
+			$types = ExportPolicy::enabled_post_types( $this->options );
 			foreach ( $types as $type ) {
 				$this->delete_type( $type );
 			}
+
+			if ( $this->index_generator ) {
+				$deleted = $this->index_generator->delete_all();
+				\WP_CLI::log( sprintf( 'Index files deleted: %d', $deleted ) );
+			}
+
+			if ( null !== $this->bundle_generator ) {
+				$bundle_removed = $this->bundle_generator->delete();
+				\WP_CLI::log(
+					$bundle_removed ? 'Bundle file deleted.' : 'No bundle file to delete.'
+				);
+			}
+
 			\WP_CLI::success( 'All Markdown files deleted.' );
 			return;
 		}
@@ -248,6 +325,41 @@ class Commands {
 				$results['failed']
 			)
 		);
+
+		$this->rebuild_indexes();
+		$this->rebuild_bundle();
+	}
+
+	/**
+	 * Generate OKF `index.md` directory listings for posts and taxonomies.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Report what would be generated without writing files.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *   wp markdown-agents generate-indexes
+	 *   wp markdown-agents generate-indexes --dry-run
+	 *
+	 * @since  1.6.0
+	 * @param  array<int, string>    $args
+	 * @param  array<string, string> $assoc_args
+	 */
+	public function generate_indexes( array $args, array $assoc_args ): void {
+		if ( null === $this->index_generator ) {
+			\WP_CLI::error( 'IndexGenerator is not available.' );
+			return;
+		}
+
+		$dry_run = isset( $assoc_args['dry-run'] );
+		$results = $this->index_generator->generate_all( $dry_run );
+
+		$verb = $dry_run ? 'Would write' : 'Written';
+		\WP_CLI::success(
+			sprintf( 'Indexes: %s %d, skipped %d.', $verb, $results['written'], $results['skipped'] )
+		);
 	}
 
 	/**
@@ -315,6 +427,9 @@ class Commands {
 		$ok
 			? \WP_CLI::success( "Generated: {$post->post_name}" )
 			: \WP_CLI::warning( "Failed: {$post->post_name}" );
+
+		$this->rebuild_indexes();
+		$this->rebuild_bundle();
 	}
 
 	/**
@@ -499,6 +614,118 @@ class Commands {
 		}
 
 		return $success;
+	}
+
+	/**
+	 * Count the .md files directly inside a directory, excluding index.md
+	 * (an OKF directory listing, not a generated post).
+	 *
+	 * @since  1.6.0
+	 * @param  string $dir Absolute directory path.
+	 * @return int
+	 */
+	private function count_post_files( string $dir ): int {
+		if ( ! is_dir( $dir ) ) {
+			return 0;
+		}
+
+		$files = glob( $dir . '/*.md' );
+		$files = false === $files ? array() : $files;
+
+		return count(
+			array_filter( $files, static fn( string $file ): bool => 'index.md' !== basename( $file ) )
+		);
+	}
+
+	/**
+	 * Regenerate every index.md after a bulk generate run and print the counts.
+	 * No-op when the index generator was not wired up.
+	 *
+	 * @since  1.6.0
+	 */
+	private function rebuild_indexes(): void {
+		if ( null === $this->index_generator ) {
+			return;
+		}
+
+		$results = $this->index_generator->generate_all();
+
+		\WP_CLI::log( sprintf( 'Indexes: %d written, %d skipped.', $results['written'], $results['skipped'] ) );
+	}
+
+	/**
+	 * Rebuild the OKF `.zip` bundle after a bulk generate run, when enabled.
+	 * No-op unless the bundle generator was wired up and `bundle_enabled` is on.
+	 *
+	 * @since  1.6.0
+	 */
+	private function rebuild_bundle(): void {
+		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
+			return;
+		}
+
+		if ( $this->bundle_generator->build() ) {
+			\WP_CLI::log( sprintf( 'Bundle rebuilt: %s', $this->bundle_generator->bundle_path() ) );
+		} else {
+			\WP_CLI::warning( 'Bundle rebuild failed.' );
+		}
+	}
+
+	/**
+	 * Compose the bundle freshness line for `status`, disambiguating the
+	 * mid-debounce window: a save deletes the tree hash immediately, so
+	 * "stale" alone doesn't say whether a rebuild is already scheduled.
+	 *
+	 * @since  1.6.0
+	 */
+	private function bundle_status_line(): string {
+		$path = $this->bundle_generator->bundle_path();
+
+		if ( ! file_exists( $path ) ) {
+			return 'Bundle: missing';
+		}
+
+		if ( ! $this->bundle_generator->is_stale() ) {
+			return sprintf( 'Bundle: fresh (%s)', $path );
+		}
+
+		return wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' )
+			? sprintf( 'Bundle: stale — rebuild scheduled (%s)', $path )
+			: sprintf( 'Bundle: stale — no rebuild scheduled (%s)', $path );
+	}
+
+	/**
+	 * Count every index.md file under the export base: the bundle root, each
+	 * post type directory, the taxonomy root, and each taxonomy directory.
+	 *
+	 * @since  1.6.0
+	 * @param  string $export_base Absolute path to the export base directory.
+	 * @return int
+	 */
+	private function count_index_files( string $export_base ): int {
+		$count = 0;
+
+		if ( file_exists( $export_base . '/index.md' ) ) {
+			++$count;
+		}
+
+		foreach ( ExportPolicy::enabled_post_types( $this->options ) as $type ) {
+			if ( file_exists( $export_base . '/' . $type . '/index.md' ) ) {
+				++$count;
+			}
+		}
+
+		if ( file_exists( $export_base . '/' . ExportPolicy::TAXONOMY_DIR . '/index.md' ) ) {
+			++$count;
+		}
+
+		foreach ( array_keys( get_taxonomies( array( 'public' => true ) ) ) as $taxonomy ) {
+			if ( file_exists( $export_base . '/' . ExportPolicy::TAXONOMY_DIR . '/' . $taxonomy . '/index.md' ) ) {
+				++$count;
+			}
+		}
+
+		return $count;
 	}
 
 	/**

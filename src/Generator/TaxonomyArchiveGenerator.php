@@ -37,14 +37,10 @@ class TaxonomyArchiveGenerator {
 	 * @return string
 	 */
 	public function get_export_path( \WP_Term $term ): string {
-		$base     = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
-		$taxonomy = sanitize_file_name( $term->taxonomy );
-		$slug     = sanitize_file_name( $term->slug );
+		$base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 
-		return $base
-			. DIRECTORY_SEPARATOR . 'taxonomy'
-			. DIRECTORY_SEPARATOR . $taxonomy
-			. DIRECTORY_SEPARATOR . $slug . '.md';
+		return $base . DIRECTORY_SEPARATOR
+			. str_replace( '/', DIRECTORY_SEPARATOR, ExportPolicy::term_relative_path( $term->taxonomy, $term->slug ) );
 	}
 
 	/**
@@ -84,7 +80,21 @@ class TaxonomyArchiveGenerator {
 		$body    = $this->build_body( $term, $posts );
 		$content = $yaml . "\n" . $body;
 
-		return $this->file_writer->write( $this->get_export_path( $term ), $content );
+		$path   = $this->get_export_path( $term );
+		$result = $this->file_writer->write( $path, $content );
+
+		if ( $result ) {
+			/**
+			 * Fired after a taxonomy archive Markdown file is successfully written.
+			 *
+			 * @since  1.6.0
+			 * @param  string   $path The filesystem path to the written file.
+			 * @param  \WP_Term $term The term.
+			 */
+			do_action( 'markdown_for_agents_taxonomy_file_generated', $path, $term );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -103,7 +113,20 @@ class TaxonomyArchiveGenerator {
 			return false;
 		}
 
-		return $this->file_writer->delete( $path );
+		$result = $this->file_writer->delete( $path );
+
+		if ( $result ) {
+			/**
+			 * Fired after a taxonomy archive Markdown file is deleted.
+			 *
+			 * @since  1.6.0
+			 * @param  string   $path The filesystem path of the deleted file.
+			 * @param  \WP_Term $term The term.
+			 */
+			do_action( 'markdown_for_agents_taxonomy_file_deleted', $path, $term );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -233,7 +256,7 @@ class TaxonomyArchiveGenerator {
 		do {
 			$posts = get_posts( // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
 				[
-					'post_type'      => (array) ( $this->options['post_types'] ?? [ 'post' ] ),
+					'post_type'      => ExportPolicy::enabled_post_types( $this->options ),
 					'post_status'    => 'publish',
 					'posts_per_page' => $batch_size,
 					'offset'         => $offset,
@@ -276,10 +299,19 @@ class TaxonomyArchiveGenerator {
 			'',
 		];
 
+		$okf_compat         = ! empty( $this->options['okf_compat'] );
+		$enabled_post_types = ExportPolicy::enabled_post_types( $this->options );
+
 		foreach ( $posts as $post ) {
 			$title   = wp_strip_all_tags( $post->post_title );
-			$url     = get_permalink( $post->ID );
 			$excerpt = wp_strip_all_tags( $post->post_excerpt );
+
+			if ( $okf_compat && in_array( $post->post_type, $enabled_post_types, true ) ) {
+				$url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options )
+					. '/' . ExportPolicy::post_relative_path( $post );
+			} else {
+				$url = get_permalink( $post->ID );
+			}
 
 			$line = '- [' . $title . '](' . $url . ')';
 

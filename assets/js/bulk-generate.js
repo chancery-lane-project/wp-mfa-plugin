@@ -1,7 +1,9 @@
 /* global markdownForAgentsBulkGenerate */
 /* WordPress admin bulk-generate AJAX loop.
  * Intercepts clicks on [data-post-type] and [data-action] buttons, drives
- * sequential AJAX batch requests, and updates a live counter.
+ * sequential AJAX batch requests, and updates a live counter. A
+ * [data-generate-all] button runs every post-type flow and then the
+ * taxonomy flow in sequence.
  */
 (function () {
     'use strict';
@@ -17,16 +19,25 @@
      * @param {number}            offset
      * @param {{processed: number, errors: Array}} accumulated
      * @param {HTMLButtonElement} button
+     * @param {(function(boolean): void)=} onComplete Called once with success
+     *     when this flow finishes or errors. Optional.
      */
-    function sendBatch(action, postType, offset, accumulated, button) {
+    function sendBatch(action, postType, offset, accumulated, button, onComplete) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', markdownForAgentsBulkGenerate.ajaxurl, true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
+        function fail() {
+            button.textContent = 'Error — generation stopped';
+            button.disabled = false;
+            if (onComplete) {
+                onComplete(false);
+            }
+        }
+
         xhr.onload = function () {
             if (xhr.status !== 200) {
-                button.textContent = 'Error — generation stopped';
-                button.disabled = false;
+                fail();
                 return;
             }
 
@@ -34,14 +45,12 @@
             try {
                 response = JSON.parse(xhr.responseText);
             } catch (e) {
-                button.textContent = 'Error — generation stopped';
-                button.disabled = false;
+                fail();
                 return;
             }
 
             if (!response || !response.success) {
-                button.textContent = 'Error — generation stopped';
-                button.disabled = false;
+                fail();
                 return;
             }
 
@@ -53,20 +62,20 @@
             button.textContent = accumulated.processed + ' / ' + total;
 
             if (accumulated.processed < total) {
-                sendBatch(action, postType, offset + BATCH_SIZE, accumulated, button);
+                sendBatch(action, postType, offset + BATCH_SIZE, accumulated, button, onComplete);
             } else {
                 var errorSummary = accumulated.errors.length
                     ? ', ' + accumulated.errors.length + ' error(s)'
                     : '';
                 button.textContent = 'Done: ' + accumulated.processed + ' processed' + errorSummary;
                 button.disabled = false;
+                if (onComplete) {
+                    onComplete(true);
+                }
             }
         };
 
-        xhr.onerror = function () {
-            button.textContent = 'Error — generation stopped';
-            button.disabled = false;
-        };
+        xhr.onerror = fail;
 
         var params = 'action='  + encodeURIComponent(action)
             + '&nonce='         + encodeURIComponent(markdownForAgentsBulkGenerate.nonce)
@@ -99,10 +108,67 @@
         sendBatch(action, postType, 0, accumulated, button);
     }
 
+    /**
+     * Run every per-post-type flow and then the taxonomy flow, one after
+     * another, driving each flow's own button so its counter stays live.
+     *
+     * @param {MouseEvent} event
+     */
+    function handleGenerateAllClick(event) {
+        var allButton = /** @type {HTMLButtonElement} */ (event.currentTarget);
+        var queue = [];
+
+        document.querySelectorAll('button[data-post-type]').forEach(function (button) {
+            queue.push({ action: 'mfa_generate_batch', postType: button.dataset.postType, button: button });
+        });
+        document.querySelectorAll('button[data-action="mfa_generate_taxonomy_batch"]').forEach(function (button) {
+            queue.push({ action: 'mfa_generate_taxonomy_batch', postType: null, button: button });
+        });
+
+        if (!queue.length) {
+            return;
+        }
+
+        var total = queue.length;
+        allButton.disabled = true;
+        queue.forEach(function (step) {
+            step.button.disabled = true;
+        });
+
+        function runNext(index) {
+            if (index >= queue.length) {
+                allButton.textContent = 'Done: ' + total + ' of ' + total + ' steps';
+                allButton.disabled = false;
+                return;
+            }
+
+            allButton.textContent = 'Running step ' + (index + 1) + ' of ' + total + '…';
+
+            var step = queue[index];
+            step.button.textContent = '0 / …';
+
+            sendBatch(step.action, step.postType, 0, { processed: 0, errors: [] }, step.button, function (success) {
+                if (!success) {
+                    allButton.textContent = 'Stopped at step ' + (index + 1) + ' of ' + total;
+                    allButton.disabled = false;
+                    return;
+                }
+                runNext(index + 1);
+            });
+        }
+
+        runNext(0);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         var buttons = document.querySelectorAll('button[data-post-type], button[data-action]');
         buttons.forEach(function (button) {
             button.addEventListener('click', handleGenerateClick);
         });
+
+        var allButton = document.querySelector('button[data-generate-all]');
+        if (allButton) {
+            allButton.addEventListener('click', handleGenerateAllClick);
+        }
     });
 }());

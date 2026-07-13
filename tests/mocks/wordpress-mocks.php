@@ -46,8 +46,9 @@ $GLOBALS['_mock_localized_scripts']  = [];
 $GLOBALS['_mock_wp_query']           = null;
 
 function reset_mock_hooks(): void {
-    $GLOBALS['_mock_actions'] = [];
-    $GLOBALS['_mock_filters'] = [];
+    $GLOBALS['_mock_actions']       = [];
+    $GLOBALS['_mock_filters']       = [];
+    $GLOBALS['_mock_fired_actions'] = [];
 }
 
 function reset_mock_options(): void {
@@ -62,6 +63,11 @@ function get_mock_actions(): array {
 /** @return array<string, mixed> */
 function get_mock_filters(): array {
     return $GLOBALS['_mock_filters'];
+}
+
+/** @return list<array<int, mixed>> Argument lists for each recorded fire of $hook_name. */
+function get_mock_fired_actions(string $hook_name): array {
+    return $GLOBALS['_mock_fired_actions'][$hook_name] ?? [];
 }
 
 if (!function_exists('add_action')) {
@@ -92,7 +98,7 @@ if (!function_exists('apply_filters')) {
 
 if (!function_exists('do_action')) {
     function do_action(string $hook, mixed ...$args): void {
-        // No-op in tests.
+        $GLOBALS['_mock_fired_actions'][$hook][] = $args;
     }
 }
 
@@ -127,6 +133,34 @@ if (!function_exists('delete_option')) {
     function delete_option(string $option): bool {
         unset($GLOBALS['_mock_options'][$option]);
         return true;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cron API
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_scheduled_events'] = [];
+
+function reset_mock_scheduled_events(): void {
+    $GLOBALS['_mock_scheduled_events'] = [];
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool {
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args];
+        return true;
+    }
+}
+
+if (!function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled(string $hook, array $args = []) {
+        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
+            if ($e['hook'] === $hook) {
+                return $e['timestamp'];
+            }
+        }
+        return false;
     }
 }
 
@@ -300,6 +334,18 @@ if (!function_exists('trailingslashit')) {
     }
 }
 
+if (!function_exists('untrailingslashit')) {
+    function untrailingslashit(string $string): string {
+        return rtrim($string, '/\\');
+    }
+}
+
+if (!function_exists('wp_parse_url')) {
+    function wp_parse_url(string $url, int $component = -1): mixed {
+        return parse_url($url, $component); // phpcs:ignore WordPress.WP.AlternativeFunctions.parse_url_parse_url
+    }
+}
+
 if (!function_exists('wp_list_pluck')) {
     function wp_list_pluck(array $list, string $field): array {
         return array_column($list, $field);
@@ -348,7 +394,13 @@ if (!function_exists('get_posts')) {
     /** @return \WP_Post[] */
     function get_posts(array $args = []): array {
         $GLOBALS['_mock_get_posts_args'] = $args;
-        return $GLOBALS['_mock_posts'] ?? [];
+        $posts = $GLOBALS['_mock_posts'] ?? [];
+
+        if (isset($args['name']) && '' !== $args['name']) {
+            $posts = array_values(array_filter($posts, fn($p) => $p->post_name === $args['name']));
+        }
+
+        return $posts;
     }
 }
 
@@ -358,6 +410,13 @@ if (!function_exists('get_post')) {
             return $post;
         }
         return $GLOBALS['_mock_post_objects'][(int) $post] ?? null;
+    }
+}
+
+if (!function_exists('url_to_postid')) {
+    function url_to_postid(string $url): int {
+        $GLOBALS['_mock_url_to_postid_calls'] = ($GLOBALS['_mock_url_to_postid_calls'] ?? 0) + 1;
+        return $GLOBALS['_mock_url_to_postid'][$url] ?? 0;
     }
 }
 
@@ -514,8 +573,8 @@ if (!function_exists('get_post_types')) {
 if (!function_exists('get_post_type_object')) {
     function get_post_type_object(string $post_type): ?object {
         $objects = $GLOBALS['_mock_post_type_objects'] ?? [
-            'post' => (object) ['name' => 'post', 'label' => 'Posts'],
-            'page' => (object) ['name' => 'page', 'label' => 'Pages'],
+            'post' => (object) ['name' => 'post', 'label' => 'Posts', 'labels' => (object) ['name' => 'Posts']],
+            'page' => (object) ['name' => 'page', 'label' => 'Pages', 'labels' => (object) ['name' => 'Pages']],
         ];
         return $objects[$post_type] ?? null;
     }
@@ -670,6 +729,12 @@ if (!function_exists('esc_attr_e')) {
 if (!function_exists('esc_html_e')) {
     function esc_html_e(string $text, string $domain = 'default'): void {
         echo htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    function esc_html__(string $text, string $domain = 'default'): string {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 }
 
@@ -1032,6 +1097,16 @@ if (!function_exists('get_taxonomies')) {
     }
 }
 
+if (!function_exists('get_taxonomy')) {
+    function get_taxonomy(string $taxonomy): object|false {
+        $objects = $GLOBALS['_mock_taxonomy_objects'] ?? [
+            'category' => (object) ['name' => 'category', 'label' => 'Categories', 'labels' => (object) ['name' => 'Categories']],
+            'post_tag' => (object) ['name' => 'post_tag', 'label' => 'Tags', 'labels' => (object) ['name' => 'Tags']],
+        ];
+        return $objects[$taxonomy] ?? false;
+    }
+}
+
 if (!function_exists('wp_get_post_terms')) {
     function wp_get_post_terms(int $post_id, string $taxonomy, array $args = []): array|\WP_Error {
         return $GLOBALS['_mock_post_terms'][$post_id][$taxonomy] ?? [];
@@ -1041,7 +1116,13 @@ if (!function_exists('wp_get_post_terms')) {
 if (!function_exists('get_terms')) {
     function get_terms(array|string $args = []): array|\WP_Error {
         $taxonomy = is_array($args) ? ($args['taxonomy'] ?? '') : $args;
-        return $GLOBALS['_mock_taxonomy_terms'][$taxonomy] ?? [];
+        $terms    = $GLOBALS['_mock_taxonomy_terms'][$taxonomy] ?? [];
+
+        if (is_array($args) && isset($args['slug']) && '' !== $args['slug']) {
+            $terms = array_values(array_filter($terms, fn($t) => $t->slug === $args['slug']));
+        }
+
+        return $terms;
     }
 }
 

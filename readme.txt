@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.5.1
+Stable tag: 1.6.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -45,7 +45,11 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * **Optional frontmatter fields** — hierarchy (parent/ancestors/children IDs), author display name, root-relative featured image paths
 * **Topics section** — appends a `## Topics` section with linked taxonomy terms to the Markdown body
 * **Export preview** — preview generated Markdown inline in the post editor without writing to disk
-* WP-CLI commands: `generate`, `generate-taxonomies`, `prune-stats`, `status`, `delete`
+* **OKF directory indexes** — `index.md` listings at the export root and in every post-type and taxonomy directory (Open Knowledge Format), kept current automatically
+* **OKF compatibility mode** — optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
+* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
+* **ARD catalog generation** — optional `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories
+* WP-CLI commands: `generate`, `generate-taxonomies`, `generate-indexes`, `prune-stats`, `status`, `delete`, `bundle`
 * Fully unit-tested
 
 == Installation ==
@@ -54,7 +58,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 2. Activate the plugin through the Plugins screen in WordPress.
 3. Visit **Settings → Markdown for Agents** and choose which post types and taxonomies to generate.
 4. Enable **Auto-generate on save** so files stay in sync as you publish or edit content (optional).
-5. Click **Generate All** to create Markdown for your existing content. On large sites you can also run `wp markdown-agents generate` and `wp markdown-agents generate-taxonomies` from WP-CLI.
+5. Click **Generate everything** to create Markdown for your existing content. On large sites you can also run `wp markdown-agents generate` and `wp markdown-agents generate-taxonomies` from WP-CLI.
 6. Verify by appending `?output_format=md` to any post URL (or using an AI User-Agent) to confirm Markdown is served.
 
 == Frequently Asked Questions ==
@@ -226,6 +230,13 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.6.0 =
+* Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.
+* Add optional OKF compatibility mode (Settings → Markdown for Agents): adds `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewrites internal links in Markdown bodies and taxonomy archives to point at the `.md` file versions. Off by default — existing output is unchanged unless enabled.
+* New filters `markdown_for_agents_flat_tags` and `markdown_for_agents_index_content`; new actions `markdown_for_agents_taxonomy_file_generated` and `markdown_for_agents_taxonomy_file_deleted`.
+* Add optional downloadable OKF bundle (Settings → Markdown for Agents → "Build downloadable bundle"): packages the export tree into a `.zip` archive with internal links rewritten to relative form, so an extracted bundle is traversable offline. Rebuilt synchronously after bulk generation and on a debounced WP-Cron schedule after individual saves; also available via `wp markdown-agents bundle`. Off by default.
+* Add optional ARD catalog display (Settings → Markdown for Agents → "ARD catalog"): generates an `ai-catalog.json` document for manual deployment to `/.well-known/ai-catalog.json`. The plugin never serves this path itself. Requires the bundle toggle. New filter `markdown_for_agents_ai_catalog`.
 
 = 1.5.1 =
 * Add `markdown_for_agents_cache_headers` filter so the cache-related headers on Markdown responses can be customised (e.g. to allow CDN caching where `Vary` is honoured). Defaults are unchanged and remain cache-bypassing.

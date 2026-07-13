@@ -10,12 +10,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\CLI\Commands;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
 use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
+use Tclp\WpMarkdownForAgents\Generator\InternalUrlResolver;
+use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
@@ -91,6 +96,13 @@ class Plugin {
 		// Store for use by other methods.
 		$this->taxonomy_generator = $taxonomy_generator;
 
+		// Built once, outside the closure, so URL memoisation and the term-link map persist across every link resolved this request.
+		$url_resolver  = new InternalUrlResolver( $options );
+		$link_rewriter = new LinkRewriter(
+			fn( string $url ): ?string => $url_resolver->resolve( $url ),
+			Options::get_export_base_url( $options )
+		);
+
 		$generator = new Generator(
 			$options,
 			new FrontmatterBuilder( $field_resolver, new TaxonomyCollector(), $options ),
@@ -100,6 +112,7 @@ class Plugin {
 			$this->file_writer,
 			$field_resolver,
 			$taxonomy_generator,
+			$link_rewriter,
 		);
 
 		// Store on object so other methods can access it.
@@ -119,6 +132,24 @@ class Plugin {
 			$this->loader->add_action( 'before_delete_post', $generator, 'cache_post_terms', 10, 1 );
 			$this->loader->add_action( 'after_delete_post',  $generator, 'regenerate_term_archives_after_delete', 10, 2 );
 		}
+
+		$index_generator = new IndexGenerator( $options, $this->file_writer );
+		$this->index_generator = $index_generator;
+
+		$this->loader->add_action( 'markdown_for_agents_file_generated', $index_generator, 'on_file_generated', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_file_deleted', $index_generator, 'on_file_deleted', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $index_generator, 'on_taxonomy_file_generated', 10, 2 );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $index_generator, 'on_taxonomy_file_deleted', 10, 2 );
+		$this->loader->add_action( 'shutdown', $index_generator, 'flush_dirty' );
+
+		$bundle_generator       = new BundleGenerator( $options );
+		$this->bundle_generator = $bundle_generator;
+
+		$this->loader->add_action( 'markdown_for_agents_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
+		$this->loader->add_action( 'markdown_for_agents_rebuild_bundle', $bundle_generator, 'on_rebuild_bundle' );
 	}
 
 	/**
@@ -148,7 +179,8 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
-		$admin = new Admin( $options, $this->generator, $this->taxonomy_generator );
+		$ard_catalog = new ArdCatalog( $options, $this->bundle_generator );
+		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before
@@ -190,7 +222,7 @@ class Plugin {
 
 		\WP_CLI::add_command(
 			'markdown-agents',
-			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ) )
+			new Commands( $options, $this->generator, $this->file_writer, $this->taxonomy_generator, new StatsRepository( $wpdb ), $this->index_generator, $this->bundle_generator )
 		);
 	}
 
@@ -206,4 +238,6 @@ class Plugin {
 	private Generator $generator;
 	private TaxonomyArchiveGenerator $taxonomy_generator;
 	private FileWriter $file_writer;
+	private IndexGenerator $index_generator;
+	private BundleGenerator $bundle_generator;
 }

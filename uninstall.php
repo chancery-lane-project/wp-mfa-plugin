@@ -17,4 +17,21 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+$options = get_option( 'markdown_for_agents_options', array() );
+
 delete_option( 'markdown_for_agents_options' );
+delete_option( 'markdown_for_agents_bundle_hash' );
+
+if ( ! empty( $options['delete_files_on_uninstall'] ) ) {
+	$export_dir = sanitize_file_name( (string) ( $options['export_dir'] ?? 'wp-mfa-exports' ) );
+	$upload_dir = wp_upload_dir();
+	$bundle     = rtrim( (string) $upload_dir['basedir'], '/\\' ) . '/' . $export_dir . '.tar.gz';
+
+	if ( file_exists( $bundle ) ) {
+		unlink( $bundle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+	}
+}
+
+// Note: the export tree itself (wp-content/uploads/{export_dir}/) is never
+// deleted here, even when delete_files_on_uninstall is set — that is a
+// pre-existing gap tracked as a follow-up, not addressed by this bundle work.

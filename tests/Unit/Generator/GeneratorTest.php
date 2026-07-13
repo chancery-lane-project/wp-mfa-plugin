@@ -12,6 +12,7 @@ use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
 
@@ -117,6 +118,24 @@ class GeneratorTest extends TestCase {
         );
     }
 
+    private function make_generator_with_link_rewriter( array $options, ?LinkRewriter $link_rewriter ): Generator {
+        $defaults = [
+            'post_types' => [ 'post', 'page' ],
+            'export_dir' => $this->export_subdir,
+        ];
+        return new Generator(
+            array_merge( $defaults, $options ),
+            $this->frontmatter_builder,
+            $this->content_filter,
+            $this->converter,
+            $this->yaml_formatter,
+            $this->file_writer,
+            new FieldResolver(),
+            null,
+            $link_rewriter
+        );
+    }
+
     private function make_post( array $props = [] ): \WP_Post {
         return new \WP_Post( array_merge( [
             'ID'          => 1,
@@ -211,7 +230,7 @@ class GeneratorTest extends TestCase {
         $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
         $this->file_writer->method( 'write' )->willReturn( true );
 
-        // do_action is a no-op stub in tests — just confirm no exception.
+        // do_action stub records fires; this test only confirms no exception.
         $result = $this->generator->generate_post( $post );
         $this->assertTrue( $result );
     }
@@ -676,6 +695,85 @@ class GeneratorTest extends TestCase {
         $output = $this->generator->get_post_markdown( $post );
 
         $this->assertNull( $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // Link rewriting (okf_compat option)
+    // -----------------------------------------------------------------------
+
+    public function test_okf_compat_off_does_not_rewrite_links(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
+        $link_rewriter = new LinkRewriter(
+            fn( string $url ): ?string => $map[ $url ] ?? null,
+            'https://example.com/wp-content/uploads/wp-mfa-exports'
+        );
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'See [other post](https://example.com/other-post/).' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => false], $link_rewriter );
+        $gen->generate_post( $post );
+
+        $this->assertStringContainsString( '[other post](https://example.com/other-post/)', $written );
+    }
+
+    public function test_okf_compat_on_rewrites_internal_links_to_md_urls(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
+        $link_rewriter = new LinkRewriter(
+            fn( string $url ): ?string => $map[ $url ] ?? null,
+            'https://example.com/wp-content/uploads/wp-mfa-exports'
+        );
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'See [other post](https://example.com/other-post/).' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => true], $link_rewriter );
+        $gen->generate_post( $post );
+
+        $this->assertStringContainsString(
+            '[other post](https://example.com/wp-content/uploads/wp-mfa-exports/post/other-post.md)',
+            $written
+        );
+    }
+
+    public function test_no_rewriter_injected_is_a_noop_even_with_toggle_on(): void {
+        $post = $this->make_post( ['ID' => 42] );
+
+        $written = '';
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( 'See [other post](https://example.com/other-post/).' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
+                $written = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => true], null );
+        $gen->generate_post( $post );
+
+        $this->assertStringContainsString( '[other post](https://example.com/other-post/)', $written );
     }
 
     // -----------------------------------------------------------------------

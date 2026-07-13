@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Admin\SettingsPage;
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 
 /**
@@ -26,11 +28,19 @@ class SettingsPageTest extends TestCase {
         $this->generator = $this->createMock( Generator::class );
     }
 
-    private function make_page( array $options = [] ): SettingsPage {
+    private function make_page( array $options = [], ?ArdCatalog $ard_catalog = null ): SettingsPage {
         return new SettingsPage(
             array_merge( Options::get_defaults(), $options ),
-            $this->generator
+            $this->generator,
+            $ard_catalog
         );
+    }
+
+    private function make_ard_catalog( array $options = [] ): ArdCatalog {
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'bundle_url' )->willReturn( 'https://example.test/wp-content/uploads/wp-mfa-exports.zip' );
+
+        return new ArdCatalog( array_merge( Options::get_defaults(), $options ), $bundle_generator );
     }
 
     public function test_register_registers_option_key(): void {
@@ -127,6 +137,20 @@ class SettingsPageTest extends TestCase {
         $this->assertSame( [ 'GPTBot' ], $result['ua_agent_strings'] );
     }
 
+    public function test_register_adds_okf_compat_field(): void {
+        $this->make_page()->register();
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $this->assertContains( 'markdown_for_agents_okf_compat', $fields );
+    }
+
+    public function test_sanitize_okf_compat_cast_to_bool(): void {
+        $result = $this->make_page()->sanitize_options( [ 'okf_compat' => '1' ] );
+        $this->assertTrue( $result['okf_compat'] );
+
+        $result = $this->make_page()->sanitize_options( [] );
+        $this->assertFalse( $result['okf_compat'] );
+    }
+
     public function test_sanitize_flags_regen_when_post_type_configs_change(): void {
         $page = $this->make_page( [
             'post_types'        => [ 'post' ],
@@ -140,6 +164,20 @@ class SettingsPageTest extends TestCase {
             'post_type_configs' => [
                 'post' => [ 'frontmatter_fields' => "new_field\n", 'content_fields' => '' ],
             ],
+        ] );
+
+        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_sanitize_flags_regen_when_okf_compat_changes(): void {
+        $page = $this->make_page( [
+            'post_types' => [ 'post' ],
+            'okf_compat' => false,
+        ] );
+
+        $page->sanitize_options( [
+            'post_types' => [ 'post' ],
+            'okf_compat' => '1',
         ] );
 
         $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
@@ -167,5 +205,175 @@ class SettingsPageTest extends TestCase {
         ] );
 
         $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_register_adds_discovery_section(): void {
+        $this->make_page()->register();
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
+        $this->assertContains( 'markdown_for_agents_discovery', $sections );
+    }
+
+    public function test_register_adds_discovery_fields(): void {
+        $this->make_page()->register();
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $this->assertContains( 'markdown_for_agents_okf_compat', $fields );
+        $this->assertContains( 'markdown_for_agents_bundle_enabled', $fields );
+        $this->assertContains( 'markdown_for_agents_ard_enabled', $fields );
+    }
+
+    public function test_sanitize_bundle_enabled_requires_okf_compat(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'okf_compat'      => '',
+            'bundle_enabled'  => '1',
+        ] );
+        $this->assertFalse( $result['bundle_enabled'] );
+
+        $result = $this->make_page()->sanitize_options( [
+            'okf_compat'     => '1',
+            'bundle_enabled' => '1',
+        ] );
+        $this->assertTrue( $result['bundle_enabled'] );
+    }
+
+    public function test_sanitize_ard_enabled_requires_bundle_enabled(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'okf_compat'     => '1',
+            'bundle_enabled' => '',
+            'ard_enabled'    => '1',
+        ] );
+        $this->assertFalse( $result['ard_enabled'] );
+
+        $result = $this->make_page()->sanitize_options( [
+            'okf_compat'     => '1',
+            'bundle_enabled' => '1',
+            'ard_enabled'    => '1',
+        ] );
+        $this->assertTrue( $result['ard_enabled'] );
+    }
+
+    public function test_sanitize_all_three_discovery_toggles_on(): void {
+        $result = $this->make_page()->sanitize_options( [
+            'okf_compat'     => '1',
+            'bundle_enabled' => '1',
+            'ard_enabled'    => '1',
+        ] );
+        $this->assertTrue( $result['okf_compat'] );
+        $this->assertTrue( $result['bundle_enabled'] );
+        $this->assertTrue( $result['ard_enabled'] );
+    }
+
+    public function test_sanitize_flags_regen_when_bundle_enabled_changes(): void {
+        $page = $this->make_page( [
+            'post_types'     => [ 'post' ],
+            'okf_compat'     => true,
+            'bundle_enabled' => false,
+        ] );
+
+        $page->sanitize_options( [
+            'post_types'     => [ 'post' ],
+            'okf_compat'     => '1',
+            'bundle_enabled' => '1',
+        ] );
+
+        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_sanitize_does_not_flag_regen_when_only_ard_enabled_changes(): void {
+        $page = $this->make_page( [
+            'post_types'          => [ 'post' ],
+            'include_taxonomies'  => true,
+            'ua_force_enabled'    => true,
+            'okf_compat'          => true,
+            'bundle_enabled'      => true,
+            'ard_enabled'         => false,
+        ] );
+
+        $page->sanitize_options( [
+            'post_types'          => [ 'post' ],
+            'include_taxonomies'  => '1',
+            'ua_force_enabled'    => '1',
+            'okf_compat'          => '1',
+            'bundle_enabled'      => '1',
+            'ard_enabled'         => '1',
+        ] );
+
+        $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
+    }
+
+    public function test_render_page_includes_generate_everything_button(): void {
+        $page = $this->make_page( [ 'post_types' => [ 'post', 'page' ] ] );
+        ob_start();
+        $page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'data-generate-all="1"', $output );
+        $this->assertStringContainsString( 'Generate everything', $output );
+        // Per-type and taxonomy buttons remain alongside it.
+        $this->assertStringContainsString( 'data-post-type="post"', $output );
+        $this->assertStringContainsString( 'data-action="mfa_generate_taxonomy_batch"', $output );
+    }
+
+    public function test_field_bundle_enabled_disabled_when_okf_compat_off(): void {
+        $page = $this->make_page( [ 'okf_compat' => false ] );
+        ob_start();
+        $page->field_bundle_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'disabled="disabled"', $output );
+        $this->assertStringContainsString( 'Enable OKF compatibility mode first.', $output );
+    }
+
+    public function test_field_bundle_enabled_not_disabled_when_okf_compat_on(): void {
+        $page = $this->make_page( [ 'okf_compat' => true ] );
+        ob_start();
+        $page->field_bundle_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( 'disabled="disabled"', $output );
+    }
+
+    public function test_field_ard_enabled_disabled_when_bundle_enabled_off(): void {
+        $page = $this->make_page( [ 'okf_compat' => true, 'bundle_enabled' => false ] );
+        ob_start();
+        $page->field_ard_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'disabled="disabled"', $output );
+        $this->assertStringContainsString( 'Enable the bundle first.', $output );
+    }
+
+    public function test_field_ard_enabled_renders_json_panel_when_enabled(): void {
+        $options = [ 'okf_compat' => true, 'bundle_enabled' => true, 'ard_enabled' => true ];
+        $page    = $this->make_page( $options, $this->make_ard_catalog( $options ) );
+
+        ob_start();
+        $page->field_ard_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '<textarea', $output );
+        $this->assertStringContainsString( 'specVersion', $output );
+        $this->assertStringContainsString( 'ai-catalog.json', $output );
+    }
+
+    public function test_field_ard_enabled_shows_fallback_when_catalog_null(): void {
+        $options = [ 'okf_compat' => true, 'bundle_enabled' => true, 'ard_enabled' => true ];
+        $page    = $this->make_page( $options, null );
+
+        ob_start();
+        $page->field_ard_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( '<textarea', $output );
+    }
+
+    public function test_field_ard_enabled_no_panel_when_disabled(): void {
+        $options = [ 'okf_compat' => true, 'bundle_enabled' => true, 'ard_enabled' => false ];
+        $page    = $this->make_page( $options, $this->make_ard_catalog( $options ) );
+
+        ob_start();
+        $page->field_ard_enabled();
+        $output = ob_get_clean();
+
+        $this->assertStringNotContainsString( '<textarea', $output );
     }
 }

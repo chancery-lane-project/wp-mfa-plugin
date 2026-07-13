@@ -46,9 +46,11 @@ class FrontmatterBuilder {
 			'wpid'      => $post->ID,
 		);
 
+		$collected = null;
+
 		if ( ! empty( $this->options['include_taxonomies'] ) ) {
-			$terms       = $this->taxonomy_collector->collect( $post->ID, $post->post_type );
-			$frontmatter = array_merge( $frontmatter, $terms );
+			$collected   = $this->taxonomy_collector->collect( $post->ID, $post->post_type );
+			$frontmatter = array_merge( $frontmatter, $collected );
 		}
 
 		// Per-post-type frontmatter fields (takes priority over global meta_keys).
@@ -87,6 +89,34 @@ class FrontmatterBuilder {
 			if ( $user instanceof \WP_User ) {
 				$frontmatter['author'] = $user->display_name;
 			}
+		}
+
+		if ( ! empty( $this->options['okf_compat'] ) ) {
+			if ( '' !== $frontmatter['modified'] ) {
+				$frontmatter['timestamp'] = $frontmatter['modified'];
+			}
+
+			if ( null === $collected ) {
+				$collected = $this->taxonomy_collector->collect( $post->ID, $post->post_type );
+			}
+
+			$flat = array();
+			foreach ( $collected as $names ) {
+				foreach ( (array) $names as $name ) {
+					if ( ! in_array( $name, $flat, true ) ) {
+						$flat[] = $name;
+					}
+				}
+			}
+
+			/**
+			 * Modify the flat OKF tags list before it is written to frontmatter.
+			 *
+			 * @since  1.6.0
+			 * @param  string[]  $flat The deduplicated cross-taxonomy tag list.
+			 * @param  \WP_Post  $post The post.
+			 */
+			$frontmatter['tags'] = (array) apply_filters( 'markdown_for_agents_flat_tags', $flat, $post );
 		}
 
 		/**
