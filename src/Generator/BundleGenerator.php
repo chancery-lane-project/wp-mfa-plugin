@@ -240,7 +240,7 @@ class BundleGenerator {
 	 * link and drop it, so no graph edge is built. True relative paths
 	 * (`../post/slug.md`) are the OKF §3 norm and work everywhere.
 	 *
-	 * @since  1.6.1
+	 * @since  1.6.0
 	 * @param  string $content       Markdown file content.
 	 * @param  string $relative_path This file's own path within the bundle.
 	 * @param  string $base_url      Export base URL, no trailing slash.
@@ -274,7 +274,7 @@ class BundleGenerator {
 	 * Compute a relative path from a directory to a bundle-root-relative
 	 * target path.
 	 *
-	 * @since  1.6.1
+	 * @since  1.6.0
 	 * @param  string $from_dir Directory of the linking file, relative to
 	 *                          bundle root; empty string for the root itself.
 	 * @param  string $to_path  Target file path, relative to bundle root.
