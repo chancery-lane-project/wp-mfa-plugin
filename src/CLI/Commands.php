@@ -150,8 +150,7 @@ class Commands {
 			return;
 		}
 
-		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
-		$this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) );
+		$this->write_manifests_for_bundle();
 
 		if ( ! $this->bundle_generator->build() ) {
 			\WP_CLI::error( 'Bundle build failed.' );
@@ -575,6 +574,21 @@ class Commands {
 	}
 
 	/**
+	 * Refresh manifest.json files immediately before a bundle build, so the
+	 * bundle reflects the current content hashes rather than a stale set.
+	 * Surfaces a warning (rather than aborting) when a write fails, since a
+	 * stale-but-present manifest is still preferable to no bundle at all.
+	 *
+	 * @since 1.6.0
+	 */
+	private function write_manifests_for_bundle(): void {
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) ) {
+			\WP_CLI::warning( 'One or more manifest.json files failed to write; bundle may be stale.' );
+		}
+	}
+
+	/**
 	 * Count the .md files directly inside a directory, excluding index.md
 	 * (an OKF directory listing, not a generated post).
 	 *
@@ -622,8 +636,7 @@ class Commands {
 			return;
 		}
 
-		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
-		$this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) );
+		$this->write_manifests_for_bundle();
 
 		if ( $this->bundle_generator->build() ) {
 			\WP_CLI::log( sprintf( 'Bundle rebuilt: %s', $this->bundle_generator->bundle_path() ) );

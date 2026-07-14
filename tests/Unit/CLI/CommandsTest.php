@@ -29,6 +29,7 @@ class CommandsTest extends TestCase {
 
     protected function setUp(): void {
         reset_mock_scheduled_events();
+        reset_mock_wp_cli_warnings();
         $this->bundle_path = sys_get_temp_dir() . '/wp-mfa-commands-test-' . uniqid() . '.zip';
     }
 
@@ -37,6 +38,7 @@ class CommandsTest extends TestCase {
             unlink( $this->bundle_path );
         }
         reset_mock_scheduled_events();
+        reset_mock_wp_cli_warnings();
     }
 
     private function make_commands( BundleGenerator $bundle_generator ): Commands {
@@ -105,8 +107,49 @@ class CommandsTest extends TestCase {
     }
 
     public function test_bundle_command_writes_manifests_before_building(): void {
+        $calls = array();
+
         $generator = $this->createMock( Generator::class );
-        $generator->expects( $this->once() )->method( 'write_manifests' );
+        $generator->expects( $this->once() )
+            ->method( 'write_manifests' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'write_manifests';
+                    return true;
+                }
+            );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'build';
+                    return true;
+                }
+            );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $commands->bundle( array(), array() );
+
+        $this->assertSame( array( 'write_manifests', 'build' ), $calls );
+    }
+
+    public function test_bundle_command_warns_when_manifest_write_fails(): void {
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'write_manifests' )->willReturn( false );
 
         $bundle_generator = $this->createMock( BundleGenerator::class );
         $bundle_generator->method( 'build' )->willReturn( true );
@@ -126,11 +169,57 @@ class CommandsTest extends TestCase {
         );
 
         $commands->bundle( array(), array() );
+
+        $warnings = get_mock_wp_cli_warnings();
+        $this->assertNotEmpty( $warnings );
+        $this->assertStringContainsString( 'manifest', strtolower( $warnings[0] ) );
     }
 
     public function test_rebuild_bundle_writes_manifests_before_building(): void {
+        $calls = array();
+
         $generator = $this->createMock( Generator::class );
-        $generator->expects( $this->once() )->method( 'write_manifests' );
+        $generator->expects( $this->once() )
+            ->method( 'write_manifests' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'write_manifests';
+                    return true;
+                }
+            );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'build';
+                    return true;
+                }
+            );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $method = new \ReflectionMethod( Commands::class, 'rebuild_bundle' );
+        $method->invoke( $commands );
+
+        $this->assertSame( array( 'write_manifests', 'build' ), $calls );
+    }
+
+    public function test_rebuild_bundle_warns_when_manifest_write_fails(): void {
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'write_manifests' )->willReturn( false );
 
         $bundle_generator = $this->createMock( BundleGenerator::class );
         $bundle_generator->method( 'build' )->willReturn( true );
@@ -151,5 +240,9 @@ class CommandsTest extends TestCase {
 
         $method = new \ReflectionMethod( Commands::class, 'rebuild_bundle' );
         $method->invoke( $commands );
+
+        $warnings = get_mock_wp_cli_warnings();
+        $this->assertNotEmpty( $warnings );
+        $this->assertStringContainsString( 'manifest', strtolower( $warnings[0] ) );
     }
 }

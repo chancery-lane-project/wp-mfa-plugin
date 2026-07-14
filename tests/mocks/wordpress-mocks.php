@@ -1172,13 +1172,25 @@ if (!function_exists('get_current_screen')) {
 // behaviour that runs after an error() call in the same method.
 // ---------------------------------------------------------------------------
 
+$GLOBALS['_mock_wp_cli_warnings'] = [];
+
+function reset_mock_wp_cli_warnings(): void {
+	$GLOBALS['_mock_wp_cli_warnings'] = [];
+}
+
+function get_mock_wp_cli_warnings(): array {
+	return $GLOBALS['_mock_wp_cli_warnings'];
+}
+
 if (!class_exists('WP_CLI')) {
 	class WP_CLI {
 		public static function log(string $message): void {}
 
 		public static function success(string $message): void {}
 
-		public static function warning(string $message): void {}
+		public static function warning(string $message): void {
+			$GLOBALS['_mock_wp_cli_warnings'][] = $message;
+		}
 
 		public static function error(string $message): void {}
 
