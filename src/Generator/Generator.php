@@ -65,7 +65,7 @@ class Generator {
 			}
 		}
 
-		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+		if ( null !== $this->link_rewriter ) {
 			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
@@ -115,7 +115,7 @@ class Generator {
 			}
 		}
 
-		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+		if ( null !== $this->link_rewriter ) {
 			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
