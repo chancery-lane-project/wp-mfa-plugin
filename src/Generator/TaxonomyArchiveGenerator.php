@@ -299,14 +299,13 @@ class TaxonomyArchiveGenerator {
 			'',
 		];
 
-		$okf_compat         = ! empty( $this->options['okf_compat'] );
 		$enabled_post_types = ExportPolicy::enabled_post_types( $this->options );
 
 		foreach ( $posts as $post ) {
 			$title   = wp_strip_all_tags( $post->post_title );
 			$excerpt = wp_strip_all_tags( $post->post_excerpt );
 
-			if ( $okf_compat && in_array( $post->post_type, $enabled_post_types, true ) ) {
+			if ( in_array( $post->post_type, $enabled_post_types, true ) ) {
 				$url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options )
 					. '/' . ExportPolicy::post_relative_path( $post );
 			} else {

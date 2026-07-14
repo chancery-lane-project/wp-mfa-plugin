@@ -247,10 +247,10 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // generate_term — body links (okf_compat)
+    // generate_term — body links
     // -----------------------------------------------------------------------
 
-    public function test_okf_compat_on_body_links_to_md_files(): void {
+    public function test_body_links_to_md_files(): void {
         $GLOBALS['_mock_posts']     = [
             new \WP_Post( ['ID' => 1, 'post_title' => 'Post One', 'post_excerpt' => '', 'post_name' => 'post-one', 'post_type' => 'post'] ),
         ];
@@ -264,7 +264,7 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
                 return true;
             } );
 
-        $gen = $this->make_generator( ['okf_compat' => true, 'post_types' => ['post']] );
+        $gen = $this->make_generator( ['post_types' => ['post']] );
         $gen->generate_term( $this->make_term() );
 
         $this->assertStringContainsString(
@@ -274,33 +274,7 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $this->assertStringNotContainsString( 'https://example.com/post-one/', $captured );
     }
 
-    public function test_okf_compat_off_body_keeps_permalinks(): void {
-        $GLOBALS['_mock_posts']     = [
-            new \WP_Post( ['ID' => 1, 'post_title' => 'Post One', 'post_excerpt' => 'About one.', 'post_name' => 'post-one', 'post_type' => 'post'] ),
-        ];
-        $GLOBALS['_mock_permalink'] = 'https://example.com/post-one/';
-
-        $this->yaml_formatter->method( 'format' )->willReturn( '' );
-        $captured = null;
-        $this->file_writer->method( 'write' )
-            ->willReturnCallback( function ( string $path, string $content ) use ( &$captured ) {
-                $captured = $content;
-                return true;
-            } );
-
-        $gen = $this->make_generator( ['okf_compat' => false, 'post_types' => ['post']] );
-        $gen->generate_term( $this->make_term() );
-
-        // Byte-level regression: yaml_formatter is stubbed to '', so the full written
-        // content is exactly "\n" + build_body()'s output — heading, count, post line
-        // with permalink and excerpt, trailing newline.
-        $expected = "\n# Climate Law\n\nPosts in this archive: 1\n\n"
-            . "- [Post One](https://example.com/post-one/) — About one.\n";
-
-        $this->assertSame( $expected, $captured );
-    }
-
-    public function test_okf_compat_on_keeps_permalink_for_non_enabled_post_type(): void {
+    public function test_keeps_permalink_for_non_enabled_post_type(): void {
         $GLOBALS['_mock_posts']     = [
             new \WP_Post( ['ID' => 1, 'post_title' => 'Other Type Post', 'post_excerpt' => '', 'post_name' => 'other-post', 'post_type' => 'climate_contract'] ),
         ];
@@ -315,7 +289,7 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
             } );
 
         // post_types enabled only includes 'post' — the fixture post is of type 'climate_contract'.
-        $gen = $this->make_generator( ['okf_compat' => true, 'post_types' => ['post']] );
+        $gen = $this->make_generator( ['post_types' => ['post']] );
         $gen->generate_term( $this->make_term() );
 
         $this->assertStringContainsString( '- [Other Type Post](https://example.com/other-post/)', $captured );
