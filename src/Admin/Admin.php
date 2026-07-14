@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Admin;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -281,6 +282,12 @@ class Admin {
 
 		if ( ! $this->bundle_generator->is_stale() ) {
 			return;
+		}
+
+		$export_base = Options::get_export_base( $this->options );
+		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( 'WP Markdown for Agents: manifest write failed during bundle rebuild; bundle may be stale.' );
 		}
 
 		if ( ! $this->bundle_generator->build() && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
