@@ -219,9 +219,24 @@
 
 **Files:**
 - Modify: `src/Core/Options.php:42-44`
-- Test: none directly (covered transitively by SettingsPageTest changes in B2)
+- Test: `tests/Unit/Core/OptionsTest.php` (`test_defaults_include_okf_compat_disabled`, `test_defaults_include_bundle_and_ard_disabled`)
 
-- [ ] **Step 1: Remove the two option defaults**
+- [ ] **Step 1: Delete/rewrite the `OptionsTest.php` assertions for the removed keys**
+
+  Delete `test_defaults_include_okf_compat_disabled` (`OptionsTest.php:77-82`) entirely — it asserts `okf_compat` exists in defaults, which will no longer be true.
+
+  In `test_defaults_include_bundle_and_ard_disabled` (`OptionsTest.php:84-91`), remove the `ard_enabled` assertions:
+  ```php
+      public function test_defaults_include_bundle_and_ard_disabled(): void {
+          $defaults = Options::get_defaults();
+
+          $this->assertArrayHasKey( 'bundle_enabled', $defaults );
+          $this->assertFalse( $defaults['bundle_enabled'] );
+      }
+  ```
+  (Rename to `test_defaults_include_bundle_disabled` since it no longer covers ARD.)
+
+- [ ] **Step 2: Remove the two option defaults**
 
   In `src/Core/Options.php`, remove lines:
   ```php
@@ -233,15 +248,18 @@
   ```
   Leave `'bundle_enabled' => false,` in place.
 
-- [ ] **Step 2: Run the full suite to find every place that now breaks**
+- [ ] **Step 3: Run `OptionsTest.php`, then the full suite**
+
+  Run: `vendor/bin/phpunit tests/Unit/Core/OptionsTest.php`
+  Expected: PASS — Step 1's rewritten test no longer references the removed keys.
 
   Run: `composer test`
-  Expected: FAIL — `SettingsPageTest.php` and possibly others will fail on references to the removed keys. This is expected; Task B2 fixes `SettingsPage.php` and its tests. Do not fix failures here — just confirm they're the expected `okf_compat`/`ard_enabled`-related ones before moving to B2.
+  Expected: FAIL — `SettingsPageTest.php` will fail on references to the removed keys (`OptionsTest.php` now passes; this remaining failure is expected). Task B2 fixes `SettingsPage.php` and its tests. Do not fix failures here — just confirm they're the expected `okf_compat`/`ard_enabled`-related ones in `SettingsPageTest.php` before moving to B2.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
   ```bash
-  git add src/Core/Options.php
+  git add src/Core/Options.php tests/Unit/Core/OptionsTest.php
   git commit -m "feat: remove okf_compat and ard_enabled option defaults"
   ```
 
