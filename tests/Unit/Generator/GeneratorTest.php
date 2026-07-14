@@ -698,7 +698,7 @@ class GeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // Link rewriting (okf_compat option)
+    // Link rewriting
     // -----------------------------------------------------------------------
 
     public function test_rewrites_internal_links_to_md_urls(): void {
