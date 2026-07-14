@@ -213,6 +213,8 @@
 
 ## Phase B — Delete the retired options and collapse the settings UI
 
+**Tasks B1 and B2 must be executed back-to-back without a review/pause checkpoint in between.** Task B1's commit intentionally leaves `composer test` red (`SettingsPageTest.php` fails against the removed option defaults) as a deliberate intermediate step, not a stopping point — if execution is interrupted after B1's commit and before B2's, the repository sits at a broken `HEAD` with no passing-suite commit to fall back to short of reverting B1. Do not treat the B1 commit as a place to end a session, request review, or hand off — proceed directly into B2 in the same sitting.
+
 ### Task B1: Remove `okf_compat`/`ard_enabled` from `Options::get_defaults()`
 
 **Files:**
@@ -691,13 +693,13 @@
 
 **Files:**
 - Modify: `src/Admin/Admin.php:1-11` (imports), `:277-290` (`maybe_rebuild_bundle()`)
-- Test: `tests/Unit/Admin/AdminTest.php` (confirm exact filename via `ls tests/Unit/Admin/`)
+- Test: `tests/Unit/Admin/AdminAjaxTest.php` (confirmed — `tests/Unit/Admin/` contains `AdminAjaxTest.php`, `MetaBoxTest.php`, `SettingsPageTest.php`; no `AdminTest.php` exists, and `maybe_rebuild_bundle()` is AJAX-triggered, so `AdminAjaxTest.php` is the correct target)
 
-- [ ] **Step 1: Confirm the Admin test file and its `maybe_rebuild_bundle()` coverage**
+- [ ] **Step 1: Find `maybe_rebuild_bundle()` coverage in `AdminAjaxTest.php`**
 
-  Run: `ls tests/Unit/Admin/ && grep -n "maybe_rebuild_bundle\|function test.*[Rr]ebuild" tests/Unit/Admin/*.php`
+  Run: `grep -n "maybe_rebuild_bundle\|function test.*[Rr]ebuild" tests/Unit/Admin/AdminAjaxTest.php`
 
-  Read the matching test(s) to learn this file's `Admin` construction and mocking convention.
+  Read the matching test(s) to learn this file's `Admin` construction and mocking convention. If nothing matches (i.e. no existing test currently exercises this method directly), add the new test to this same file anyway, following its existing `Admin`-construction/mock conventions for other AJAX-handler tests.
 
 - [ ] **Step 2: Write a failing test**
 
