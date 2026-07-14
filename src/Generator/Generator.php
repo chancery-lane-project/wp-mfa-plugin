@@ -26,7 +26,7 @@ class Generator {
 	 * @param  FileWriter                     $file_writer          Handles filesystem I/O.
 	 * @param  FieldResolver                  $field_resolver       Resolves custom field values.
 	 * @param  TaxonomyArchiveGenerator|null  $taxonomy_generator   Optional taxonomy archive generator.
-	 * @param  LinkRewriter|null              $link_rewriter        Optional internal link rewriter (OKF compat).
+	 * @param  LinkRewriter|null              $link_rewriter        Optional; when present, internal links are rewritten to .md URLs.
 	 */
 	public function __construct(
 		private readonly array $options,
