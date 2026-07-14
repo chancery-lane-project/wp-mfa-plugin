@@ -15,9 +15,11 @@
      * Build (or replace) an expandable list of error details beneath a button.
      *
      * The AJAX response already carries a per-item {post_id|term_id, message}
-     * record for every failure; this surfaces them instead of only a count.
+     * record for every failure (including genuine disk-write failures); this
+     * surfaces them instead of only a count. Details persist for the current
+     * session only — a fresh run of the same button clears them first.
      *
-     * @param {HTMLButtonElement}                              button
+     * @param {HTMLButtonElement}                                             button
      * @param {Array<{post_id?: number, term_id?: number, message: string}>} errors
      */
     function renderErrorDetails(button, errors) {
@@ -196,6 +198,7 @@
 
             var step = queue[index];
             step.button.textContent = '0 / …';
+            renderErrorDetails(step.button, []);
 
             sendBatch(step.action, step.postType, 0, { processed: 0, errors: [] }, step.button, function (success) {
                 if (!success) {
