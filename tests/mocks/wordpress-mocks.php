@@ -1162,3 +1162,28 @@ if (!function_exists('get_current_screen')) {
 		return $GLOBALS['_mock_current_screen'] ?? null;
 	}
 }
+
+// ---------------------------------------------------------------------------
+// WP_CLI stub
+//
+// Minimal no-op stand-in so CLI\Commands methods can be exercised directly
+// in unit tests without a real WP-CLI runtime. Real WP_CLI::error() halts
+// execution; this stub deliberately does not, so tests can assert on
+// behaviour that runs after an error() call in the same method.
+// ---------------------------------------------------------------------------
+
+if (!class_exists('WP_CLI')) {
+	class WP_CLI {
+		public static function log(string $message): void {}
+
+		public static function success(string $message): void {}
+
+		public static function warning(string $message): void {}
+
+		public static function error(string $message): void {}
+
+		public static function confirm(string $question, array $assoc_args = []): void {}
+
+		public static function add_command(string $name, object $callable): void {}
+	}
+}

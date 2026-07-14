@@ -150,6 +150,9 @@ class Commands {
 			return;
 		}
 
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		$this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) );
+
 		if ( ! $this->bundle_generator->build() ) {
 			\WP_CLI::error( 'Bundle build failed.' );
 			return;
@@ -618,6 +621,9 @@ class Commands {
 		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
 			return;
 		}
+
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		$this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) );
 
 		if ( $this->bundle_generator->build() ) {
 			\WP_CLI::log( sprintf( 'Bundle rebuilt: %s', $this->bundle_generator->bundle_path() ) );
