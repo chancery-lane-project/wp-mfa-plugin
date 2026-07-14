@@ -152,16 +152,18 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
 		add_action(
 			'markdown_for_agents_rebuild_bundle',
-			function () use ( $generator, $bundle_generator, $options ): void {
+			static function () use ( $generator, $bundle_generator, $options ): void {
+				// This closure deliberately has no error_log for either call below, unlike
+				// the CLI/AJAX manifest call sites: nobody watches a cron tick, matching
+				// on_rebuild_bundle()'s own existing silence on build() failure (see its
+				// comment). Unlike that build() case, there genuinely is no other signal
+				// that surfaces a write_manifests() failure here — it's an accepted gap,
+				// not a documented safety net.
 				$generator->write_manifests(
 					Options::get_export_base( $options ),
 					ExportPolicy::enabled_post_types( $options )
 				);
 
-				// No error_log here (unlike the CLI/AJAX call sites): on_rebuild_bundle()
-				// already absorbs build() failures silently for cron (see its own comment) —
-				// nobody watches a cron tick, so a manifest-write failure is left to surface
-				// via is_stale()/CLI status the same way.
 				$bundle_generator->on_rebuild_bundle();
 			}
 		);
