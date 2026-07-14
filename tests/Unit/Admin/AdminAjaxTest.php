@@ -450,9 +450,6 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 'markdownForAgentsBulkGenerate', $localised['object'] );
         $this->assertArrayHasKey( 'nonce', $localised['data'] );
         $this->assertArrayHasKey( 'ajaxurl', $localised['data'] );
-
-        $this->assertArrayHasKey( 'mfa-discovery-toggles', $GLOBALS['_mock_enqueued_scripts'] );
-        $this->assertStringContainsString( 'discovery-toggles.js', $GLOBALS['_mock_enqueued_scripts']['mfa-discovery-toggles'] );
     }
 
     public function test_enqueue_scripts_skips_other_pages(): void {

@@ -351,16 +351,6 @@ class Admin {
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				)
 			);
-
-			// Live cumulative gating for the agent-discovery toggles, so
-			// enabling a level unlocks the next in the same form submit.
-			wp_enqueue_script(
-				'mfa-discovery-toggles',
-				MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/discovery-toggles.js',
-				array(),
-				MARKDOWN_FOR_AGENTS_VERSION,
-				true
-			);
 		}
 
 		// Enqueue preview JS on post editor screens for enabled post types.
