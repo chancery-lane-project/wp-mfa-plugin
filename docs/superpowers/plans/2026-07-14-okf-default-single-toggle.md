@@ -441,32 +441,37 @@
 - Modify: `src/CLI/Commands.php:12, 569-617` (delegate instead of implementing)
 - Test: create `tests/Unit/Generator/GeneratorTest.php` additions; check `tests/Unit/CLI/CommandsTest.php` for existing manifest-related coverage to relocate
 
-- [ ] **Step 1: Find existing manifest test coverage in `CommandsTest.php`**
+- [ ] **Step 1: Confirm there's no existing manifest coverage in `CommandsTest.php` to relocate**
 
   Run: `grep -n "manifest\|Manifest" tests/Unit/CLI/CommandsTest.php`
-
-  Read whatever tests currently exercise `--with-manifest`/`--incremental`/`generate_manifest()` to understand the current assertion style (likely checking `manifest.json` file existence/content after calling `generate()`). Note their exact names — they'll be adapted in Step 6, not deleted, since the CLI-facing behavior doesn't change.
+  Expected: no matches — confirmed there is currently no test exercising `--with-manifest`/`--incremental`/`generate_manifest()` in this file. There is nothing to relocate; Step 7 below only needs to confirm the full CLI suite still passes after the delegation change, not adapt pre-existing manifest-specific assertions.
 
 - [ ] **Step 2: Write a new test for `Generator::write_manifests()`**
 
-  Add to `tests/Unit/Generator/GeneratorTest.php` (mirroring this file's existing setup conventions for constructing a `Generator` with a real `FileWriter` against a temp export dir, and creating/publishing a test post — check the top of the file for the established `setUp()`/helper pattern and match it exactly rather than introducing a new one):
+  This test suite (`tests/Unit/Generator/GeneratorTest.php`) uses `PHPUnit\Framework\TestCase` with a **mocked** `FileWriter` (`$this->file_writer = $this->createMock( FileWriter::class )`, set up in `setUp()` at `GeneratorTest.php:64`) and a real temp directory only for path resolution (`$this->base_dir`, `GeneratorTest.php:50-51`) — no file is ever actually written to disk in this test file's existing tests, and there is no `self::factory()` (that's a `WP_UnitTestCase`-only API, unavailable here). `get_posts()` is mocked via `$GLOBALS['_mock_posts']` (see `tests/mocks/wordpress-mocks.php:393-405`) and ignores `post_type`/pagination args, simply returning whatever array is set.
+
+  Because `$file_writer` is mocked, `write_manifests()`'s internal `file_exists( $full_path )` check (a real, unmocked PHP builtin against the real filesystem) will always be `false` — no post's `.md` file actually exists on disk — so `ManifestGenerator::add_document()` is never called for any post, and the resulting manifest has an empty `documents` array. That's fine: the test only needs to confirm `write_manifests()` drives `ManifestGenerator::save()` (which calls `$file_writer->write(...)`, see `ManifestGenerator.php:139-143`) and returns `true`, not that real files land on disk.
+
+  Add to `tests/Unit/Generator/GeneratorTest.php`, following this file's existing `make_post()`/`$GLOBALS['_mock_posts']` conventions (see e.g. `test_generate_post_calls_collaborators_in_order` for the established pattern):
 
   ```php
-  public function test_write_manifests_creates_manifest_json_per_post_type(): void {
-      $post = self::factory()->post->create_and_get( array( 'post_type' => 'post', 'post_status' => 'publish' ) );
-      $this->generator->generate( $post ); // or this file's existing equivalent generation call
+  public function test_write_manifests_saves_a_manifest_per_post_type(): void {
+      $GLOBALS['_mock_posts'] = [ $this->make_post( [ 'post_type' => 'post' ] ) ];
 
-      $result = $this->generator->write_manifests( $this->export_base, array( 'post' ) );
+      $this->file_writer->expects( $this->once() )
+          ->method( 'write' )
+          ->with( $this->stringContains( 'post/manifest.json' ) )
+          ->willReturn( true );
+
+      $result = $this->generator->write_manifests( $this->base_dir, [ 'post' ] );
 
       $this->assertTrue( $result );
-      $this->assertFileExists( $this->export_base . '/post/manifest.json' );
   }
   ```
-  (Adjust the generation call and property names — `$this->export_base`, `$this->generator` — to match whatever this test file's `setUp()` actually exposes; read it first.)
 
 - [ ] **Step 3: Run the new test to confirm it fails**
 
-  Run: `vendor/bin/phpunit tests/Unit/Generator/GeneratorTest.php --filter test_write_manifests_creates_manifest_json_per_post_type`
+  Run: `vendor/bin/phpunit tests/Unit/Generator/GeneratorTest.php --filter test_write_manifests_saves_a_manifest_per_post_type`
   Expected: FAIL with "Call to undefined method ...Generator::write_manifests()".
 
 - [ ] **Step 4: Add `write_manifests()` to `Generator.php`**
@@ -541,7 +546,7 @@
 
 - [ ] **Step 5: Run the new test — confirm it passes**
 
-  Run: `vendor/bin/phpunit tests/Unit/Generator/GeneratorTest.php --filter test_write_manifests_creates_manifest_json_per_post_type`
+  Run: `vendor/bin/phpunit tests/Unit/Generator/GeneratorTest.php --filter test_write_manifests_saves_a_manifest_per_post_type`
   Expected: PASS.
 
 - [ ] **Step 6: Make `Commands::generate_manifest()` delegate to `Generator::write_manifests()`**
@@ -567,10 +572,10 @@
   ```
   Remove the now-unused `use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;` import at `Commands.php:12`.
 
-- [ ] **Step 7: Run the CLI manifest tests found in Step 1 — confirm they still pass unchanged**
+- [ ] **Step 7: Run the full `CommandsTest.php` suite to confirm the delegation change breaks nothing**
 
   Run: `vendor/bin/phpunit tests/Unit/CLI/CommandsTest.php`
-  Expected: PASS — `generate_manifest()`'s external behavior (via `--with-manifest`/`--incremental`) is unchanged; only its internals moved.
+  Expected: PASS — `generate_manifest()`'s external behavior (via `--with-manifest`/`--incremental`) is unchanged; only its internals moved. No test in this file asserted on `generate_manifest()`'s internals directly (confirmed in Step 1), so no test edits are expected here.
 
 - [ ] **Step 8: Run the full suite**
 
