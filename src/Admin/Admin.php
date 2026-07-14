@@ -25,7 +25,7 @@ class Admin {
 	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed>  $options          Current plugin options.
-	 * @param  Generator             $generator        Generator instance.
+	 * @param  Generator             $generator        Generator instance; also used to write manifests before a bundle rebuild.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
 	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
