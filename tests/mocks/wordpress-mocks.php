@@ -329,6 +329,7 @@ if (!function_exists('wp_unslash')) {
 }
 
 if (!function_exists('current_time')) {
+    // ManifestGenerator's constructor calls this unconditionally via initialize_manifest().
     function current_time(string $type, int|bool $gmt = 0): string|int {
         if ('timestamp' === $type || true === $gmt) {
             return time();

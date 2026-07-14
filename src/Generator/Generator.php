@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Generator;
 
 /**
- * Orchestrates Markdown file generation for WordPress posts.
+ * Orchestrates Markdown file generation for WordPress posts, and manifest
+ * bookkeeping for the export tree.
  *
  * Coordinates FrontmatterBuilder, ContentFilter, Converter, YamlFormatter,
  * and FileWriter. All collaborators are injected via the constructor for
