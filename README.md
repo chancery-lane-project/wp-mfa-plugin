@@ -26,7 +26,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Bulk generation** - generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
 - **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
-- **Manifest + incremental export** - content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
+- **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
 - **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
 - **OKF-compliant frontmatter and links** - `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
 - **Access statistics** - logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination

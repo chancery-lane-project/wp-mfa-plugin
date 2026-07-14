@@ -155,11 +155,13 @@ not just individual posts.
 
 = What is the manifest.json file? =
 
-When you generate with `--with-manifest` or `--incremental`, a `manifest.json` is
-created inside each post-type export folder (e.g. `wp-mfa-exports/post/manifest.json`).
-It contains a registry of all exported documents with content hashes and change
-tracking (new/modified/unchanged/deleted), enabling RAG systems to identify what
-changed since the last export without reprocessing all documents.
+A `manifest.json` is created inside each post-type export folder (e.g.
+`wp-mfa-exports/post/manifest.json`) whenever the downloadable bundle toggle is
+on (it's refreshed automatically before every bundle rebuild), or on demand via
+`--with-manifest` or `--incremental`. It contains a registry of all exported
+documents with content hashes and change tracking (new/modified/unchanged/deleted),
+enabling RAG systems to identify what changed since the last export without
+reprocessing all documents.
 
 = How does incremental export work? =
 
