@@ -150,15 +150,21 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
-		$rebuild_with_manifest = function () use ( $generator, $bundle_generator, $options ): void {
-			$generator->write_manifests(
-				Options::get_export_base( $options ),
-				ExportPolicy::enabled_post_types( $options )
-			);
-			$bundle_generator->on_rebuild_bundle();
-		};
+		add_action(
+			'markdown_for_agents_rebuild_bundle',
+			function () use ( $generator, $bundle_generator, $options ): void {
+				$generator->write_manifests(
+					Options::get_export_base( $options ),
+					ExportPolicy::enabled_post_types( $options )
+				);
 
-		$this->loader->add_action( 'markdown_for_agents_rebuild_bundle', $rebuild_with_manifest, '__invoke' );
+				// No error_log here (unlike the CLI/AJAX call sites): on_rebuild_bundle()
+				// already absorbs build() failures silently for cron (see its own comment) —
+				// nobody watches a cron tick, so a manifest-write failure is left to surface
+				// via is_stale()/CLI status the same way.
+				$bundle_generator->on_rebuild_bundle();
+			}
+		);
 	}
 
 	/**
