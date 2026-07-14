@@ -317,6 +317,67 @@ class Generator {
 	}
 
 	/**
+	 * Build and save a manifest.json per post-type folder.
+	 *
+	 * Each post type gets its own manifest inside its export subdirectory,
+	 * enabling independent change tracking per content type.
+	 *
+	 * @since  1.7.0
+	 * @param  string   $export_base Absolute path to the export base directory.
+	 * @param  string[] $post_types  Post type slugs to include.
+	 * @return bool True if all manifests saved successfully.
+	 */
+	public function write_manifests( string $export_base, array $post_types ): bool {
+		$success    = true;
+		$batch_size = 100;
+
+		foreach ( $post_types as $post_type ) {
+			$type_dir = trailingslashit( $export_base ) . $post_type . '/';
+			$manifest = new ManifestGenerator( $type_dir, $this->file_writer );
+			$type_ids = array();
+			$offset   = 0;
+
+			do {
+				$posts = get_posts(
+					array(
+						'post_type'      => $post_type,
+						'post_status'    => 'publish',
+						'posts_per_page' => $batch_size, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
+						'offset'         => $offset,
+						'orderby'        => 'ID',
+						'order'          => 'ASC',
+						'no_found_rows'  => true,
+					)
+				);
+
+				$fetched = count( $posts );
+
+				foreach ( $posts as $post ) {
+					$full_path     = $this->get_export_path( $post );
+					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$type_ids[]    = $post->ID;
+
+					if ( file_exists( $full_path ) ) {
+						$manifest->add_document( $post, $relative_path );
+					}
+
+					clean_post_cache( $post );
+				}
+
+				$offset += $batch_size;
+			} while ( $fetched === $batch_size );
+
+			$manifest->mark_deleted_documents( $type_ids );
+
+			if ( ! $manifest->save() ) {
+				$success = false;
+			}
+		}
+
+		return $success;
+	}
+
+	/**
 	 * Hook callback for save_post — deletes the export file when a published post
 	 * gains a password or is marked excluded via meta, regardless of auto_generate.
 	 *

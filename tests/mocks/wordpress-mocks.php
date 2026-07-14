@@ -328,6 +328,15 @@ if (!function_exists('wp_unslash')) {
     }
 }
 
+if (!function_exists('current_time')) {
+    function current_time(string $type, int|bool $gmt = 0): string|int {
+        if ('timestamp' === $type || true === $gmt) {
+            return time();
+        }
+        return gmdate('Y-m-d H:i:s');
+    }
+}
+
 if (!function_exists('trailingslashit')) {
     function trailingslashit(string $string): string {
         return rtrim($string, '/\\') . '/';

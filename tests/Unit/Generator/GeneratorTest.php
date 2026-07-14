@@ -751,6 +751,23 @@ class GeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // write_manifests()
+    // -----------------------------------------------------------------------
+
+    public function test_write_manifests_saves_a_manifest_per_post_type(): void {
+        $GLOBALS['_mock_posts'] = [ $this->make_post( [ 'post_type' => 'post' ] ) ];
+
+        $this->file_writer->expects( $this->once() )
+            ->method( 'write' )
+            ->with( $this->stringContains( 'post/manifest.json' ) )
+            ->willReturn( true );
+
+        $result = $this->generator->write_manifests( $this->base_dir, [ 'post' ] );
+
+        $this->assertTrue( $result );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
