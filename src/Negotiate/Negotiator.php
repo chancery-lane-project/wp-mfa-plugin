@@ -57,6 +57,15 @@ class Negotiator {
 			return;
 		}
 
+		// Method precedence: query-param > accept-header > ua.
+		if ( $via_query ) {
+			$access_method = 'query-param';
+		} elseif ( $via_accept ) {
+			$access_method = 'accept-header';
+		} else {
+			$access_method = 'ua';
+		}
+
 		if ( $this->is_eligible_singular() ) {
 			$post = get_queried_object();
 			if ( ! $post instanceof \WP_Post ) {
@@ -92,22 +101,13 @@ class Negotiator {
 				return;
 			}
 
-			// Method precedence: query-param > accept-header > ua.
-			if ( $via_query ) {
-				$access_method = 'query-param';
-			} elseif ( $via_accept ) {
-				$access_method = 'accept-header';
-			} else {
-				$access_method = 'ua';
-			}
-
 			// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
 			// Falls back to normalised UA so query-param / accept-header requests still
 			// record the caller's product name even when no known-agent pattern matches.
 			$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
 
 			$this->access_logger->log_access( $post->ID, $agent, $access_method );
-			$this->send_markdown_file( $filepath );
+			$this->send_markdown_file( $filepath, $access_method );
 			return;
 		}
 
@@ -133,7 +133,7 @@ class Negotiator {
 				return;
 			}
 
-			$this->send_markdown_file( $filepath );
+			$this->send_markdown_file( $filepath, $access_method );
 		}
 	}
 
@@ -145,49 +145,120 @@ class Negotiator {
 	 * @since  1.0.0
 	 */
 	public function output_link_tag(): void {
+		$url = $this->get_markdown_alternate_url();
+		if ( null === $url ) {
+			return;
+		}
+
+		echo '<link rel="alternate" type="text/markdown" href="' . esc_url( $url ) . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Send discovery and cache-variance headers with the HTML response.
+	 *
+	 * Hooked to `template_redirect` at priority 2, directly after
+	 * maybe_serve_markdown() at priority 1: when Markdown is served the
+	 * process has already exited, so this only ever runs for HTML responses.
+	 *
+	 * The `Link` header mirrors the wp_head <link rel="alternate"> tag at the
+	 * protocol layer, making the Markdown alternate discoverable to HEAD
+	 * requests and clients that do not parse HTML. `Vary: Accept` tells
+	 * spec-correct shared caches not to replay a stored HTML variant to a
+	 * client negotiating for text/markdown on the same URL.
+	 *
+	 * @since  1.6.1
+	 */
+	public function output_html_headers(): void {
+		$url = $this->get_markdown_alternate_url();
+		if ( null === $url ) {
+			return;
+		}
+
+		/**
+		 * Filter the headers added to the HTML response when a Markdown
+		 * alternate exists for the current page.
+		 *
+		 * `Vary: Accept` fragments the HTML cache by Accept string on
+		 * spec-correct caches, and some cache layers refuse to store any
+		 * response whose Vary lists more than Accept-Encoding — map it to an
+		 * empty string to omit it if full-page caching matters more than
+		 * same-URL negotiation on your host. Headers are appended rather than
+		 * replaced, so Vary/Link headers set elsewhere are preserved.
+		 *
+		 * @since 1.6.1
+		 * @param array<string,string> $headers Header name => value pairs.
+		 * @param string               $url     The Markdown alternate URL.
+		 */
+		$headers = apply_filters(
+			'markdown_for_agents_html_headers',
+			array(
+				'Link' => '<' . esc_url_raw( $url ) . '>; rel="alternate"; type="text/markdown"',
+				'Vary' => 'Accept',
+			),
+			$url
+		);
+
+		foreach ( (array) $headers as $name => $value ) {
+			if ( '' !== $value ) {
+				header( $name . ': ' . $value, false );
+			}
+		}
+	}
+
+	/**
+	 * Resolve the Markdown alternate URL for the current request.
+	 *
+	 * Applies the same eligibility rules as serving: published,
+	 * non-password-protected, non-excluded singulars of a configured post
+	 * type, or taxonomy archives — in each case only when the pre-generated
+	 * `.md` file exists on disk.
+	 *
+	 * @since  1.6.1
+	 * @return string|null Unescaped URL, or null when no alternate exists.
+	 */
+	private function get_markdown_alternate_url(): ?string {
 		if ( $this->is_eligible_singular() ) {
 			$post = get_queried_object();
 			if ( ! $post instanceof \WP_Post ) {
-				return;
+				return null;
 			}
 
 			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
-				return;
+				return null;
 			}
 
 			if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
-				return;
+				return null;
 			}
 
 			$filepath = $this->generator->get_export_path( $post );
 			if ( ! file_exists( $filepath ) ) {
-				return;
+				return null;
 			}
 
-			$url = esc_url( add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) ) );
-			echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-			return;
+			return add_query_arg( 'output_format', 'md', get_permalink( $post->ID ) );
 		}
 
 		if ( is_tax() || is_category() || is_tag() ) {
 			$term = get_queried_object();
 			if ( ! $term instanceof \WP_Term ) {
-				return;
+				return null;
 			}
 
 			$filepath = $this->taxonomy_generator->get_export_path( $term );
 			if ( ! file_exists( $filepath ) ) {
-				return;
+				return null;
 			}
 
 			$term_link = get_term_link( $term );
 			if ( is_wp_error( $term_link ) ) {
-				return;
+				return null;
 			}
 
-			$url = esc_url( add_query_arg( 'output_format', 'md', $term_link ) );
-			echo '<link rel="alternate" type="text/markdown" href="' . $url . '">' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			return add_query_arg( 'output_format', 'md', $term_link );
 		}
+
+		return null;
 	}
 
 	/**
@@ -240,9 +311,10 @@ class Negotiator {
 	 * to subsequent HTML browser requests on the same URL.
 	 *
 	 * @since  1.1.0
-	 * @param  string $filepath Absolute path to the .md file.
+	 * @param  string $filepath      Absolute path to the .md file.
+	 * @param  string $access_method How the request was identified: 'query-param', 'accept-header' or 'ua'.
 	 */
-	private function send_markdown_file( string $filepath ): void {
+	private function send_markdown_file( string $filepath, string $access_method ): void {
 		header( 'Content-Type: text/markdown; charset=utf-8' );
 
 		/**
@@ -250,14 +322,19 @@ class Negotiator {
 		 *
 		 * The defaults prevent shared/full-page caches from storing the
 		 * Markdown variant under the URL key and replaying it to HTML clients.
-		 * Override with caution: the Markdown is negotiated on the same URL as
-		 * the HTML page, so allowing it to be cached risks a cache layer that
-		 * ignores `Vary` serving Markdown to browsers. Map a header to an empty
-		 * string to omit it entirely.
+		 * Override with caution — but note the risk differs by access method:
+		 * 'accept-header' and 'ua' responses share the page URL with the HTML
+		 * representation, so allowing them to be cached risks a cache layer
+		 * that ignores `Vary` serving Markdown to browsers. 'query-param'
+		 * responses live on their own URL (`?output_format=md`) and therefore
+		 * their own cache key, so they may safely be made cacheable. Map a
+		 * header to an empty string to omit it entirely.
 		 *
 		 * @since 1.5.1
-		 * @param array<string,string> $headers  Header name => value pairs.
-		 * @param string               $filepath Absolute path to the .md file.
+		 * @since 1.6.1 Added the `$access_method` parameter.
+		 * @param array<string,string> $headers       Header name => value pairs.
+		 * @param string               $filepath      Absolute path to the .md file.
+		 * @param string               $access_method 'query-param', 'accept-header' or 'ua'.
 		 */
 		$cache_headers = apply_filters(
 			'markdown_for_agents_cache_headers',
@@ -267,7 +344,8 @@ class Negotiator {
 				'X-Accel-Expires'           => '0',
 				'Vary'                      => 'Accept, User-Agent',
 			),
-			$filepath
+			$filepath,
+			$access_method
 		);
 
 		foreach ( (array) $cache_headers as $name => $value ) {

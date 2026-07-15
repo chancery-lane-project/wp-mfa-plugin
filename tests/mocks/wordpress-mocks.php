@@ -370,6 +370,12 @@ if (!function_exists('esc_url')) {
     }
 }
 
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw(string $url): string {
+        return $url;
+    }
+}
+
 if (!function_exists('wp_is_post_revision')) {
     function wp_is_post_revision(int|\WP_Post $post): int|false {
         return $GLOBALS['_mock_is_post_revision'] ?? false;
