@@ -222,6 +222,13 @@ This filter governs only the cache-related headers listed above. The `Content-Si
 
 One caveat on caching the query-param URL: if a cache in front of the site is configured to *ignore query strings* when building cache keys, `?output_format=md` collapses onto the page URL's key and a public Markdown response could be served to browsers. The default therefore stays private; opt in only when you know your cache keys include the query string.
 
+Practical notes for enabling this:
+
+* **Where to put it:** a small mu-plugin (`wp-content/mu-plugins/`) is the best home for the snippet — it survives theme switches and plugin updates and needs no activation.
+* **Check your cache keys on query strings first:** request any post URL with a random query string (e.g. `?cb=12345`) and check the cache-status header (`server-timing`, `x-cache` or `cf-cache-status`, depending on host). A cache MISS means query strings are part of the cache key and the opt-in is safe. A cache HIT on a random query string means your cache ignores query strings — do not enable this.
+* **`max-age` bounds staleness after edits:** updating a post purges the permalink's cache entry, but the `?output_format=md` variant is a separate cache key and typically is *not* purged — it simply ages out. Keep `max-age` modest (300–900 seconds) so edits propagate promptly.
+* **Verify after enabling:** request the `?output_format=md` URL twice — the first should be a cache MISS with `Cache-Control: public`, the second a fast HIT still returning `Content-Type: text/markdown`. Then request the bare permalink as a browser would and confirm it still returns HTML.
+
 = Why do HTML pages send `Vary: Accept` and a `Link` header? =
 
 Since 1.6.1, pages that have a Markdown alternate send two extra headers with the HTML response: `Link: <…?output_format=md>; rel="alternate"; type="text/markdown"` (protocol-level discovery, visible to HEAD requests and clients that do not parse HTML) and `Vary: Accept` (tells spec-correct shared caches not to replay a stored HTML variant to a client asking for `text/markdown` on the same URL — without it, a primed page cache answers agents with HTML before WordPress runs).
