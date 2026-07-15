@@ -243,6 +243,9 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_cache_headers` | `(array $headers, string $filepath, string $access_method)` | Override the cache-related headers on the Markdown response; `$access_method` is `query-param`, `accept-header` or `ua` |
 | `markdown_for_agents_html_headers` | `(array $headers, string $url)` | Modify or omit the `Link` and `Vary: Accept` headers added to HTML responses that have a Markdown alternate |
 | `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list |
+| `markdown_for_agents_cache_headers` | `(array $headers, string $filepath, string $access_method)` | Override the cache-related headers on the Markdown response; `$access_method` is `query-param`, `accept-header` or `ua` |
+| `markdown_for_agents_html_headers` | `(array $headers, string $url)` | Modify or omit the `Link` and `Vary: Accept` headers added to HTML responses that have a Markdown alternate |
+| `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list (OKF compatibility mode) |
 | `markdown_for_agents_index_content` | `(string $content, string $relative_path)` | Modify an `index.md` body before it is written |
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
 

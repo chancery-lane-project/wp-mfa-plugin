@@ -206,7 +206,7 @@ By default the Markdown response is sent with `Cache-Control: private, no-store,
 The safe way to relax this is per access method, which the `markdown_for_agents_cache_headers` filter receives as its third argument (since 1.6.1). Requests via `?output_format=md` are on their own URL — and therefore their own cache key — so they can be cached publicly with no risk of variant confusion. Requests negotiated via the `Accept` header or detected by User-Agent share the page URL with the HTML and should stay private unless you are certain every cache layer in front of the site keys on `Accept`. Map any header to an empty string to omit it entirely:
 
 ```
-add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath = '', string $access_method = '' ) {
+add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath, string $access_method ) {
 	// Safe: ?output_format=md is a distinct URL with its own cache key.
 	if ( 'query-param' === $access_method ) {
 		$headers['Cache-Control']             = 'public, max-age=300';
@@ -225,13 +225,6 @@ The default values on `$filepath` and `$access_method` are deliberate: plugin ve
 This filter governs only the cache-related headers listed above. The `Content-Signal` and `X-Markdown-Source` headers are sent separately and are unaffected (`Content-Signal` has its own `markdown_for_agents_content_signal` filter).
 
 One caveat on caching the query-param URL: if a cache in front of the site is configured to *ignore query strings* when building cache keys, `?output_format=md` collapses onto the page URL's key and a public Markdown response could be served to browsers. The default therefore stays private; opt in only when you know your cache keys include the query string.
-
-Practical notes for enabling this:
-
-* **Where to put it:** a small mu-plugin (`wp-content/mu-plugins/`) is the best home for the snippet — it survives theme switches and plugin updates and needs no activation.
-* **Check your cache keys on query strings first:** request any post URL with a random query string (e.g. `?cb=12345`) and check the cache-status header (`server-timing`, `x-cache` or `cf-cache-status`, depending on host). A cache MISS means query strings are part of the cache key and the opt-in is safe. A cache HIT on a random query string means your cache ignores query strings — do not enable this.
-* **`max-age` bounds staleness after edits:** updating a post purges the permalink's cache entry, but the `?output_format=md` variant is a separate cache key and typically is *not* purged — it simply ages out. Keep `max-age` modest (300–900 seconds) so edits propagate promptly.
-* **Verify after enabling:** request the `?output_format=md` URL twice — the first should be a cache MISS with `Cache-Control: public`, the second a fast HIT still returning `Content-Type: text/markdown`. Then request the bare permalink as a browser would and confirm it still returns HTML.
 
 = Why do HTML pages send `Vary: Accept` and a `Link` header? =
 
