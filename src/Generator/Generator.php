@@ -323,7 +323,7 @@ class Generator {
 	 * Each post type gets its own manifest inside its export subdirectory,
 	 * enabling independent change tracking per content type.
 	 *
-	 * @since  1.7.0
+	 * @since  1.6.0
 	 * @param  string   $export_base Absolute path to the export base directory.
 	 * @param  string[] $post_types  Post type slugs to include.
 	 * @return bool True if all manifests saved successfully.
