@@ -206,7 +206,7 @@ By default the Markdown response is sent with `Cache-Control: private, no-store,
 The safe way to relax this is per access method, which the `markdown_for_agents_cache_headers` filter receives as its third argument (since 1.6.1). Requests via `?output_format=md` are on their own URL — and therefore their own cache key — so they can be cached publicly with no risk of variant confusion. Requests negotiated via the `Accept` header or detected by User-Agent share the page URL with the HTML and should stay private unless you are certain every cache layer in front of the site keys on `Accept`. Map any header to an empty string to omit it entirely:
 
 ```
-add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath, string $access_method ) {
+add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath = '', string $access_method = '' ) {
 	// Safe: ?output_format=md is a distinct URL with its own cache key.
 	if ( 'query-param' === $access_method ) {
 		$headers['Cache-Control']             = 'public, max-age=300';
@@ -219,6 +219,8 @@ add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, stri
 	return $headers;
 }, 10, 3 );
 ```
+
+The default values on `$filepath` and `$access_method` are deliberate: plugin versions before 1.6.1 pass fewer arguments to this filter, and required parameters would fatal every Markdown response with an `ArgumentCountError` if the snippet outlives a plugin downgrade (or is deployed ahead of the upgrade). With the defaults it is a safe no-op on older versions and activates automatically on 1.6.1+.
 
 This filter governs only the cache-related headers listed above. The `Content-Signal` and `X-Markdown-Source` headers are sent separately and are unaffected (`Content-Signal` has its own `markdown_for_agents_content_signal` filter).
 
