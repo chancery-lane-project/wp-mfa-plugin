@@ -14,6 +14,7 @@ use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
@@ -149,7 +150,23 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $bundle_generator, 'mark_stale_and_schedule' );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
-		$this->loader->add_action( 'markdown_for_agents_rebuild_bundle', $bundle_generator, 'on_rebuild_bundle' );
+		add_action(
+			'markdown_for_agents_rebuild_bundle',
+			static function () use ( $generator, $bundle_generator, $options ): void {
+				// This closure deliberately has no error_log for either call below, unlike
+				// the CLI/AJAX manifest call sites: nobody watches a cron tick, matching
+				// on_rebuild_bundle()'s own existing silence on build() failure (see its
+				// comment). Unlike that build() case, there genuinely is no other signal
+				// that surfaces a write_manifests() failure here — it's an accepted gap,
+				// not a documented safety net.
+				$generator->write_manifests(
+					Options::get_export_base( $options ),
+					ExportPolicy::enabled_post_types( $options )
+				);
+
+				$bundle_generator->on_rebuild_bundle();
+			}
+		);
 	}
 
 	/**

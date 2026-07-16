@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Generator;
 
 /**
- * Orchestrates Markdown file generation for WordPress posts.
+ * Orchestrates Markdown file generation for WordPress posts, and manifest
+ * bookkeeping for the export tree.
  *
  * Coordinates FrontmatterBuilder, ContentFilter, Converter, YamlFormatter,
  * and FileWriter. All collaborators are injected via the constructor for
@@ -26,7 +27,7 @@ class Generator {
 	 * @param  FileWriter                     $file_writer          Handles filesystem I/O.
 	 * @param  FieldResolver                  $field_resolver       Resolves custom field values.
 	 * @param  TaxonomyArchiveGenerator|null  $taxonomy_generator   Optional taxonomy archive generator.
-	 * @param  LinkRewriter|null              $link_rewriter        Optional internal link rewriter (OKF compat).
+	 * @param  LinkRewriter|null              $link_rewriter        Optional; when present, internal links are rewritten to .md URLs.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -65,7 +66,7 @@ class Generator {
 			}
 		}
 
-		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+		if ( null !== $this->link_rewriter ) {
 			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
@@ -115,7 +116,7 @@ class Generator {
 			}
 		}
 
-		if ( ! empty( $this->options['okf_compat'] ) && null !== $this->link_rewriter ) {
+		if ( null !== $this->link_rewriter ) {
 			$markdown = $this->link_rewriter->rewrite( $markdown );
 		}
 
@@ -314,6 +315,67 @@ class Generator {
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Build and save a manifest.json per post-type folder.
+	 *
+	 * Each post type gets its own manifest inside its export subdirectory,
+	 * enabling independent change tracking per content type.
+	 *
+	 * @since  1.6.0
+	 * @param  string   $export_base Absolute path to the export base directory.
+	 * @param  string[] $post_types  Post type slugs to include.
+	 * @return bool True if all manifests saved successfully.
+	 */
+	public function write_manifests( string $export_base, array $post_types ): bool {
+		$success    = true;
+		$batch_size = 100;
+
+		foreach ( $post_types as $post_type ) {
+			$type_dir = trailingslashit( $export_base ) . $post_type . '/';
+			$manifest = new ManifestGenerator( $type_dir, $this->file_writer );
+			$type_ids = array();
+			$offset   = 0;
+
+			do {
+				$posts = get_posts(
+					array(
+						'post_type'      => $post_type,
+						'post_status'    => 'publish',
+						'posts_per_page' => $batch_size, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
+						'offset'         => $offset,
+						'orderby'        => 'ID',
+						'order'          => 'ASC',
+						'no_found_rows'  => true,
+					)
+				);
+
+				$fetched = count( $posts );
+
+				foreach ( $posts as $post ) {
+					$full_path     = $this->get_export_path( $post );
+					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$type_ids[]    = $post->ID;
+
+					if ( file_exists( $full_path ) ) {
+						$manifest->add_document( $post, $relative_path );
+					}
+
+					clean_post_cache( $post );
+				}
+
+				$offset += $batch_size;
+			} while ( $fetched === $batch_size );
+
+			$manifest->mark_deleted_documents( $type_ids );
+
+			if ( ! $manifest->save() ) {
+				$success = false;
+			}
+		}
+
+		return $success;
 	}
 
 	/**

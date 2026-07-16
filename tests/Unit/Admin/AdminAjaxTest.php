@@ -256,6 +256,71 @@ class AdminAjaxTest extends TestCase {
         $admin->handle_generate_batch_ajax();
     }
 
+    public function test_final_post_batch_writes_manifests_before_building_bundle(): void {
+        $calls = array();
+
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+        $generator->expects( $this->once() )
+            ->method( 'write_manifests' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'write_manifests';
+                    return true;
+                }
+            );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
+        $bundle_generator->method( 'build' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'build';
+                    return true;
+                }
+            );
+
+        $admin = new Admin( $options, $generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $admin->handle_generate_batch_ajax();
+
+        $this->assertSame( array( 'write_manifests', 'build' ), $calls );
+    }
+
+    public function test_final_post_batch_still_builds_bundle_when_manifest_write_fails(): void {
+        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'generate_batch' )
+            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+        $generator->method( 'write_manifests' )->willReturn( false );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'is_stale' )->willReturn( true );
+        $bundle_generator->expects( $this->once() )->method( 'build' )->willReturn( true );
+
+        $admin = new Admin( $options, $generator, $this->taxonomy_generator, $bundle_generator );
+
+        $_POST = [
+            'nonce'     => 'test',
+            'post_type' => 'post',
+            'offset'    => '0',
+            'limit'     => '10',
+        ];
+
+        $admin->handle_generate_batch_ajax();
+    }
+
     public function test_final_post_batch_does_not_build_bundle_when_fresh(): void {
         $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
 
@@ -450,9 +515,6 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 'markdownForAgentsBulkGenerate', $localised['object'] );
         $this->assertArrayHasKey( 'nonce', $localised['data'] );
         $this->assertArrayHasKey( 'ajaxurl', $localised['data'] );
-
-        $this->assertArrayHasKey( 'mfa-discovery-toggles', $GLOBALS['_mock_enqueued_scripts'] );
-        $this->assertStringContainsString( 'discovery-toggles.js', $GLOBALS['_mock_enqueued_scripts']['mfa-discovery-toggles'] );
     }
 
     public function test_enqueue_scripts_skips_other_pages(): void {

@@ -328,6 +328,16 @@ if (!function_exists('wp_unslash')) {
     }
 }
 
+if (!function_exists('current_time')) {
+    // ManifestGenerator's constructor calls this unconditionally via initialize_manifest().
+    function current_time(string $type, int|bool $gmt = 0): string|int {
+        if ('timestamp' === $type || true === $gmt) {
+            return time();
+        }
+        return gmdate('Y-m-d H:i:s');
+    }
+}
+
 if (!function_exists('trailingslashit')) {
     function trailingslashit(string $string): string {
         return rtrim($string, '/\\') . '/';
@@ -1156,5 +1166,42 @@ if (!class_exists('WP_Screen')) {
 if (!function_exists('get_current_screen')) {
 	function get_current_screen(): ?\WP_Screen {
 		return $GLOBALS['_mock_current_screen'] ?? null;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// WP_CLI stub
+//
+// Minimal no-op stand-in so CLI\Commands methods can be exercised directly
+// in unit tests without a real WP-CLI runtime. Real WP_CLI::error() halts
+// execution; this stub deliberately does not, so tests can assert on
+// behaviour that runs after an error() call in the same method.
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_wp_cli_warnings'] = [];
+
+function reset_mock_wp_cli_warnings(): void {
+	$GLOBALS['_mock_wp_cli_warnings'] = [];
+}
+
+function get_mock_wp_cli_warnings(): array {
+	return $GLOBALS['_mock_wp_cli_warnings'];
+}
+
+if (!class_exists('WP_CLI')) {
+	class WP_CLI {
+		public static function log(string $message): void {}
+
+		public static function success(string $message): void {}
+
+		public static function warning(string $message): void {
+			$GLOBALS['_mock_wp_cli_warnings'][] = $message;
+		}
+
+		public static function error(string $message): void {}
+
+		public static function confirm(string $question, array $assoc_args = []): void {}
+
+		public static function add_command(string $name, object $callable): void {}
 	}
 }

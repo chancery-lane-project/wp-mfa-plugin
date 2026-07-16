@@ -91,33 +91,31 @@ class FrontmatterBuilder {
 			}
 		}
 
-		if ( ! empty( $this->options['okf_compat'] ) ) {
-			if ( '' !== $frontmatter['modified'] ) {
-				$frontmatter['timestamp'] = $frontmatter['modified'];
-			}
+		if ( '' !== $frontmatter['modified'] ) {
+			$frontmatter['timestamp'] = $frontmatter['modified'];
+		}
 
-			if ( null === $collected ) {
-				$collected = $this->taxonomy_collector->collect( $post->ID, $post->post_type );
-			}
+		if ( null === $collected ) {
+			$collected = $this->taxonomy_collector->collect( $post->ID, $post->post_type );
+		}
 
-			$flat = array();
-			foreach ( $collected as $names ) {
-				foreach ( (array) $names as $name ) {
-					if ( ! in_array( $name, $flat, true ) ) {
-						$flat[] = $name;
-					}
+		$flat = array();
+		foreach ( $collected as $names ) {
+			foreach ( (array) $names as $name ) {
+				if ( ! in_array( $name, $flat, true ) ) {
+					$flat[] = $name;
 				}
 			}
-
-			/**
-			 * Modify the flat OKF tags list before it is written to frontmatter.
-			 *
-			 * @since  1.6.0
-			 * @param  string[]  $flat The deduplicated cross-taxonomy tag list.
-			 * @param  \WP_Post  $post The post.
-			 */
-			$frontmatter['tags'] = (array) apply_filters( 'markdown_for_agents_flat_tags', $flat, $post );
 		}
+
+		/**
+		 * Modify the flat OKF tags list before it is written to frontmatter.
+		 *
+		 * @since  1.6.0
+		 * @param  string[]  $flat The deduplicated cross-taxonomy tag list.
+		 * @param  \WP_Post  $post The post.
+		 */
+		$frontmatter['tags'] = (array) apply_filters( 'markdown_for_agents_flat_tags', $flat, $post );
 
 		/**
 		 * Modify the frontmatter array before serialisation.

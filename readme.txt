@@ -46,9 +46,9 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * **Topics section** — appends a `## Topics` section with linked taxonomy terms to the Markdown body
 * **Export preview** — preview generated Markdown inline in the post editor without writing to disk
 * **OKF directory indexes** — `index.md` listings at the export root and in every post-type and taxonomy directory (Open Knowledge Format), kept current automatically
-* **OKF compatibility mode** — optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
-* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
-* **ARD catalog generation** — optional `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories
+* **OKF-compliant frontmatter and links** — `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
+* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, `manifest.json`, and an ARD discovery catalog panel, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
+* **ARD catalog generation** — `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories, shown automatically whenever the bundle toggle is on
 * WP-CLI commands: `generate`, `generate-taxonomies`, `generate-indexes`, `prune-stats`, `status`, `delete`, `bundle`
 * Fully unit-tested
 
@@ -155,11 +155,13 @@ not just individual posts.
 
 = What is the manifest.json file? =
 
-When you generate with `--with-manifest` or `--incremental`, a `manifest.json` is
-created inside each post-type export folder (e.g. `wp-mfa-exports/post/manifest.json`).
-It contains a registry of all exported documents with content hashes and change
-tracking (new/modified/unchanged/deleted), enabling RAG systems to identify what
-changed since the last export without reprocessing all documents.
+A `manifest.json` is created inside each post-type export folder (e.g.
+`wp-mfa-exports/post/manifest.json`) whenever the downloadable bundle toggle is
+on (it's refreshed automatically before every bundle rebuild), or on demand via
+`--with-manifest` or `--incremental`. It contains a registry of all exported
+documents with content hashes and change tracking (new/modified/unchanged/deleted),
+enabling RAG systems to identify what changed since the last export without
+reprocessing all documents.
 
 = How does incremental export work? =
 
@@ -257,10 +259,9 @@ wp markdown-agents generate-taxonomies --dry-run
 
 = 1.6.0 =
 * Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.
-* Add optional OKF compatibility mode (Settings → Markdown for Agents): adds `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewrites internal links in Markdown bodies and taxonomy archives to point at the `.md` file versions. Off by default — existing output is unchanged unless enabled.
+* Add OKF-compliant frontmatter: `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links in Markdown bodies and taxonomy archives rewritten to point at the `.md` file versions. Always on.
 * New filters `markdown_for_agents_flat_tags` and `markdown_for_agents_index_content`; new actions `markdown_for_agents_taxonomy_file_generated` and `markdown_for_agents_taxonomy_file_deleted`.
-* Add optional downloadable OKF bundle (Settings → Markdown for Agents → "Build downloadable bundle"): packages the export tree into a `.zip` archive with internal links rewritten to relative form, so an extracted bundle is traversable offline. Rebuilt synchronously after bulk generation and on a debounced WP-Cron schedule after individual saves; also available via `wp markdown-agents bundle`. Off by default.
-* Add optional ARD catalog display (Settings → Markdown for Agents → "ARD catalog"): generates an `ai-catalog.json` document for manual deployment to `/.well-known/ai-catalog.json`. The plugin never serves this path itself. Requires the bundle toggle. New filter `markdown_for_agents_ai_catalog`.
+* Add optional downloadable OKF bundle (Settings → Markdown for Agents → "Build downloadable bundle (.zip + manifest)"): packages the export tree into a `.zip` archive with internal links rewritten to relative form and a freshly regenerated `manifest.json`, so an extracted bundle is traversable offline and change-trackable. Also displays an ARD discovery catalog (`ai-catalog.json`) for manual deployment to `/.well-known/ai-catalog.json` — the plugin never serves this path itself. Rebuilt synchronously after bulk generation and on a debounced WP-Cron schedule after individual saves; also available via `wp markdown-agents bundle`. Off by default. New filter `markdown_for_agents_ai_catalog`.
 
 = 1.5.1 =
 * Add `markdown_for_agents_cache_headers` filter so the cache-related headers on Markdown responses can be customised (e.g. to allow CDN caching where `Vary` is honoured). Defaults are unchanged and remain cache-bypassing.

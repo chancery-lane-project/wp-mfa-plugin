@@ -11,15 +11,17 @@ use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 
 /**
- * Covers Commands::bundle_status_line() only — it is pure (no \WP_CLI calls),
- * so it can be driven directly via reflection.
+ * Covers Commands::bundle_status_line() (pure, no \WP_CLI calls, driven
+ * directly via reflection) plus targeted coverage of bundle() and
+ * rebuild_bundle() using the WP_CLI stub in tests/mocks/wordpress-mocks.php.
  *
- * The rest of Commands (generate, bundle, delete, status, rebuild_bundle,
- * etc.) calls \WP_CLI::* statically and this repo has no WP_CLI stub
- * (established posture — see tests/mocks/), so those methods remain
- * untested at the unit level.
+ * The remainder of Commands (generate, delete, status, etc.) is not covered
+ * here; broader WP_CLI-call coverage can be added incrementally using the
+ * same stub.
  *
  * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::bundle_status_line
+ * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::bundle
+ * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::rebuild_bundle
  */
 class CommandsTest extends TestCase {
 
@@ -27,6 +29,7 @@ class CommandsTest extends TestCase {
 
     protected function setUp(): void {
         reset_mock_scheduled_events();
+        reset_mock_wp_cli_warnings();
         $this->bundle_path = sys_get_temp_dir() . '/wp-mfa-commands-test-' . uniqid() . '.zip';
     }
 
@@ -35,6 +38,7 @@ class CommandsTest extends TestCase {
             unlink( $this->bundle_path );
         }
         reset_mock_scheduled_events();
+        reset_mock_wp_cli_warnings();
     }
 
     private function make_commands( BundleGenerator $bundle_generator ): Commands {
@@ -100,5 +104,145 @@ class CommandsTest extends TestCase {
         $line = $this->invoke_bundle_status_line( $this->make_commands( $bundle_generator ) );
 
         $this->assertSame( "Bundle: stale — no rebuild scheduled ({$this->bundle_path})", $line );
+    }
+
+    public function test_bundle_command_writes_manifests_before_building(): void {
+        $calls = array();
+
+        $generator = $this->createMock( Generator::class );
+        $generator->expects( $this->once() )
+            ->method( 'write_manifests' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'write_manifests';
+                    return true;
+                }
+            );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'build';
+                    return true;
+                }
+            );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $commands->bundle( array(), array() );
+
+        $this->assertSame( array( 'write_manifests', 'build' ), $calls );
+    }
+
+    public function test_bundle_command_warns_when_manifest_write_fails(): void {
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'write_manifests' )->willReturn( false );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )->willReturn( true );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $commands->bundle( array(), array() );
+
+        $warnings = get_mock_wp_cli_warnings();
+        $this->assertNotEmpty( $warnings );
+        $this->assertStringContainsString( 'manifest', strtolower( $warnings[0] ) );
+    }
+
+    public function test_rebuild_bundle_writes_manifests_before_building(): void {
+        $calls = array();
+
+        $generator = $this->createMock( Generator::class );
+        $generator->expects( $this->once() )
+            ->method( 'write_manifests' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'write_manifests';
+                    return true;
+                }
+            );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )
+            ->willReturnCallback(
+                function () use ( &$calls ) {
+                    $calls[] = 'build';
+                    return true;
+                }
+            );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $method = new \ReflectionMethod( Commands::class, 'rebuild_bundle' );
+        $method->invoke( $commands );
+
+        $this->assertSame( array( 'write_manifests', 'build' ), $calls );
+    }
+
+    public function test_rebuild_bundle_warns_when_manifest_write_fails(): void {
+        $generator = $this->createMock( Generator::class );
+        $generator->method( 'write_manifests' )->willReturn( false );
+
+        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $bundle_generator->method( 'build' )->willReturn( true );
+        $bundle_generator->method( 'bundle_path' )->willReturn( $this->bundle_path );
+
+        $options                    = Options::get_defaults();
+        $options['bundle_enabled']  = true;
+
+        $commands = new Commands(
+            $options,
+            $generator,
+            null,
+            null,
+            null,
+            null,
+            $bundle_generator
+        );
+
+        $method = new \ReflectionMethod( Commands::class, 'rebuild_bundle' );
+        $method->invoke( $commands );
+
+        $warnings = get_mock_wp_cli_warnings();
+        $this->assertNotEmpty( $warnings );
+        $this->assertStringContainsString( 'manifest', strtolower( $warnings[0] ) );
     }
 }
