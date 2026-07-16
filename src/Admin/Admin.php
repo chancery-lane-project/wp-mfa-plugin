@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Admin;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -24,7 +25,7 @@ class Admin {
 	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed>  $options          Current plugin options.
-	 * @param  Generator             $generator        Generator instance.
+	 * @param  Generator             $generator        Generator instance; also used to write manifests before a bundle rebuild.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
 	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
@@ -283,6 +284,12 @@ class Admin {
 			return;
 		}
 
+		$export_base = Options::get_export_base( $this->options );
+		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+			error_log( 'WP Markdown for Agents: manifest write failed during bundle rebuild; bundle may be stale.' );
+		}
+
 		if ( ! $this->bundle_generator->build() && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
@@ -350,16 +357,6 @@ class Admin {
 					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				)
-			);
-
-			// Live cumulative gating for the agent-discovery toggles, so
-			// enabling a level unlocks the next in the same form submit.
-			wp_enqueue_script(
-				'mfa-discovery-toggles',
-				MARKDOWN_FOR_AGENTS_PLUGIN_URL . 'assets/js/discovery-toggles.js',
-				array(),
-				MARKDOWN_FOR_AGENTS_VERSION,
-				true
 			);
 		}
 

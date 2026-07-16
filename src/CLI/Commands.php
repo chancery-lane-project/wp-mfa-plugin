@@ -150,6 +150,8 @@ class Commands {
 			return;
 		}
 
+		$this->write_manifests_for_bundle();
+
 		if ( ! $this->bundle_generator->build() ) {
 			\WP_CLI::error( 'Bundle build failed.' );
 			return;
@@ -558,8 +560,9 @@ class Commands {
 	/**
 	 * Build and save a manifest.json per post-type folder.
 	 *
-	 * Each post type gets its own manifest inside its export subdirectory,
-	 * enabling independent change tracking per content type.
+	 * Delegates to Generator::write_manifests(); kept as a thin wrapper so
+	 * call sites within this class don't need to know about the Generator
+	 * dependency directly.
 	 *
 	 * @since  1.1.0
 	 * @param  string   $export_base Absolute path to the export base directory.
@@ -567,53 +570,22 @@ class Commands {
 	 * @return bool True if all manifests saved successfully.
 	 */
 	private function generate_manifest( string $export_base, array $post_types ): bool {
-		$success    = true;
-		$batch_size = 100;
+		return $this->generator->write_manifests( $export_base, $post_types );
+	}
 
-		foreach ( $post_types as $post_type ) {
-			$type_dir = trailingslashit( $export_base ) . $post_type . '/';
-			$manifest = new ManifestGenerator( $type_dir, $this->file_writer );
-			$type_ids = array();
-			$offset   = 0;
-
-			do {
-				$posts = get_posts(
-					array(
-						'post_type'      => $post_type,
-						'post_status'    => 'publish',
-						'posts_per_page' => $batch_size, // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
-						'offset'         => $offset,
-						'orderby'        => 'ID',
-						'order'          => 'ASC',
-						'no_found_rows'  => true,
-					)
-				);
-
-				$fetched = count( $posts );
-
-				foreach ( $posts as $post ) {
-					$full_path     = $this->generator->get_export_path( $post );
-					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
-					$type_ids[]    = $post->ID;
-
-					if ( file_exists( $full_path ) ) {
-						$manifest->add_document( $post, $relative_path );
-					}
-
-					clean_post_cache( $post );
-				}
-
-				$offset += $batch_size;
-			} while ( $fetched === $batch_size );
-
-			$manifest->mark_deleted_documents( $type_ids );
-
-			if ( ! $manifest->save() ) {
-				$success = false;
-			}
+	/**
+	 * Refresh manifest.json files immediately before a bundle build, so the
+	 * bundle reflects the current content hashes rather than a stale set.
+	 * Surfaces a warning (rather than aborting) when a write fails, since a
+	 * stale-but-present manifest is still preferable to no bundle at all.
+	 *
+	 * @since 1.6.0
+	 */
+	private function write_manifests_for_bundle(): void {
+		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
+		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) ) {
+			\WP_CLI::warning( 'One or more manifest.json files failed to write; bundle may be stale.' );
 		}
-
-		return $success;
 	}
 
 	/**
@@ -663,6 +635,8 @@ class Commands {
 		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
 			return;
 		}
+
+		$this->write_manifests_for_bundle();
 
 		if ( $this->bundle_generator->build() ) {
 			\WP_CLI::log( sprintf( 'Bundle rebuilt: %s', $this->bundle_generator->bundle_path() ) );

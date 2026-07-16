@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.6.0
+Stable tag: 1.7.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -46,9 +46,9 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * **Topics section** — appends a `## Topics` section with linked taxonomy terms to the Markdown body
 * **Export preview** — preview generated Markdown inline in the post editor without writing to disk
 * **OKF directory indexes** — `index.md` listings at the export root and in every post-type and taxonomy directory (Open Knowledge Format), kept current automatically
-* **OKF compatibility mode** — optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
-* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
-* **ARD catalog generation** — optional `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories
+* **OKF-compliant frontmatter and links** — `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
+* **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, `manifest.json`, and an ARD discovery catalog panel, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
+* **ARD catalog generation** — `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories, shown automatically whenever the bundle toggle is on
 * WP-CLI commands: `generate`, `generate-taxonomies`, `generate-indexes`, `prune-stats`, `status`, `delete`, `bundle`
 * Fully unit-tested
 
@@ -155,11 +155,13 @@ not just individual posts.
 
 = What is the manifest.json file? =
 
-When you generate with `--with-manifest` or `--incremental`, a `manifest.json` is
-created inside each post-type export folder (e.g. `wp-mfa-exports/post/manifest.json`).
-It contains a registry of all exported documents with content hashes and change
-tracking (new/modified/unchanged/deleted), enabling RAG systems to identify what
-changed since the last export without reprocessing all documents.
+A `manifest.json` is created inside each post-type export folder (e.g.
+`wp-mfa-exports/post/manifest.json`) whenever the downloadable bundle toggle is
+on (it's refreshed automatically before every bundle rebuild), or on demand via
+`--with-manifest` or `--incremental`. It contains a registry of all exported
+documents with content hashes and change tracking (new/modified/unchanged/deleted),
+enabling RAG systems to identify what changed since the last export without
+reprocessing all documents.
 
 = How does incremental export work? =
 
@@ -230,6 +232,11 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.7.0 =
+* OKF-compliant frontmatter (`timestamp`, flat `tags`) and internal link rewriting are now always on; the `okf_compat` setting has been removed. Existing sites should regenerate to see the updated output.
+* The `ard_enabled` setting has also been removed: the ARD discovery catalog panel now displays automatically whenever the bundle toggle (`bundle_enabled`) is on, with no separate toggle.
+* The bundle toggle now also generates `manifest.json` automatically as part of every bundle rebuild (previously manifest generation was CLI-only, behind `--with-manifest`/`--incremental` flags, which remain available independently).
 
 = 1.6.0 =
 * Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.

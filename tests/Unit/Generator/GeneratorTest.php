@@ -698,10 +698,10 @@ class GeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // Link rewriting (okf_compat option)
+    // Link rewriting
     // -----------------------------------------------------------------------
 
-    public function test_okf_compat_off_does_not_rewrite_links(): void {
+    public function test_rewrites_internal_links_to_md_urls(): void {
         $post = $this->make_post( ['ID' => 42] );
 
         $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
@@ -721,33 +721,7 @@ class GeneratorTest extends TestCase {
                 return true;
             } );
 
-        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => false], $link_rewriter );
-        $gen->generate_post( $post );
-
-        $this->assertStringContainsString( '[other post](https://example.com/other-post/)', $written );
-    }
-
-    public function test_okf_compat_on_rewrites_internal_links_to_md_urls(): void {
-        $post = $this->make_post( ['ID' => 42] );
-
-        $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
-        $link_rewriter = new LinkRewriter(
-            fn( string $url ): ?string => $map[ $url ] ?? null,
-            'https://example.com/wp-content/uploads/wp-mfa-exports'
-        );
-
-        $written = '';
-        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
-        $this->content_filter->method( 'filter' )->willReturn( '' );
-        $this->converter->method( 'convert' )->willReturn( 'See [other post](https://example.com/other-post/).' );
-        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
-        $this->file_writer->method( 'write' )
-            ->willReturnCallback( function ( string $path, string $content ) use ( &$written ): bool {
-                $written = $content;
-                return true;
-            } );
-
-        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => true], $link_rewriter );
+        $gen = $this->make_generator_with_link_rewriter( [], $link_rewriter );
         $gen->generate_post( $post );
 
         $this->assertStringContainsString(
@@ -756,7 +730,7 @@ class GeneratorTest extends TestCase {
         );
     }
 
-    public function test_no_rewriter_injected_is_a_noop_even_with_toggle_on(): void {
+    public function test_no_rewriter_injected_is_a_noop(): void {
         $post = $this->make_post( ['ID' => 42] );
 
         $written = '';
@@ -770,10 +744,27 @@ class GeneratorTest extends TestCase {
                 return true;
             } );
 
-        $gen = $this->make_generator_with_link_rewriter( ['okf_compat' => true], null );
+        $gen = $this->make_generator_with_link_rewriter( [], null );
         $gen->generate_post( $post );
 
         $this->assertStringContainsString( '[other post](https://example.com/other-post/)', $written );
+    }
+
+    // -----------------------------------------------------------------------
+    // write_manifests()
+    // -----------------------------------------------------------------------
+
+    public function test_write_manifests_saves_a_manifest_per_post_type(): void {
+        $GLOBALS['_mock_posts'] = [ $this->make_post( [ 'post_type' => 'post' ] ) ];
+
+        $this->file_writer->expects( $this->once() )
+            ->method( 'write' )
+            ->with( $this->stringContains( 'post/manifest.json' ) )
+            ->willReturn( true );
+
+        $result = $this->generator->write_manifests( $this->base_dir, [ 'post' ] );
+
+        $this->assertTrue( $result );
     }
 
     // -----------------------------------------------------------------------

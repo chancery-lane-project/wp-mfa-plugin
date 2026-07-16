@@ -97,9 +97,7 @@ class SettingsPage {
 			self::PAGE_SLUG
 		);
 
-		add_settings_field( 'markdown_for_agents_okf_compat', __( 'OKF compatibility mode', 'markdown-for-agents-and-statistics' ), array( $this, 'field_okf_compat' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
-		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
-		add_settings_field( 'markdown_for_agents_ard_enabled', __( 'ARD catalog for /.well-known/', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ard_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
 
 		// Per-post-type field configuration sections.
 		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
@@ -169,9 +167,7 @@ class SettingsPage {
 		$clean['include_author']          = ! empty( $input['include_author'] );
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
-		$clean['okf_compat']              = ! empty( $input['okf_compat'] );
-		$clean['bundle_enabled']          = $clean['okf_compat'] && ! empty( $input['bundle_enabled'] );
-		$clean['ard_enabled']             = $clean['bundle_enabled'] && ! empty( $input['ard_enabled'] );
+		$clean['bundle_enabled']          = ! empty( $input['bundle_enabled'] );
 		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
@@ -242,7 +238,6 @@ class SettingsPage {
 		$changed =
 			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
 			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
-			|| ! empty( $old['okf_compat'] ) !== ! empty( $new['okf_compat'] )
 			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $new['bundle_enabled'] )
 			|| $old_pt !== $new_pt
 			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
@@ -422,78 +417,34 @@ class SettingsPage {
 	/**
 	 * Render the introductory text for the "Agent discovery" section.
 	 *
-	 * Explains the three-level progression: OKF compatibility mode builds
-	 * spec-aligned Markdown; the bundle packages it as a downloadable
-	 * archive; the ARD catalog advertises the bundle for discovery.
+	 * Describes the single bundle toggle: exported Markdown is always
+	 * OKF-compliant; enabling the toggle additionally packages the export
+	 * tree into a downloadable archive and publishes an ARD discovery
+	 * catalog for it.
 	 *
 	 * @since  1.6.0
 	 */
 	public function section_discovery_intro(): void {
-		echo '<p>' . esc_html__( 'These three toggles are cumulative: OKF compatibility mode produces spec-aligned Markdown files; the bundle packages them into a single downloadable archive; the ARD catalog advertises that bundle for automated discovery. Each level requires the one before it.', 'markdown-for-agents-and-statistics' ) . '</p>';
-	}
-
-	/**
-	 * Render the OKF compatibility mode checkbox field.
-	 *
-	 * @since  1.6.0
-	 */
-	public function field_okf_compat(): void {
-		$checked = ! empty( $this->options['okf_compat'] );
-		?>
-		<label>
-			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[okf_compat]"
-					value="1" <?php checked( $checked, true ); ?>>
-			<?php esc_html_e( 'Adds OKF frontmatter keys (timestamp, flat tags) and rewrites internal links to point at the Markdown file versions. Regenerate files after changing this.', 'markdown-for-agents-and-statistics' ); ?>
-		</label>
-		<?php
+		echo '<p>' . esc_html__( 'Exported Markdown files are always OKF-compliant (flat tags, timestamp, and internal links pointing at the Markdown file versions). Enable the toggle below for a downloadable bundle of the whole export tree, complete with a manifest and an ARD discovery catalog.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 
 	/**
 	 * Render the bundle-build checkbox field.
 	 *
-	 * Gated on OKF compatibility mode (Decision 3): disabled with an
-	 * explanatory hint when the prerequisite level is off.
+	 * When checked, also renders the ARD catalog JSON panel and deployment
+	 * instructions directly below (previously a separate `ard_enabled`
+	 * checkbox) — the bundle, its manifest, and the catalog are now one unit.
 	 *
 	 * @since  1.6.0
 	 */
 	public function field_bundle_enabled(): void {
-		$checked  = ! empty( $this->options['bundle_enabled'] );
-		$disabled = empty( $this->options['okf_compat'] );
+		$checked = ! empty( $this->options['bundle_enabled'] );
 		?>
 		<label>
 			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[bundle_enabled]"
-					value="1" <?php checked( $checked, true ); ?> <?php disabled( $disabled, true ); ?>>
-			<?php esc_html_e( 'Build downloadable bundle (.zip)', 'markdown-for-agents-and-statistics' ); ?>
+					value="1" <?php checked( $checked, true ); ?>>
+			<?php esc_html_e( 'Build the export tree into a downloadable .zip bundle with a manifest.json and relative internal links, and publish an ARD discovery catalog for it below.', 'markdown-for-agents-and-statistics' ); ?>
 		</label>
-		<?php if ( $disabled ) : ?>
-			<p class="description"><?php esc_html_e( 'Enable OKF compatibility mode first.', 'markdown-for-agents-and-statistics' ); ?></p>
-		<?php endif; ?>
-		<?php
-	}
-
-	/**
-	 * Render the ARD catalog checkbox field.
-	 *
-	 * Gated on the bundle level (Decision 3). When enabled, additionally
-	 * renders the generated `ai-catalog.json` document and deployment
-	 * instructions for the site owner to copy it into a manually managed
-	 * `/.well-known/ai-catalog.json` (Decisions 1 and 2 — the plugin never
-	 * writes or serves this file itself).
-	 *
-	 * @since  1.6.0
-	 */
-	public function field_ard_enabled(): void {
-		$checked  = ! empty( $this->options['ard_enabled'] );
-		$disabled = empty( $this->options['bundle_enabled'] );
-		?>
-		<label>
-			<input type="checkbox" name="<?php echo esc_attr( Options::OPTION_KEY ); ?>[ard_enabled]"
-					value="1" <?php checked( $checked, true ); ?> <?php disabled( $disabled, true ); ?>>
-			<?php esc_html_e( 'ARD catalog for /.well-known/', 'markdown-for-agents-and-statistics' ); ?>
-		</label>
-		<?php if ( $disabled ) : ?>
-			<p class="description"><?php esc_html_e( 'Enable the bundle first.', 'markdown-for-agents-and-statistics' ); ?></p>
-		<?php endif; ?>
 		<?php
 		if ( $checked ) {
 			$this->render_ard_panel();

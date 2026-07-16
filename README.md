@@ -26,9 +26,9 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Bulk generation** - generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
 - **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
-- **Manifest + incremental export** - content-hash manifest with `--incremental` flag; `changes.json` delta for RAG sync
+- **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
 - **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
-- **OKF compatibility mode** - optional toggle adding `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and rewriting internal links to point at the Markdown file versions
+- **OKF-compliant frontmatter and links** - `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
 - **Access statistics** - logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
 - **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`, `generate-indexes`
 - **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
@@ -75,9 +75,7 @@ Navigate to **Settings → Markdown for Agents**.
 | Auto-generate | Regenerate files automatically on post save |
 | User-Agent detection | Force Markdown serving for specific AI User-Agent strings |
 | Field configuration | Per-post-type frontmatter and content field mappings |
-| OKF compatibility mode | Adds OKF frontmatter keys (`timestamp`, flat `tags`) and rewrites internal links to the `.md` file versions (off by default) |
-| Build downloadable bundle | Maintains a `.zip` of the export tree with relative internal links (off by default; requires OKF compatibility mode) |
-| ARD catalog | Displays a generated `ai-catalog.json` document for manual deployment to `/.well-known/` (off by default; requires the bundle toggle) |
+| Build downloadable bundle | Maintains a `.zip` of the export tree with relative internal links, generates `manifest.json`, and displays an ARD discovery catalog panel (`ai-catalog.json`, for manual deployment to `/.well-known/`) (off by default; no other toggle required) |
 
 ---
 
@@ -147,14 +145,13 @@ Posts in this archive: 23
 
 ## OKF (Open Knowledge Format)
 
-The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog) conventions so agents can discover and traverse the corpus.
+The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowledge-catalog) conventions so agents can discover and traverse the corpus. OKF-compliant frontmatter and link rewriting are always on — there is no toggle.
 
-**Always on:** `index.md` directory listings (see file structure above) are generated at the export root and in every post-type and taxonomy directory, and regenerated automatically when files change. The root index declares `okf_version: "0.1"`.
+**Always on:**
 
-**Behind the "OKF compatibility mode" toggle (off by default):**
-
-- Frontmatter gains `timestamp` (mirrors `modified`) and `tags` — a flat, deduplicated list of term names across **all** taxonomies. With the toggle on, `tags` replaces the previous post_tag-only value; per-taxonomy keys (`categories`, custom slugs) are unchanged. New `markdown_for_agents_flat_tags` filter.
-- Internal links in post bodies and taxonomy archive listings are rewritten to absolute `.md` upload URLs (e.g. `https://site/wp-content/uploads/{export_dir}/post/other-slug.md`), so cross-links work whether the file is fetched from the uploads tree or served via content negotiation. Regenerate files after changing the toggle.
+- `index.md` directory listings (see file structure above) are generated at the export root and in every post-type and taxonomy directory, and regenerated automatically when files change. The root index declares `okf_version: "0.1"`.
+- Frontmatter gains `timestamp` (mirrors `modified`) and `tags` — a flat, deduplicated list of term names across **all** taxonomies. `tags` replaces the previous post_tag-only value; per-taxonomy keys (`categories`, custom slugs) are unchanged. New `markdown_for_agents_flat_tags` filter.
+- Internal links in post bodies and taxonomy archive listings are rewritten to absolute `.md` upload URLs (e.g. `https://site/wp-content/uploads/{export_dir}/post/other-slug.md`), so cross-links work whether the file is fetched from the uploads tree or served via content negotiation.
 
 **Limitations:**
 
@@ -165,9 +162,9 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 
 ### Bundle (.zip)
 
-**Behind the "Build downloadable bundle" toggle (off by default; requires OKF compatibility mode on):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{site-name}-okf.zip`, where `{site-name}` is the site's title (`sanitize_file_name(get_bloginfo('name'))`), falling back to `{export_dir}` if the site name sanitizes to an empty string.
+**Behind the "Build downloadable bundle" toggle (off by default; no other toggle required):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{site-name}-okf.zip`, where `{site-name}` is the site's title (`sanitize_file_name(get_bloginfo('name'))`), falling back to `{export_dir}` if the site name sanitizes to an empty string. Every bundle rebuild also (re)generates `manifest.json` and, on the settings page, displays the ARD discovery catalog panel described below — both are automatic whenever this toggle is on.
 
-- **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json` when present.
+- **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json`.
 - **Links:** internal links inside bundled `.md` files are rewritten from absolute upload URLs to paths relative to each linking file (OKF §5.2, e.g. `](../post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain. Relative form is used rather than root-absolute (`](/post/…)`) because many consumers treat a leading `/` as an external link and drop it.
 - **Location and stability:** the archive is built at a temporary path and atomically renamed into place, so the public URL is always stable and a concurrent download never sees a partial file.
 - **Rebuild policy:** the bundle is rebuilt synchronously at the end of bulk generation (the admin "Generate everything" button or `wp markdown-agents generate` / `generate-taxonomies`). A single post save instead marks the bundle stale and schedules a debounced WP-Cron event five minutes out, collapsing a burst of edits into one rebuild. That delay assumes the default WP-Cron behaviour of firing on the next page load; on sites with `DISABLE_WP_CRON` set, the rebuild instead fires on the next system-cron hit to `wp-cron.php`. You can also force a rebuild with `wp markdown-agents bundle`.
@@ -175,7 +172,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 
 ### ARD discovery (/.well-known/ai-catalog.json)
 
-**Behind the "ARD catalog" toggle (off by default; requires the bundle toggle on):** together the three toggles form a progression — OKF compatibility mode, then the bundle, then ARD discovery.
+**Automatic whenever the "Build downloadable bundle" toggle is on** — there is no separate ARD toggle.
 
 The plugin *generates* an [ARD](https://github.com/agent-readable/agent-readable-directory) catalog document (`ai-catalog.json`) and displays it as read-only JSON on the settings page, but it never serves it itself: no routes or rewrite rules are registered for `/.well-known/`. To publish it, copy the JSON into a `/.well-known/ai-catalog.json` file at your web root yourself (or symlink to a file you manage). The catalog content is deliberately stable across bundle rebuilds — it omits the ARD-optional `updatedAt` and `version` fields — so a one-time copy stays valid; you don't need to re-copy it after every rebuild.
 
@@ -243,7 +240,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
 | `markdown_for_agents_post_convert` | `(string $markdown, WP_Post $post)` | Filter Markdown after conversion |
 | `markdown_for_agents_content_signal` | `(string $signal)` | Modify the `Content-Signal` header value |
-| `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list (OKF compatibility mode) |
+| `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list |
 | `markdown_for_agents_index_content` | `(string $content, string $relative_path)` | Modify an `index.md` body before it is written |
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
 
