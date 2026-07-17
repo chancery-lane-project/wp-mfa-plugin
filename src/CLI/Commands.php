@@ -104,7 +104,7 @@ class Commands {
 			}
 
 			if ( isset( $assoc_args['with-manifest'] ) && $this->file_writer ) {
-				$result = $this->generate_manifest( $export_base, $types );
+				$result = $this->generator->write_manifests( $export_base, $types );
 				$result
 					? \WP_CLI::success( 'manifest.json generated.' )
 					: \WP_CLI::warning( 'manifest.json generation failed.' );
@@ -140,19 +140,23 @@ class Commands {
 			return;
 		}
 
-		if ( empty( $this->options['bundle_enabled'] ) ) {
+		$result = $this->generator->rebuild_bundle( $this->bundle_generator, isset( $assoc_args['if-stale'] ) );
+
+		if ( Generator::BUNDLE_DISABLED === $result['status'] ) {
 			\WP_CLI::error( 'Bundle generation is disabled. Enable "bundle_enabled" in settings first.' );
 			return;
 		}
 
-		if ( isset( $assoc_args['if-stale'] ) && ! $this->bundle_generator->is_stale() ) {
+		if ( Generator::BUNDLE_FRESH === $result['status'] ) {
 			\WP_CLI::log( 'Bundle is up to date; skipping.' );
 			return;
 		}
 
-		$this->write_manifests_for_bundle();
+		if ( ! $result['manifests_ok'] ) {
+			\WP_CLI::warning( 'One or more manifest.json files failed to write; bundle may be stale.' );
+		}
 
-		if ( ! $this->bundle_generator->build() ) {
+		if ( Generator::BUNDLE_FAILED === $result['status'] ) {
 			\WP_CLI::error( 'Bundle build failed.' );
 			return;
 		}
@@ -558,37 +562,6 @@ class Commands {
 	}
 
 	/**
-	 * Build and save a manifest.json per post-type folder.
-	 *
-	 * Delegates to Generator::write_manifests(); kept as a thin wrapper so
-	 * call sites within this class don't need to know about the Generator
-	 * dependency directly.
-	 *
-	 * @since  1.1.0
-	 * @param  string   $export_base Absolute path to the export base directory.
-	 * @param  string[] $post_types  Post type slugs to include.
-	 * @return bool True if all manifests saved successfully.
-	 */
-	private function generate_manifest( string $export_base, array $post_types ): bool {
-		return $this->generator->write_manifests( $export_base, $post_types );
-	}
-
-	/**
-	 * Refresh manifest.json files immediately before a bundle build, so the
-	 * bundle reflects the current content hashes rather than a stale set.
-	 * Surfaces a warning (rather than aborting) when a write fails, since a
-	 * stale-but-present manifest is still preferable to no bundle at all.
-	 *
-	 * @since 1.6.0
-	 */
-	private function write_manifests_for_bundle(): void {
-		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
-		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) ) {
-			\WP_CLI::warning( 'One or more manifest.json files failed to write; bundle may be stale.' );
-		}
-	}
-
-	/**
 	 * Count the .md files directly inside a directory, excluding index.md
 	 * (an OKF directory listing, not a generated post).
 	 *
@@ -632,13 +605,21 @@ class Commands {
 	 * @since  1.6.0
 	 */
 	private function rebuild_bundle(): void {
-		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
+		if ( null === $this->bundle_generator ) {
 			return;
 		}
 
-		$this->write_manifests_for_bundle();
+		$result = $this->generator->rebuild_bundle( $this->bundle_generator );
 
-		if ( $this->bundle_generator->build() ) {
+		if ( Generator::BUNDLE_DISABLED === $result['status'] ) {
+			return;
+		}
+
+		if ( ! $result['manifests_ok'] ) {
+			\WP_CLI::warning( 'One or more manifest.json files failed to write; bundle may be stale.' );
+		}
+
+		if ( Generator::BUNDLE_BUILT === $result['status'] ) {
 			\WP_CLI::log( sprintf( 'Bundle rebuilt: %s', $this->bundle_generator->bundle_path() ) );
 		} else {
 			\WP_CLI::warning( 'Bundle rebuild failed.' );

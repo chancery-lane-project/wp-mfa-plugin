@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Generator;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
+use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
 use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
@@ -765,6 +766,102 @@ class GeneratorTest extends TestCase {
         $result = $this->generator->write_manifests( $this->base_dir, [ 'post' ] );
 
         $this->assertTrue( $result );
+    }
+
+    // -----------------------------------------------------------------------
+    // rebuild_bundle()
+    // -----------------------------------------------------------------------
+
+    public function test_rebuild_bundle_returns_disabled_and_never_builds_when_toggle_off(): void {
+        $bundle = $this->createMock( BundleGenerator::class );
+        $bundle->expects( $this->never() )->method( 'build' );
+
+        $gen    = $this->make_generator( [ 'bundle_enabled' => false ] );
+        $result = $gen->rebuild_bundle( $bundle );
+
+        $this->assertSame( Generator::BUNDLE_DISABLED, $result['status'] );
+        $this->assertTrue( $result['manifests_ok'] );
+    }
+
+    public function test_rebuild_bundle_skips_fresh_bundle_when_only_if_stale(): void {
+        $bundle = $this->createMock( BundleGenerator::class );
+        $bundle->method( 'is_stale' )->willReturn( false );
+        $bundle->expects( $this->never() )->method( 'build' );
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $gen    = $this->make_generator( [ 'bundle_enabled' => true ] );
+        $result = $gen->rebuild_bundle( $bundle, true );
+
+        $this->assertSame( Generator::BUNDLE_FRESH, $result['status'] );
+    }
+
+    public function test_rebuild_bundle_writes_manifests_before_building(): void {
+        $GLOBALS['_mock_posts'] = [ $this->make_post( [ 'post_type' => 'post' ] ) ];
+
+        $calls = [];
+
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function () use ( &$calls ) {
+                $calls[] = 'manifest';
+                return true;
+            } );
+
+        $bundle = $this->createMock( BundleGenerator::class );
+        $bundle->method( 'build' )
+            ->willReturnCallback( function () use ( &$calls ) {
+                $calls[] = 'build';
+                return true;
+            } );
+
+        $gen    = $this->make_generator(
+            [
+                'bundle_enabled' => true,
+                'post_types'     => [ 'post' ],
+            ]
+        );
+        $result = $gen->rebuild_bundle( $bundle );
+
+        $this->assertSame( Generator::BUNDLE_BUILT, $result['status'] );
+        $this->assertTrue( $result['manifests_ok'] );
+        $this->assertSame( 'manifest', $calls[0] );
+        $this->assertSame( 'build', end( $calls ), 'build() must run after manifests are written' );
+    }
+
+    public function test_rebuild_bundle_reports_failed_build(): void {
+        $this->file_writer->method( 'write' )->willReturn( true );
+
+        $bundle = $this->createMock( BundleGenerator::class );
+        $bundle->method( 'build' )->willReturn( false );
+
+        $gen    = $this->make_generator(
+            [
+                'bundle_enabled' => true,
+                'post_types'     => [ 'post' ],
+            ]
+        );
+        $result = $gen->rebuild_bundle( $bundle );
+
+        $this->assertSame( Generator::BUNDLE_FAILED, $result['status'] );
+    }
+
+    public function test_rebuild_bundle_still_builds_when_manifest_write_fails(): void {
+        $GLOBALS['_mock_posts'] = [ $this->make_post( [ 'post_type' => 'post' ] ) ];
+
+        $this->file_writer->method( 'write' )->willReturn( false );
+
+        $bundle = $this->createMock( BundleGenerator::class );
+        $bundle->expects( $this->once() )->method( 'build' )->willReturn( true );
+
+        $gen    = $this->make_generator(
+            [
+                'bundle_enabled' => true,
+                'post_types'     => [ 'post' ],
+            ]
+        );
+        $result = $gen->rebuild_bundle( $bundle );
+
+        $this->assertSame( Generator::BUNDLE_BUILT, $result['status'] );
+        $this->assertFalse( $result['manifests_ok'] );
     }
 
     // -----------------------------------------------------------------------

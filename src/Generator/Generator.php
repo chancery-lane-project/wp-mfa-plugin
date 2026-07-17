@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+use Tclp\WpMarkdownForAgents\Core\Options;
+
 /**
  * Orchestrates Markdown file generation for WordPress posts, and manifest
  * bookkeeping for the export tree.
@@ -16,6 +18,11 @@ namespace Tclp\WpMarkdownForAgents\Generator;
  * @package Tclp\WpMarkdownForAgents\Generator
  */
 class Generator {
+
+	public const BUNDLE_DISABLED = 'disabled';
+	public const BUNDLE_FRESH    = 'fresh';
+	public const BUNDLE_BUILT    = 'built';
+	public const BUNDLE_FAILED   = 'failed';
 
 	/**
 	 * @since  1.0.0
@@ -297,6 +304,50 @@ class Generator {
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Rebuild the OKF bundle, refreshing manifests first.
+	 *
+	 * Single coordinator for every rebuild path (CLI, admin AJAX, cron), so
+	 * the "manifests before bundle" ordering is structural rather than a
+	 * convention each caller repeats. Callers translate the returned status
+	 * into their own channel's reporting (WP_CLI, error_log, or silence).
+	 *
+	 * A failed manifest write does not abort the build: a stale-but-present
+	 * manifest inside a fresh bundle is preferable to no bundle at all.
+	 *
+	 * @since  1.6.0
+	 * @param  BundleGenerator $bundle_generator The bundle builder.
+	 * @param  bool            $only_if_stale    Skip when the bundle is already fresh.
+	 * @return array{status: string, manifests_ok: bool} status is one of the
+	 *         BUNDLE_* constants; manifests_ok is false when one or more
+	 *         manifest.json writes failed.
+	 */
+	public function rebuild_bundle( BundleGenerator $bundle_generator, bool $only_if_stale = false ): array {
+		if ( empty( $this->options['bundle_enabled'] ) ) {
+			return array(
+				'status'       => self::BUNDLE_DISABLED,
+				'manifests_ok' => true,
+			);
+		}
+
+		if ( $only_if_stale && ! $bundle_generator->is_stale() ) {
+			return array(
+				'status'       => self::BUNDLE_FRESH,
+				'manifests_ok' => true,
+			);
+		}
+
+		$manifests_ok = $this->write_manifests(
+			Options::get_export_base( $this->options ),
+			ExportPolicy::enabled_post_types( $this->options )
+		);
+
+		return array(
+			'status'       => $bundle_generator->build() ? self::BUNDLE_BUILT : self::BUNDLE_FAILED,
+			'manifests_ok' => $manifests_ok,
+		);
 	}
 
 	/**

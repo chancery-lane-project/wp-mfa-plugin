@@ -364,21 +364,4 @@ class BundleGeneratorTest extends TestCase {
         $this->assertSame( [], $GLOBALS['_mock_scheduled_events'] );
     }
 
-    public function test_on_rebuild_bundle_builds_when_enabled(): void {
-        $this->write_file( 'index.md', "# Content\n" );
-        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
-
-        $generator->on_rebuild_bundle();
-
-        $this->assertFileExists( $generator->bundle_path() );
-    }
-
-    public function test_on_rebuild_bundle_noop_when_disabled(): void {
-        $this->write_file( 'index.md', "# Content\n" );
-        $generator = $this->make_generator( [ 'bundle_enabled' => false ] );
-
-        $generator->on_rebuild_bundle();
-
-        $this->assertFileDoesNotExist( $generator->bundle_path() );
-    }
 }
