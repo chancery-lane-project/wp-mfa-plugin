@@ -265,9 +265,9 @@ class Admin {
 	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
 	 * up. Called from the final batch of both AJAX bulk-generation handlers —
 	 * synchronous is acceptable here because the user is already waiting on
-	 * the final batch's response. Gated on is_stale() so that clicking
+	 * the final batch's response. Passed only_if_stale so that clicking
 	 * "Generate" repeatedly with no content changes in between doesn't
-	 * re-tar/gzip the whole export tree each time; any real change already
+	 * re-zip the whole export tree each time; any real change already
 	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
 	 * bundle here means there is genuinely nothing new to package.
 	 *

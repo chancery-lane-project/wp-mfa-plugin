@@ -224,26 +224,26 @@ class SettingsPage {
 	 *
 	 * @since  1.2.0
 	 * @param  array<string, mixed> $old Existing saved options.
-	 * @param  array<string, mixed> $new Sanitised incoming options.
+	 * @param  array<string, mixed> $incoming Sanitised incoming options.
 	 */
-	private function maybe_flag_regeneration( array $old, array $new ): void {
+	private function maybe_flag_regeneration( array $old, array $incoming ): void {
 		$old_pt = (array) ( $old['post_types'] ?? array() );
-		$new_pt = (array) ( $new['post_types'] ?? array() );
+		$new_pt = (array) ( $incoming['post_types'] ?? array() );
 		sort( $old_pt );
 		sort( $new_pt );
 
 		$changed =
-			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
-			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
-			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $new['bundle_enabled'] )
+			( $old['export_dir'] ?? null ) !== ( $incoming['export_dir'] ?? null )
+			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $incoming['include_taxonomies'] )
+			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $incoming['bundle_enabled'] )
 			|| $old_pt !== $new_pt
-			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
+			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $incoming['post_type_configs'] ?? array() );
 
 		if ( ! $changed ) {
 			return;
 		}
 
-		$pending = array_values( (array) ( $new['post_types'] ?? array() ) );
+		$pending = array_values( (array) ( $incoming['post_types'] ?? array() ) );
 
 		if ( empty( $pending ) ) {
 			delete_transient( 'markdown_for_agents_needs_regen' );

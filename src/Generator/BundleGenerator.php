@@ -17,8 +17,9 @@ use Tclp\WpMarkdownForAgents\Core\Options;
  *
  * Freshness is tracked via a tree-state hash (sorted `relpath|mtime|size`
  * lines) stored in the `markdown_for_agents_bundle_hash` option, avoiding
- * any dependency on `manifest.json` (which is only written when generation
- * runs `--with-manifest`).
+ * any dependency on `manifest.json` (manifests are refreshed by
+ * Generator::rebuild_bundle() immediately before every build, but the hash
+ * must not rely on that ordering).
  *
  * @since  1.6.0
  * @package Tclp\WpMarkdownForAgents\Generator

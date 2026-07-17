@@ -695,7 +695,8 @@ class Commands {
 			return;
 		}
 
-		$files     = glob( $type_dir . '/*.md' ) ?: array();
+		$files     = glob( $type_dir . '/*.md' );
+		$files     = false !== $files ? $files : array();
 		$real_base = realpath( $type_dir );
 		foreach ( $files as $file ) {
 			$real_file = realpath( $file );

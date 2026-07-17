@@ -199,7 +199,7 @@ class ManifestGenerator {
 		}
 
 		$total_changed = $this->manifest['change_summary']['new']
-					   + $this->manifest['change_summary']['modified'];
+						+ $this->manifest['change_summary']['modified'];
 
 		$changes = array(
 			'previous_export' => $this->previous_manifest['export_timestamp'] ?? 'unknown',

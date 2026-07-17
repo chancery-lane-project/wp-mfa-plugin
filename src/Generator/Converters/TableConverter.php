@@ -98,7 +98,7 @@ class TableConverter implements ConverterInterface {
 		$rows    = array();
 
 		foreach ( $dom->getElementsByTagName( 'th' ) as $th ) {
-			$headers[] = trim( wp_strip_all_tags( $th->textContent ) );
+			$headers[] = trim( wp_strip_all_tags( $th->textContent ) ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOMNode API.
 		}
 
 		foreach ( $dom->getElementsByTagName( 'tr' ) as $tr ) {
@@ -106,7 +106,7 @@ class TableConverter implements ConverterInterface {
 			$td_nodes = $tr->getElementsByTagName( 'td' );
 			if ( $td_nodes->length > 0 ) {
 				foreach ( $td_nodes as $td ) {
-					$cells[] = trim( wp_strip_all_tags( $td->textContent ) );
+					$cells[] = trim( wp_strip_all_tags( $td->textContent ) ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOMNode API.
 				}
 				if ( ! empty( $cells ) ) {
 					$rows[] = $cells;
@@ -122,7 +122,7 @@ class TableConverter implements ConverterInterface {
 			return '';
 		}
 
-		$max_cols = max( count( $headers ), ...array_map( 'count', $rows ?: array( array() ) ) );
+		$max_cols = max( count( $headers ), ...array_map( 'count', $rows ? $rows : array( array() ) ) );
 		$output   = '| ' . implode( ' | ', $this->pad_cells( $headers, $max_cols ) ) . " |\n";
 		$output  .= '|' . str_repeat( ' --- |', $max_cols ) . "\n";
 
