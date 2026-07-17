@@ -49,29 +49,11 @@ class Generator {
 	 * @return bool True on success, false on failure or skip.
 	 */
 	public function generate_post( \WP_Post $post ): bool {
-		if ( ! $this->is_eligible( $post ) ) {
+		$content = $this->get_post_markdown( $post );
+
+		if ( null === $content ) {
 			return false;
 		}
-
-		$frontmatter = $this->frontmatter_builder->build( $post );
-
-		$html = $this->get_post_content( $post );
-		$html = $this->content_filter->filter( $html );
-		$markdown = $this->converter->convert( $html, $post );
-
-		if ( ! empty( $this->options['include_taxonomy_topics'] ) ) {
-			$topics = $this->build_topics_section( $post );
-			if ( '' !== $topics ) {
-				$markdown .= "\n\n" . $topics;
-			}
-		}
-
-		if ( null !== $this->link_rewriter ) {
-			$markdown = $this->link_rewriter->rewrite( $markdown );
-		}
-
-		$yaml    = $this->yaml_formatter->format( $frontmatter );
-		$content = $yaml . "\n" . $markdown;
 
 		$path   = $this->get_export_path( $post );
 		$result = $this->file_writer->write( $path, $content );
