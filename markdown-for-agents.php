@@ -37,5 +37,5 @@ use Tclp\WpMarkdownForAgents\Core\Plugin;
 register_activation_hook( __FILE__, array( Activator::class, 'activate' ) );
 register_deactivation_hook( __FILE__, array( Deactivator::class, 'deactivate' ) );
 
-$plugin = new Plugin( MARKDOWN_FOR_AGENTS_VERSION );
+$plugin = new Plugin();
 $plugin->run();

@@ -144,16 +144,6 @@ class ManifestGenerator {
 	}
 
 	/**
-	 * Return the current manifest data.
-	 *
-	 * @since  1.1.0
-	 * @return array<string, mixed>
-	 */
-	public function get_manifest(): array {
-		return $this->manifest;
-	}
-
-	/**
 	 * Check whether a post has changed since the last export.
 	 *
 	 * Computes the current hash and compares against the previous manifest.

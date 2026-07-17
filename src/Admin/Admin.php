@@ -33,9 +33,9 @@ class Admin {
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly ?BundleGenerator $bundle_generator = null,
-		private readonly ?ArdCatalog $ard_catalog = null,
+		?ArdCatalog $ard_catalog = null,
 	) {
-		$this->settings_page = new SettingsPage( $options, $generator, $ard_catalog );
+		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
 	}
 

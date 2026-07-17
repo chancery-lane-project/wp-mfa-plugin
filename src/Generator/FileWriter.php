@@ -85,17 +85,6 @@ class FileWriter {
 	}
 
 	/**
-	 * Check whether a file exists within the export directory.
-	 *
-	 * @since  1.0.0
-	 * @param  string $filepath Absolute path to the file.
-	 * @return bool
-	 */
-	public function exists( string $filepath ): bool {
-		return file_exists( $filepath );
-	}
-
-	/**
 	 * Write a protective .htaccess to the base directory if not already present.
 	 *
 	 * @since  1.0.0

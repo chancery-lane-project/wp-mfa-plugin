@@ -41,7 +41,6 @@ class Options {
 			'include_taxonomy_topics'   => false,
 			'bundle_enabled'            => false,
 			'post_type_configs'         => array(),
-			'frontmatter_format'        => 'yaml',
 			'delete_files_on_uninstall' => false,
 			'ua_force_enabled'          => true,
 			'ua_agent_strings'          => array(

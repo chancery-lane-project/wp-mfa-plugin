@@ -44,9 +44,8 @@ class Plugin {
 
 	/**
 	 * @since  1.0.0
-	 * @param  string $version Plugin version string.
 	 */
-	public function __construct( private readonly string $version ) {
+	public function __construct() {
 		$this->loader = new Loader();
 		$this->define_hooks();
 	}
@@ -186,7 +185,7 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
-		$ard_catalog = new ArdCatalog( $options, $this->bundle_generator );
+		$ard_catalog = new ArdCatalog( $this->bundle_generator );
 		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of

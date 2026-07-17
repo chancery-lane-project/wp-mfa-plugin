@@ -35,12 +35,10 @@ class SettingsPage {
 	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed> $options     Current plugin options.
-	 * @param  Generator            $generator   Generator instance for bulk generate actions.
 	 * @param  ArdCatalog|null      $ard_catalog Optional ARD catalog builder for the discovery panel.
 	 */
 	public function __construct(
 		private array $options,
-		private readonly Generator $generator,
 		private readonly ?ArdCatalog $ard_catalog = null
 	) {}
 
@@ -168,7 +166,6 @@ class SettingsPage {
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
 		$clean['bundle_enabled']          = ! empty( $input['bundle_enabled'] );
-		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
 		$export_dir = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
