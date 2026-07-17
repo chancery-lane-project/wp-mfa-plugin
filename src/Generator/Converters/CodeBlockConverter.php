@@ -51,8 +51,7 @@ class CodeBlockConverter implements ConverterInterface {
 		try {
 			$reflection    = new \ReflectionClass( $element );
 			$node_property = $reflection->getProperty( 'node' );
-			$node_property->setAccessible( true );
-			$dom_node = $node_property->getValue( $element );
+			$dom_node      = $node_property->getValue( $element );
 
 			if ( $dom_node instanceof \DOMNode ) {
 				$code = $dom_node->textContent ?? '';

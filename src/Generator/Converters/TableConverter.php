@@ -49,6 +49,7 @@ class TableConverter implements ConverterInterface {
 		$rows       = array();
 		$header_row = null;
 		$max_cols   = 0;
+		$preamble   = array();
 
 		$html  = $element->getValue();
 		$lines = array_filter( array_map( 'trim', explode( "\n", $html ) ) );
@@ -63,6 +64,10 @@ class TableConverter implements ConverterInterface {
 				} else {
 					$rows[] = $cells;
 				}
+			} else {
+				// Already-converted non-row content (e.g. the bold caption)
+				// must survive the row filter above.
+				$preamble[] = $line;
 			}
 		}
 
@@ -70,7 +75,9 @@ class TableConverter implements ConverterInterface {
 			return $this->build_table_from_element( $element );
 		}
 
-		$output  = '| ' . implode( ' | ', $this->pad_cells( $header_row, $max_cols ) ) . " |\n";
+		$output = $preamble ? implode( "\n", $preamble ) . "\n\n" : '';
+
+		$output .= '| ' . implode( ' | ', $this->pad_cells( $header_row, $max_cols ) ) . " |\n";
 		$output .= '|' . str_repeat( ' --- |', $max_cols ) . "\n";
 
 		foreach ( $rows as $row ) {
