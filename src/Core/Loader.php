@@ -9,11 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Queues actions, then registers them all with WordPress on run().
+ * Queues actions and filters, then registers them all with WordPress on run().
  *
- * Following the dgwltd-boilerplate Loader pattern. Filters are registered
- * with native add_filter() at their call sites; this class only queues
- * actions because that is all the plugin wires through it.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Core
@@ -22,6 +19,9 @@ class Loader {
 
 	/** @var array<int, array<string, mixed>> */
 	private array $actions = array();
+
+	/** @var array<int, array<string, mixed>> */
+	private array $filters = array();
 
 	/**
 	 * @since  1.0.0
@@ -33,9 +33,20 @@ class Loader {
 	/**
 	 * @since  1.0.0
 	 */
+	public function add_filter( string $hook, object $component, string $callback, int $priority = 10, int $accepted_args = 1 ): void {
+		$this->filters = $this->add( $this->filters, $hook, $component, $callback, $priority, $accepted_args );
+	}
+
+	/**
+	 * @since  1.0.0
+	 */
 	public function run(): void {
 		foreach ( $this->actions as $hook ) {
 			add_action( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+		}
+
+		foreach ( $this->filters as $hook ) {
+			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 	}
 
