@@ -547,4 +547,18 @@ class AdminAjaxTest extends TestCase {
 
         $this->assertArrayNotHasKey( 'mfa-preview', $GLOBALS['_mock_enqueued_scripts'] );
     }
+
+    // -----------------------------------------------------------------------
+    // add_action_links()
+    // -----------------------------------------------------------------------
+
+    public function test_action_links_prepends_settings_link(): void {
+        $links = $this->admin->add_action_links( [ '<a href="#">Deactivate</a>' ] );
+
+        $this->assertCount( 2, $links );
+        // Settings comes first, before Deactivate.
+        $this->assertStringContainsString( 'options-general.php?page=markdown-for-agents', $links[0] );
+        $this->assertStringContainsString( 'Settings', $links[0] );
+        $this->assertStringContainsString( 'Deactivate', $links[1] );
+    }
 }

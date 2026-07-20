@@ -29,6 +29,10 @@ if (!defined('MARKDOWN_FOR_AGENTS_VERSION')) {
     define('MARKDOWN_FOR_AGENTS_VERSION', '1.0.0-test');
 }
 
+if (!defined('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME')) {
+    define('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', 'markdown-for-agents-and-statistics/markdown-for-agents.php');
+}
+
 // ---------------------------------------------------------------------------
 // Hook tracking
 // ---------------------------------------------------------------------------
@@ -750,6 +754,12 @@ if (!function_exists('esc_html__')) {
 
 if (!function_exists('__')) {
     function __(string $text, string $domain = 'default'): string {
+        return $text;
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    function esc_html__(string $text, string $domain = 'default'): string {
         return $text;
     }
 }
