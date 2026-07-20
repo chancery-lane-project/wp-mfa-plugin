@@ -112,22 +112,6 @@ class FileWriterTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // exists()
-    // -----------------------------------------------------------------------
-
-    public function test_exists_returns_true_for_existing_file(): void {
-        $path = $this->base_dir . '/post/exists.md';
-        mkdir( dirname( $path ), 0755, true );
-        file_put_contents( $path, '' );
-
-        $this->assertTrue( $this->writer->exists( $path ) );
-    }
-
-    public function test_exists_returns_false_for_missing_file(): void {
-        $this->assertFalse( $this->writer->exists( $this->base_dir . '/post/missing.md' ) );
-    }
-
-    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

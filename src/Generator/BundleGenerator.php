@@ -17,8 +17,9 @@ use Tclp\WpMarkdownForAgents\Core\Options;
  *
  * Freshness is tracked via a tree-state hash (sorted `relpath|mtime|size`
  * lines) stored in the `markdown_for_agents_bundle_hash` option, avoiding
- * any dependency on `manifest.json` (which is only written when generation
- * runs `--with-manifest`).
+ * any dependency on `manifest.json` (manifests are refreshed by
+ * Generator::rebuild_bundle() immediately before every build, but the hash
+ * must not rely on that ordering).
  *
  * @since  1.6.0
  * @package Tclp\WpMarkdownForAgents\Generator
@@ -204,25 +205,6 @@ class BundleGenerator {
 		if ( ! wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) ) {
 			wp_schedule_single_event( time() + 300, 'markdown_for_agents_rebuild_bundle' );
 		}
-	}
-
-	/**
-	 * Cron callback: rebuild the bundle.
-	 *
-	 * No-op unless `bundle_enabled`.
-	 *
-	 * @since  1.6.0
-	 * @return void
-	 */
-	public function on_rebuild_bundle(): void {
-		if ( empty( $this->options['bundle_enabled'] ) ) {
-			return;
-		}
-
-		// A clean false from build() (e.g. missing export tree) is absorbed
-		// silently here — nobody watches a cron tick. The condition surfaces
-		// through is_stale() and the CLI status output instead.
-		$this->build();
 	}
 
 	/**

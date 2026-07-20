@@ -32,7 +32,7 @@ class ArdCatalogTest extends TestCase {
     private function make_catalog( array $options = [] ): ArdCatalog {
         $options = array_merge( [ 'export_dir' => 'wp-mfa-exports' ], $options );
 
-        return new ArdCatalog( $options, new BundleGenerator( $options ) );
+        return new ArdCatalog( new BundleGenerator( $options ) );
     }
 
     public function test_build_returns_spec_version_and_host(): void {
@@ -59,7 +59,7 @@ class ArdCatalogTest extends TestCase {
     public function test_build_entry_url_matches_bundle_generator(): void {
         $options = [ 'export_dir' => 'wp-mfa-exports' ];
         $bundle_generator = new BundleGenerator( $options );
-        $catalog = new ArdCatalog( $options, $bundle_generator );
+        $catalog = new ArdCatalog( $bundle_generator );
 
         $this->assertSame( $bundle_generator->bundle_url(), $catalog->build()['entries'][0]['url'] );
     }

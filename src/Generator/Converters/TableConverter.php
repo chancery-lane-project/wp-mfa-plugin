@@ -49,6 +49,7 @@ class TableConverter implements ConverterInterface {
 		$rows       = array();
 		$header_row = null;
 		$max_cols   = 0;
+		$preamble   = array();
 
 		$html  = $element->getValue();
 		$lines = array_filter( array_map( 'trim', explode( "\n", $html ) ) );
@@ -63,6 +64,10 @@ class TableConverter implements ConverterInterface {
 				} else {
 					$rows[] = $cells;
 				}
+			} else {
+				// Already-converted non-row content (e.g. the bold caption)
+				// must survive the row filter above.
+				$preamble[] = $line;
 			}
 		}
 
@@ -70,7 +75,9 @@ class TableConverter implements ConverterInterface {
 			return $this->build_table_from_element( $element );
 		}
 
-		$output  = '| ' . implode( ' | ', $this->pad_cells( $header_row, $max_cols ) ) . " |\n";
+		$output = $preamble ? implode( "\n", $preamble ) . "\n\n" : '';
+
+		$output .= '| ' . implode( ' | ', $this->pad_cells( $header_row, $max_cols ) ) . " |\n";
 		$output .= '|' . str_repeat( ' --- |', $max_cols ) . "\n";
 
 		foreach ( $rows as $row ) {
@@ -91,7 +98,7 @@ class TableConverter implements ConverterInterface {
 		$rows    = array();
 
 		foreach ( $dom->getElementsByTagName( 'th' ) as $th ) {
-			$headers[] = trim( wp_strip_all_tags( $th->textContent ) );
+			$headers[] = trim( wp_strip_all_tags( $th->textContent ) ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOMNode API.
 		}
 
 		foreach ( $dom->getElementsByTagName( 'tr' ) as $tr ) {
@@ -99,7 +106,7 @@ class TableConverter implements ConverterInterface {
 			$td_nodes = $tr->getElementsByTagName( 'td' );
 			if ( $td_nodes->length > 0 ) {
 				foreach ( $td_nodes as $td ) {
-					$cells[] = trim( wp_strip_all_tags( $td->textContent ) );
+					$cells[] = trim( wp_strip_all_tags( $td->textContent ) ); // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOMNode API.
 				}
 				if ( ! empty( $cells ) ) {
 					$rows[] = $cells;
@@ -115,7 +122,7 @@ class TableConverter implements ConverterInterface {
 			return '';
 		}
 
-		$max_cols = max( count( $headers ), ...array_map( 'count', $rows ?: array( array() ) ) );
+		$max_cols = max( count( $headers ), ...array_map( 'count', $rows ? $rows : array( array() ) ) );
 		$output   = '| ' . implode( ' | ', $this->pad_cells( $headers, $max_cols ) ) . " |\n";
 		$output  .= '|' . str_repeat( ' --- |', $max_cols ) . "\n";
 

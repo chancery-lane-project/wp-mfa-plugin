@@ -14,7 +14,6 @@ use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
 use Tclp\WpMarkdownForAgents\Generator\Converter;
-use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FieldResolver;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
@@ -45,9 +44,8 @@ class Plugin {
 
 	/**
 	 * @since  1.0.0
-	 * @param  string $version Plugin version string.
 	 */
-	public function __construct( private readonly string $version ) {
+	public function __construct() {
 		$this->loader = new Loader();
 		$this->define_hooks();
 	}
@@ -152,19 +150,10 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $bundle_generator, 'mark_stale_and_schedule' );
 		add_action(
 			'markdown_for_agents_rebuild_bundle',
-			static function () use ( $generator, $bundle_generator, $options ): void {
-				// This closure deliberately has no error_log for either call below, unlike
-				// the CLI/AJAX manifest call sites: nobody watches a cron tick, matching
-				// on_rebuild_bundle()'s own existing silence on build() failure (see its
-				// comment). Unlike that build() case, there genuinely is no other signal
-				// that surfaces a write_manifests() failure here — it's an accepted gap,
-				// not a documented safety net.
-				$generator->write_manifests(
-					Options::get_export_base( $options ),
-					ExportPolicy::enabled_post_types( $options )
-				);
-
-				$bundle_generator->on_rebuild_bundle();
+			static function () use ( $generator, $bundle_generator ): void {
+				// The result is deliberately discarded: nobody watches a cron tick.
+				// Failures surface through is_stale() and the CLI status output.
+				$generator->rebuild_bundle( $bundle_generator );
 			}
 		);
 	}
@@ -196,7 +185,7 @@ class Plugin {
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_admin_hooks( array $options ): void {
-		$ard_catalog = new ArdCatalog( $options, $this->bundle_generator );
+		$ard_catalog = new ArdCatalog( $this->bundle_generator );
 		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of

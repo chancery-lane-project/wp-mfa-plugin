@@ -144,16 +144,6 @@ class ManifestGenerator {
 	}
 
 	/**
-	 * Return the current manifest data.
-	 *
-	 * @since  1.1.0
-	 * @return array<string, mixed>
-	 */
-	public function get_manifest(): array {
-		return $this->manifest;
-	}
-
-	/**
 	 * Check whether a post has changed since the last export.
 	 *
 	 * Computes the current hash and compares against the previous manifest.
@@ -209,7 +199,7 @@ class ManifestGenerator {
 		}
 
 		$total_changed = $this->manifest['change_summary']['new']
-					   + $this->manifest['change_summary']['modified'];
+						+ $this->manifest['change_summary']['modified'];
 
 		$changes = array(
 			'previous_export' => $this->previous_manifest['export_timestamp'] ?? 'unknown',

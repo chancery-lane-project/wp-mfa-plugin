@@ -65,7 +65,7 @@ class MetaBox {
 		<p>
 			<label>
 				<input type="checkbox" name="markdown_for_agents_excluded" value="1"
-					   <?php checked( $excluded, true ); ?>>
+						<?php checked( $excluded, true ); ?>>
 				<?php esc_html_e( 'Exclude from Markdown output', 'markdown-for-agents-and-statistics' ); ?>
 			</label>
 		</p>

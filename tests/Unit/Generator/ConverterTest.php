@@ -69,9 +69,93 @@ class ConverterTest extends TestCase {
     }
 
     public function test_convert_with_post_passes_post_to_filters(): void {
-        // Filters are stubs (pass-through) in tests — just confirm no exception thrown.
-        $post = new \WP_Post( [ 'ID' => 1, 'post_title' => 'Test' ] );
+        $post     = new \WP_Post( [ 'ID' => 1, 'post_title' => 'Test' ] );
+        $received = [];
+
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_pre_convert'] =
+            static function ( $html, $filter_post ) use ( &$received ) {
+                $received['pre'] = $filter_post;
+                return $html;
+            };
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_post_convert'] =
+            static function ( $markdown, $filter_post ) use ( &$received ) {
+                $received['post'] = $filter_post;
+                return $markdown;
+            };
+
         $output = $this->converter->convert( '<p>Content</p>', $post );
+
+        unset(
+            $GLOBALS['_mock_apply_filters']['markdown_for_agents_pre_convert'],
+            $GLOBALS['_mock_apply_filters']['markdown_for_agents_post_convert']
+        );
+
         $this->assertStringContainsString( 'Content', $output );
+        $this->assertSame( $post, $received['pre'] );
+        $this->assertSame( $post, $received['post'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // TableConverter (registered on the environment)
+    // -----------------------------------------------------------------------
+
+    public function test_converts_table_to_gfm(): void {
+        $html = '<table>'
+            . '<thead><tr><th>Name</th><th>Role</th></tr></thead>'
+            . '<tbody><tr><td>Ada</td><td>Engineer</td></tr>'
+            . '<tr><td>Grace</td><td>Admiral</td></tr></tbody>'
+            . '</table>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( '| Name | Role |', $output );
+        $this->assertStringContainsString( '| --- | --- |', $output );
+        $this->assertStringContainsString( '| Ada | Engineer |', $output );
+        $this->assertStringContainsString( '| Grace | Admiral |', $output );
+    }
+
+    public function test_converts_table_caption_to_bold_text(): void {
+        $html = '<table><caption>Team roster</caption>'
+            . '<tr><th>Name</th></tr><tr><td>Ada</td></tr></table>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( '**Team roster**', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // CodeBlockConverter (registered on the environment)
+    // -----------------------------------------------------------------------
+
+    public function test_converts_gutenberg_code_block_to_fenced_markdown(): void {
+        $html = '<pre class="wp-block-code"><code>echo "hi";</code></pre>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( "```\necho \"hi\";\n```", $output );
+    }
+
+    public function test_gutenberg_code_block_language_from_style_class(): void {
+        $html = '<pre class="wp-block-code is-style-php"><code>echo 1;</code></pre>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( "```php\necho 1;\n```", $output );
+    }
+
+    public function test_gutenberg_code_block_decodes_entities(): void {
+        $html = '<pre class="wp-block-code"><code>if ( $a &lt; $b &amp;&amp; $b &gt; 0 )</code></pre>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( 'if ( $a < $b && $b > 0 )', $output );
+    }
+
+    public function test_plain_pre_without_wp_block_code_class_is_untouched_by_custom_converter(): void {
+        $html = '<pre>plain preformatted</pre>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString( 'plain preformatted', $output );
     }
 }

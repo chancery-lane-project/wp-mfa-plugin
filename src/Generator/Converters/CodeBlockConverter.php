@@ -23,13 +23,13 @@ class CodeBlockConverter implements ConverterInterface {
 	}
 
 	public function convert( ElementInterface $element ): string {
-		$class = $element->getAttribute( 'class' ) ?? '';
+		$css_class = $element->getAttribute( 'class' ) ?? '';
 
-		if ( ! str_contains( $class, 'wp-block-code' ) ) {
+		if ( ! str_contains( $css_class, 'wp-block-code' ) ) {
 			return $element->getValue();
 		}
 
-		$language = $this->extract_language( $class );
+		$language = $this->extract_language( $css_class );
 		$code     = $this->extract_code( $element );
 
 		// Strip any existing fenced markers the default converter may have added.
@@ -40,8 +40,8 @@ class CodeBlockConverter implements ConverterInterface {
 		return "\n```{$language}\n{$code}\n```\n\n";
 	}
 
-	private function extract_language( string $class ): string {
-		if ( preg_match( '/is-style-(\w+)/', $class, $matches ) ) {
+	private function extract_language( string $css_class ): string {
+		if ( preg_match( '/is-style-(\w+)/', $css_class, $matches ) ) {
 			return $matches[1];
 		}
 		return '';
@@ -51,15 +51,14 @@ class CodeBlockConverter implements ConverterInterface {
 		try {
 			$reflection    = new \ReflectionClass( $element );
 			$node_property = $reflection->getProperty( 'node' );
-			$node_property->setAccessible( true );
-			$dom_node = $node_property->getValue( $element );
+			$dom_node      = $node_property->getValue( $element );
 
 			if ( $dom_node instanceof \DOMNode ) {
-				$code = $dom_node->textContent ?? '';
+				$code = $dom_node->textContent ?? ''; // phpcs:ignore WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase -- DOMNode API.
 				$code = html_entity_decode( $code, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 				return rtrim( $code );
 			}
-		} catch ( \ReflectionException $e ) {
+		} catch ( \ReflectionException $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- Fall through to the tag-stripping fallback below.
 			// Fall through to fallback.
 		}
 

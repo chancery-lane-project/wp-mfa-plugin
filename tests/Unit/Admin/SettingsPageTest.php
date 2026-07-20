@@ -32,16 +32,15 @@ class SettingsPageTest extends TestCase {
     private function make_page( array $options = [], ?ArdCatalog $ard_catalog = null ): SettingsPage {
         return new SettingsPage(
             array_merge( Options::get_defaults(), $options ),
-            $this->generator,
             $ard_catalog
         );
     }
 
-    private function make_ard_catalog( array $options = [] ): ArdCatalog {
+    private function make_ard_catalog(): ArdCatalog {
         $bundle_generator = $this->createMock( BundleGenerator::class );
         $bundle_generator->method( 'bundle_url' )->willReturn( 'https://example.test/wp-content/uploads/wp-mfa-exports.zip' );
 
-        return new ArdCatalog( array_merge( Options::get_defaults(), $options ), $bundle_generator );
+        return new ArdCatalog( $bundle_generator );
     }
 
     public function test_register_registers_option_key(): void {

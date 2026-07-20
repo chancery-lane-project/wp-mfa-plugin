@@ -32,11 +32,11 @@ class ContentFilter {
 		}
 
 		// Strip WordPress block editor opening comments (with optional JSON attrs).
-		// Matches: <!-- wp:block-name { ... } --> and <!-- wp:block-name -->
+		// Matches: <!-- wp:block-name { ... } --> and <!-- wp:block-name -->.
 		$html = preg_replace( '/<!--\s*wp:[^\-]*?-->/s', '', $html ) ?? $html;
 
 		// Strip WordPress block editor closing comments.
-		// Matches: <!-- /wp:block-name -->
+		// Matches: <!-- /wp:block-name -->.
 		$html = preg_replace( '/<!--\s*\/wp:[^\-]*?-->/s', '', $html ) ?? $html;
 
 		// Strip <style>/<script> blocks including their contents. HtmlConverter

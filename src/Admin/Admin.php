@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
-use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
-use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
@@ -35,9 +33,9 @@ class Admin {
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly ?BundleGenerator $bundle_generator = null,
-		private readonly ?ArdCatalog $ard_catalog = null,
+		?ArdCatalog $ard_catalog = null,
 	) {
-		$this->settings_page = new SettingsPage( $options, $generator, $ard_catalog );
+		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
 	}
 
@@ -267,30 +265,27 @@ class Admin {
 	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
 	 * up. Called from the final batch of both AJAX bulk-generation handlers —
 	 * synchronous is acceptable here because the user is already waiting on
-	 * the final batch's response. Gated on is_stale() so that clicking
+	 * the final batch's response. Passed only_if_stale so that clicking
 	 * "Generate" repeatedly with no content changes in between doesn't
-	 * re-tar/gzip the whole export tree each time; any real change already
+	 * re-zip the whole export tree each time; any real change already
 	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
 	 * bundle here means there is genuinely nothing new to package.
 	 *
 	 * @since  1.6.0
 	 */
 	private function maybe_rebuild_bundle(): void {
-		if ( null === $this->bundle_generator || empty( $this->options['bundle_enabled'] ) ) {
+		if ( null === $this->bundle_generator ) {
 			return;
 		}
 
-		if ( ! $this->bundle_generator->is_stale() ) {
-			return;
-		}
+		$result = $this->generator->rebuild_bundle( $this->bundle_generator, true );
 
-		$export_base = Options::get_export_base( $this->options );
-		if ( ! $this->generator->write_manifests( $export_base, ExportPolicy::enabled_post_types( $this->options ) ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		if ( ! $result['manifests_ok'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 			error_log( 'WP Markdown for Agents: manifest write failed during bundle rebuild; bundle may be stale.' );
 		}
 
-		if ( ! $this->bundle_generator->build() && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		if ( Generator::BUNDLE_FAILED === $result['status'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
 		}
