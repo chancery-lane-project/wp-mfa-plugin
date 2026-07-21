@@ -131,10 +131,10 @@ class SettingsPage {
 			'markdown_for_agents_discovery',
 			__( 'Agent discovery (OKF / ARD)', 'markdown-for-agents-and-statistics' ),
 			array( $this, 'section_discovery_intro' ),
-			self::PAGE_SLUG
+			$general
 		);
 
-		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), $general, 'markdown_for_agents_discovery' );
 
 		// The Field Configuration tab is rendered manually (see render_fields_tab)
 		// so each post type can collapse into its own accordion.
