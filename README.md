@@ -257,6 +257,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_file_deleted` | Fired after a `.md` file is deleted |
 | `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
 | `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
+| `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Hook to audit export coverage |
 
 ---
 
