@@ -136,6 +136,8 @@ class FieldResolver {
 			}
 		}
 
-		return get_post_meta( $post_id, $field_path, true ) ?: null;
+		$value = get_post_meta( $post_id, $field_path, true );
+
+		return $value ? $value : null;
 	}
 }

@@ -25,22 +25,22 @@ class SettingsPageTest extends TestCase {
         $GLOBALS['_mock_settings_sections']   = [];
         $GLOBALS['_mock_settings_fields']     = [];
         $GLOBALS['_mock_transients']          = [];
+        $GLOBALS['_mock_options']             = [];
         $this->generator = $this->createMock( Generator::class );
     }
 
     private function make_page( array $options = [], ?ArdCatalog $ard_catalog = null ): SettingsPage {
         return new SettingsPage(
             array_merge( Options::get_defaults(), $options ),
-            $this->generator,
             $ard_catalog
         );
     }
 
-    private function make_ard_catalog( array $options = [] ): ArdCatalog {
+    private function make_ard_catalog(): ArdCatalog {
         $bundle_generator = $this->createMock( BundleGenerator::class );
         $bundle_generator->method( 'bundle_url' )->willReturn( 'https://example.test/wp-content/uploads/wp-mfa-exports.zip' );
 
-        return new ArdCatalog( array_merge( Options::get_defaults(), $options ), $bundle_generator );
+        return new ArdCatalog( $bundle_generator );
     }
 
     public function test_register_registers_option_key(): void {
@@ -51,13 +51,13 @@ class SettingsPageTest extends TestCase {
 
     public function test_register_adds_settings_section(): void {
         $this->make_page()->register();
-        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents-general'] ?? [];
         $this->assertContains( 'markdown_for_agents_general', $sections );
     }
 
     public function test_register_adds_all_fields(): void {
         $this->make_page()->register();
-        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents-general'] ?? [];
         foreach ( [ 'markdown_for_agents_post_types', 'markdown_for_agents_export_dir',
                     'markdown_for_agents_auto_generate', 'markdown_for_agents_include_taxonomies' ] as $field ) {
             $this->assertContains( $field, $fields );
@@ -97,13 +97,13 @@ class SettingsPageTest extends TestCase {
 
     public function test_register_adds_ua_detection_section(): void {
         $this->make_page()->register();
-        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents-agents'] ?? [];
         $this->assertContains( 'markdown_for_agents_ua_detection', $sections );
     }
 
     public function test_register_adds_ua_detection_fields(): void {
         $this->make_page()->register();
-        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents-agents'] ?? [];
         $this->assertContains( 'markdown_for_agents_ua_force_enabled', $fields );
         $this->assertContains( 'markdown_for_agents_ua_agent_strings', $fields );
     }
@@ -135,6 +135,94 @@ class SettingsPageTest extends TestCase {
             'ua_agent_strings' => "\n\nGPTBot\n\n",
         ] );
         $this->assertSame( [ 'GPTBot' ], $result['ua_agent_strings'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // Tabbed save: merging must not wipe fields on other tabs.
+    // -----------------------------------------------------------------------
+
+    /** Seed the stored option so sanitize_options() has something to merge over. */
+    private function seed_stored( array $stored ): void {
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ] = array_merge( Options::get_defaults(), $stored );
+    }
+
+    public function test_sanitize_general_tab_preserves_fields_and_agents(): void {
+        $this->seed_stored( [
+            'post_types'        => [ 'post' ],
+            'post_type_configs' => [ 'post' => [ 'frontmatter_fields' => [ 'my_field' ], 'content_fields' => [] ] ],
+            'ua_agent_strings'  => [ 'CustomBot' ],
+            'ua_force_enabled'  => false,
+        ] );
+
+        $result = $this->make_page()->sanitize_options( [
+            '_active_tab'   => 'general',
+            'post_types'    => [ 'post' ],
+            'export_dir'    => 'new-dir',
+            'auto_generate' => '1',
+        ] );
+
+        // The submitted general fields are applied…
+        $this->assertSame( 'new-dir', $result['export_dir'] );
+        $this->assertTrue( $result['auto_generate'] );
+        // …while the other tabs' settings survive.
+        $this->assertSame( [ 'my_field' ], $result['post_type_configs']['post']['frontmatter_fields'] );
+        $this->assertSame( [ 'CustomBot' ], $result['ua_agent_strings'] );
+        $this->assertFalse( $result['ua_force_enabled'] );
+    }
+
+    public function test_sanitize_fields_tab_preserves_general_and_agents(): void {
+        $this->seed_stored( [
+            'post_types'       => [ 'post' ],
+            'export_dir'       => 'custom-dir',
+            'ua_agent_strings' => [ 'CustomBot' ],
+        ] );
+
+        $result = $this->make_page()->sanitize_options( [
+            '_active_tab'       => 'fields',
+            'post_type_configs' => [ 'post' => [ 'frontmatter_fields' => "new_field\n", 'content_fields' => '' ] ],
+        ] );
+
+        $this->assertSame( [ 'new_field' ], $result['post_type_configs']['post']['frontmatter_fields'] );
+        $this->assertSame( 'custom-dir', $result['export_dir'] );
+        $this->assertSame( [ 'CustomBot' ], $result['ua_agent_strings'] );
+        $this->assertSame( [ 'post' ], $result['post_types'] );
+    }
+
+    public function test_sanitize_agents_tab_preserves_general_and_fields(): void {
+        $this->seed_stored( [
+            'post_types'        => [ 'post' ],
+            'export_dir'        => 'custom-dir',
+            'post_type_configs' => [ 'post' => [ 'frontmatter_fields' => [ 'my_field' ], 'content_fields' => [] ] ],
+        ] );
+
+        $result = $this->make_page()->sanitize_options( [
+            '_active_tab'      => 'agents',
+            'ua_force_enabled' => '1',
+            'ua_agent_strings' => "GPTBot\nClaudeBot\n",
+        ] );
+
+        $this->assertTrue( $result['ua_force_enabled'] );
+        $this->assertSame( [ 'GPTBot', 'ClaudeBot' ], $result['ua_agent_strings'] );
+        $this->assertSame( 'custom-dir', $result['export_dir'] );
+        $this->assertSame( [ 'my_field' ], $result['post_type_configs']['post']['frontmatter_fields'] );
+    }
+
+    public function test_sanitize_general_tab_prunes_configs_for_disabled_types(): void {
+        $this->seed_stored( [
+            'post_types'        => [ 'post', 'page' ],
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => [ 'a' ], 'content_fields' => [] ],
+                'page' => [ 'frontmatter_fields' => [ 'b' ], 'content_fields' => [] ],
+            ],
+        ] );
+
+        $result = $this->make_page()->sanitize_options( [
+            '_active_tab' => 'general',
+            'post_types'  => [ 'post' ], // 'page' disabled
+        ] );
+
+        $this->assertArrayHasKey( 'post', $result['post_type_configs'] );
+        $this->assertArrayNotHasKey( 'page', $result['post_type_configs'] );
     }
 
     public function test_sanitize_flags_regen_when_post_type_configs_change(): void {

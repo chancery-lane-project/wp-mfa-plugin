@@ -67,16 +67,8 @@ class Negotiator {
 		}
 
 		if ( $this->is_eligible_singular() ) {
-			$post = get_queried_object();
-			if ( ! $post instanceof \WP_Post ) {
-				return;
-			}
-
-			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
-				return;
-			}
-
-			if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+			$post = $this->queried_servable_post();
+			if ( null === $post ) {
 				return;
 			}
 
@@ -218,16 +210,8 @@ class Negotiator {
 	 */
 	private function get_markdown_alternate_url(): ?string {
 		if ( $this->is_eligible_singular() ) {
-			$post = get_queried_object();
-			if ( ! $post instanceof \WP_Post ) {
-				return null;
-			}
-
-			if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
-				return null;
-			}
-
-			if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+			$post = $this->queried_servable_post();
+			if ( null === $post ) {
 				return null;
 			}
 
@@ -259,6 +243,33 @@ class Negotiator {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Return the queried post when it may be served as Markdown, or null.
+	 *
+	 * Mirrors ExportPolicy::is_eligible() minus the post-type check, which is
+	 * handled by is_eligible_singular() so the `markdown_for_agents_serve_post_types`
+	 * filter keeps control of servable types.
+	 *
+	 * @since  1.6.0
+	 * @return \WP_Post|null
+	 */
+	private function queried_servable_post(): ?\WP_Post {
+		$post = get_queried_object();
+		if ( ! $post instanceof \WP_Post ) {
+			return null;
+		}
+
+		if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
+			return null;
+		}
+
+		if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+			return null;
+		}
+
+		return $post;
 	}
 
 	/**

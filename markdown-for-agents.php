@@ -27,6 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'MARKDOWN_FOR_AGENTS_VERSION', '1.6.1' );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 
 require_once MARKDOWN_FOR_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';
 
@@ -37,5 +38,5 @@ use Tclp\WpMarkdownForAgents\Core\Plugin;
 register_activation_hook( __FILE__, array( Activator::class, 'activate' ) );
 register_deactivation_hook( __FILE__, array( Deactivator::class, 'deactivate' ) );
 
-$plugin = new Plugin( MARKDOWN_FOR_AGENTS_VERSION );
+$plugin = new Plugin();
 $plugin->run();

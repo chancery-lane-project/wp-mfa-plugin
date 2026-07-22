@@ -249,7 +249,7 @@ class StatsPage {
 				.mfa-stat .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
 				/* Direction arrow is a CSS border-triangle (currentColor), not a glyph, so
-				   it can't be re-flowed by WP's emoji replacement and stays aligned. */
+					it can't be re-flowed by WP's emoji replacement and stays aligned. */
 				.mfa-trend { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; margin-top: 6px; }
 				.mfa-trend.rising::before, .mfa-trend.falling::before { content: ""; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }
 				.mfa-trend.rising::before { border-bottom: 6px solid currentColor; }

@@ -22,10 +22,9 @@ class ArdCatalog {
 
 	/**
 	 * @since  1.6.0
-	 * @param  array<string, mixed> $options         Plugin options.
-	 * @param  BundleGenerator      $bundle_generator Provides the bundle URL for the catalog entry.
+	 * @param  BundleGenerator $bundle_generator Provides the bundle URL for the catalog entry.
 	 */
-	public function __construct( private readonly array $options, private readonly BundleGenerator $bundle_generator ) {}
+	public function __construct( private readonly BundleGenerator $bundle_generator ) {}
 
 	/**
 	 * Build the ARD catalog document.

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+use Tclp\WpMarkdownForAgents\Core\Options;
+
 /**
  * Orchestrates Markdown file generation for WordPress posts, and manifest
  * bookkeeping for the export tree.
@@ -16,6 +18,11 @@ namespace Tclp\WpMarkdownForAgents\Generator;
  * @package Tclp\WpMarkdownForAgents\Generator
  */
 class Generator {
+
+	public const BUNDLE_DISABLED = 'disabled';
+	public const BUNDLE_FRESH    = 'fresh';
+	public const BUNDLE_BUILT    = 'built';
+	public const BUNDLE_FAILED   = 'failed';
 
 	/**
 	 * @since  1.0.0
@@ -49,29 +56,11 @@ class Generator {
 	 * @return bool True on success, false on failure or skip.
 	 */
 	public function generate_post( \WP_Post $post ): bool {
-		if ( ! $this->is_eligible( $post ) ) {
+		$content = $this->get_post_markdown( $post );
+
+		if ( null === $content ) {
 			return false;
 		}
-
-		$frontmatter = $this->frontmatter_builder->build( $post );
-
-		$html = $this->get_post_content( $post );
-		$html = $this->content_filter->filter( $html );
-		$markdown = $this->converter->convert( $html, $post );
-
-		if ( ! empty( $this->options['include_taxonomy_topics'] ) ) {
-			$topics = $this->build_topics_section( $post );
-			if ( '' !== $topics ) {
-				$markdown .= "\n\n" . $topics;
-			}
-		}
-
-		if ( null !== $this->link_rewriter ) {
-			$markdown = $this->link_rewriter->rewrite( $markdown );
-		}
-
-		$yaml    = $this->yaml_formatter->format( $frontmatter );
-		$content = $yaml . "\n" . $markdown;
 
 		$path   = $this->get_export_path( $post );
 		$result = $this->file_writer->write( $path, $content );
@@ -228,6 +217,14 @@ class Generator {
 			try {
 				if ( $this->generate_post( $post ) ) {
 					++$processed;
+				} elseif ( $this->is_eligible( $post ) ) {
+					// Eligible post that did not write means the filesystem write
+					// failed. (Ineligible posts return false too, but are an
+					// intentional skip, not an error.)
+					$errors[] = array(
+						'post_id' => $post_id,
+						'message' => 'Failed to write Markdown file to disk; check export directory permissions.',
+					);
 				}
 			} catch ( \Throwable $e ) {
 				$errors[] = array(
@@ -315,6 +312,50 @@ class Generator {
 		}
 
 		return $path;
+	}
+
+	/**
+	 * Rebuild the OKF bundle, refreshing manifests first.
+	 *
+	 * Single coordinator for every rebuild path (CLI, admin AJAX, cron), so
+	 * the "manifests before bundle" ordering is structural rather than a
+	 * convention each caller repeats. Callers translate the returned status
+	 * into their own channel's reporting (WP_CLI, error_log, or silence).
+	 *
+	 * A failed manifest write does not abort the build: a stale-but-present
+	 * manifest inside a fresh bundle is preferable to no bundle at all.
+	 *
+	 * @since  1.6.0
+	 * @param  BundleGenerator $bundle_generator The bundle builder.
+	 * @param  bool            $only_if_stale    Skip when the bundle is already fresh.
+	 * @return array{status: string, manifests_ok: bool} status is one of the
+	 *         BUNDLE_* constants; manifests_ok is false when one or more
+	 *         manifest.json writes failed.
+	 */
+	public function rebuild_bundle( BundleGenerator $bundle_generator, bool $only_if_stale = false ): array {
+		if ( empty( $this->options['bundle_enabled'] ) ) {
+			return array(
+				'status'       => self::BUNDLE_DISABLED,
+				'manifests_ok' => true,
+			);
+		}
+
+		if ( $only_if_stale && ! $bundle_generator->is_stale() ) {
+			return array(
+				'status'       => self::BUNDLE_FRESH,
+				'manifests_ok' => true,
+			);
+		}
+
+		$manifests_ok = $this->write_manifests(
+			Options::get_export_base( $this->options ),
+			ExportPolicy::enabled_post_types( $this->options )
+		);
+
+		return array(
+			'status'       => $bundle_generator->build() ? self::BUNDLE_BUILT : self::BUNDLE_FAILED,
+			'manifests_ok' => $manifests_ok,
+		);
 	}
 
 	/**

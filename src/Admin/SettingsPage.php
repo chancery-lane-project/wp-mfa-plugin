@@ -33,14 +33,48 @@ class SettingsPage {
 	private const PAGE_SLUG = 'markdown-for-agents';
 
 	/**
+	 * Settings tabs: slug => label. Each tab renders its own set of sections so
+	 * the page stays short (notably the per-post-type Field Configuration).
+	 *
+	 * @since  1.6.0
+	 * @var    array<string, string>
+	 */
+	private const TABS = array(
+		'general' => 'General',
+		'fields'  => 'Field Configuration',
+		'agents'  => 'Agent Detection',
+	);
+
+	/**
+	 * The Settings API "page" identifier for a tab's sections/fields.
+	 *
+	 * @since  1.6.0
+	 * @param  string $tab Tab slug.
+	 * @return string
+	 */
+	private function tab_page( string $tab ): string {
+		return self::PAGE_SLUG . '-' . $tab;
+	}
+
+	/**
+	 * Resolve the active tab from the request, defaulting to the first tab.
+	 *
+	 * @since  1.6.0
+	 * @return string
+	 */
+	private function active_tab(): string {
+		// Read-only view switch; no state change, so no nonce required.
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return array_key_exists( $tab, self::TABS ) ? $tab : 'general';
+	}
+
+	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed> $options     Current plugin options.
-	 * @param  Generator            $generator   Generator instance for bulk generate actions.
 	 * @param  ArdCatalog|null      $ard_catalog Optional ARD catalog builder for the discovery panel.
 	 */
 	public function __construct(
 		private array $options,
-		private readonly Generator $generator,
 		private readonly ?ArdCatalog $ard_catalog = null
 	) {}
 
@@ -74,76 +108,49 @@ class SettingsPage {
 			)
 		);
 
+		// --- General tab -------------------------------------------------
+		$general = $this->tab_page( 'general' );
+
 		add_settings_section(
 			'markdown_for_agents_general',
 			__( 'General', 'markdown-for-agents-and-statistics' ),
 			'__return_false',
-			self::PAGE_SLUG
+			$general
 		);
 
-		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents-and-statistics' ), array( $this, 'field_post_types' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomies' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_include_hierarchy', __( 'Include hierarchy', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_hierarchy' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
-		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), self::PAGE_SLUG, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_post_types', __( 'Post types', 'markdown-for-agents-and-statistics' ), array( $this, 'field_post_types' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_export_dir', __( 'Export directory', 'markdown-for-agents-and-statistics' ), array( $this, 'field_export_dir' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_auto_generate', __( 'Auto-generate on save', 'markdown-for-agents-and-statistics' ), array( $this, 'field_auto_generate' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomies', __( 'Include taxonomies', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomies' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_hierarchy', __( 'Include hierarchy', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_hierarchy' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_author', __( 'Include author', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_author' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_relative_image_paths', __( 'Relative image paths', 'markdown-for-agents-and-statistics' ), array( $this, 'field_relative_image_paths' ), $general, 'markdown_for_agents_general' );
+		add_settings_field( 'markdown_for_agents_include_taxonomy_topics', __( 'Topics section', 'markdown-for-agents-and-statistics' ), array( $this, 'field_include_taxonomy_topics' ), $general, 'markdown_for_agents_general' );
 
 		add_settings_section(
 			'markdown_for_agents_discovery',
 			__( 'Agent discovery (OKF / ARD)', 'markdown-for-agents-and-statistics' ),
 			array( $this, 'section_discovery_intro' ),
-			self::PAGE_SLUG
+			$general
 		);
 
-		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_discovery' );
+		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), $general, 'markdown_for_agents_discovery' );
 
-		// Per-post-type field configuration sections.
-		$enabled_types = (array) ( $this->options['post_types'] ?? array() );
-		foreach ( $enabled_types as $type_slug ) {
-			$type_obj    = get_post_type_object( $type_slug );
-			$type_label  = $type_obj ? $type_obj->label : $type_slug;
-			$section_id  = 'markdown_for_agents_type_' . $type_slug;
+		// The Field Configuration tab is rendered manually (see render_fields_tab)
+		// so each post type can collapse into its own accordion.
 
-			add_settings_section(
-				$section_id,
-				/* translators: %s: post type label */
-				sprintf( __( 'Field Configuration: %s', 'markdown-for-agents-and-statistics' ), $type_label ),
-				'__return_false',
-				self::PAGE_SLUG
-			);
-
-			add_settings_field(
-				'markdown_for_agents_frontmatter_fields_' . $type_slug,
-				__( 'Frontmatter fields', 'markdown-for-agents-and-statistics' ),
-				function () use ( $type_slug ): void {
-					$this->field_type_frontmatter_fields( $type_slug );
-				},
-				self::PAGE_SLUG,
-				$section_id
-			);
-
-			add_settings_field(
-				'markdown_for_agents_content_fields_' . $type_slug,
-				__( 'Content fields', 'markdown-for-agents-and-statistics' ),
-				function () use ( $type_slug ): void {
-					$this->field_type_content_fields( $type_slug );
-				},
-				self::PAGE_SLUG,
-				$section_id
-			);
-		}
+		// --- Agent Detection tab ----------------------------------------
+		$agents = $this->tab_page( 'agents' );
 
 		add_settings_section(
 			'markdown_for_agents_ua_detection',
 			__( 'Agent Detection', 'markdown-for-agents-and-statistics' ),
 			'__return_false',
-			self::PAGE_SLUG
+			$agents
 		);
 
-		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_force_enabled' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
-		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_agent_strings' ), self::PAGE_SLUG, 'markdown_for_agents_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_force_enabled' ), $agents, 'markdown_for_agents_ua_detection' );
+		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_agent_strings' ), $agents, 'markdown_for_agents_ua_detection' );
 	}
 
 	/**
@@ -158,21 +165,58 @@ class SettingsPage {
 			return Options::get_defaults();
 		}
 
-		$defaults = Options::get_defaults();
-		$clean    = array();
+		// Start from the currently stored options and overlay only the fields on
+		// the submitted tab. With tabbed forms, other tabs' fields aren't in this
+		// POST at all, so a full rebuild would silently wipe them.
+		$clean  = Options::get();
+		$active = isset( $input['_active_tab'] ) ? sanitize_key( $input['_active_tab'] ) : '';
 
-		$clean['auto_generate']      = ! empty( $input['auto_generate'] );
-		$clean['include_taxonomies'] = ! empty( $input['include_taxonomies'] );
-		$clean['include_hierarchy']    = ! empty( $input['include_hierarchy'] );
+		if ( array_key_exists( $active, self::TABS ) ) {
+			switch ( $active ) {
+				case 'general':
+					$this->sanitize_general_fields( $input, $clean );
+					break;
+				case 'fields':
+					$this->sanitize_field_configs( $input, $clean );
+					break;
+				case 'agents':
+					$this->sanitize_agent_fields( $input, $clean );
+					break;
+			}
+		} else {
+			// No tab context (programmatic save or a legacy full-form submit):
+			// process every field. Order matters — general resolves post_types,
+			// which field configs depend on.
+			$this->sanitize_general_fields( $input, $clean );
+			$this->sanitize_field_configs( $input, $clean );
+			$this->sanitize_agent_fields( $input, $clean );
+		}
+
+		$this->maybe_flag_regeneration( $this->options, $clean );
+
+		return $clean;
+	}
+
+	/**
+	 * Sanitise the General tab fields, overlaying them onto $clean.
+	 *
+	 * @since  1.6.0
+	 * @param  array<string, mixed> $input Raw form input.
+	 * @param  array<string, mixed> $clean Options being built (mutated by reference).
+	 */
+	private function sanitize_general_fields( array $input, array &$clean ): void {
+		$defaults = Options::get_defaults();
+
+		$clean['auto_generate']           = ! empty( $input['auto_generate'] );
+		$clean['include_taxonomies']      = ! empty( $input['include_taxonomies'] );
+		$clean['include_hierarchy']       = ! empty( $input['include_hierarchy'] );
 		$clean['include_author']          = ! empty( $input['include_author'] );
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
 		$clean['bundle_enabled']          = ! empty( $input['bundle_enabled'] );
-		$clean['frontmatter_format']      = 'yaml';
 
 		// Export dir: validate it's a simple directory name, no path traversal.
-		$export_dir = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
-		// Strip any remaining double-dot sequences that could form traversal after sanitisation.
+		$export_dir          = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
 		$export_dir          = trim( str_replace( '..', '', $export_dir ), '-' );
 		$clean['export_dir'] = $export_dir ? $export_dir : $defaults['export_dir'];
 
@@ -181,9 +225,26 @@ class SettingsPage {
 		$submitted_types     = (array) ( $input['post_types'] ?? array() );
 		$clean['post_types'] = array_values( array_intersect( $submitted_types, $public_types ) );
 
-		// Per-post-type field configs: sanitise field names (allow dots for ACF groups).
+		// Drop field configs for post types that are no longer enabled; keep the
+		// rest untouched (they're edited on the Field Configuration tab).
+		$clean['post_type_configs'] = array_intersect_key(
+			(array) ( $clean['post_type_configs'] ?? array() ),
+			array_flip( $clean['post_types'] )
+		);
+	}
+
+	/**
+	 * Sanitise the Field Configuration tab (per-post-type frontmatter/content
+	 * field lists), rebuilding the configs for every enabled post type.
+	 *
+	 * @since  1.6.0
+	 * @param  array<string, mixed> $input Raw form input.
+	 * @param  array<string, mixed> $clean Options being built (mutated by reference).
+	 */
+	private function sanitize_field_configs( array $input, array &$clean ): void {
 		$type_configs = array();
-		foreach ( $clean['post_types'] as $type_slug ) {
+
+		foreach ( (array) ( $clean['post_types'] ?? array() ) as $type_slug ) {
 			$raw_frontmatter = (string) ( $input['post_type_configs'][ $type_slug ]['frontmatter_fields'] ?? '' );
 			$raw_content     = (string) ( $input['post_type_configs'][ $type_slug ]['content_fields'] ?? '' );
 
@@ -197,10 +258,18 @@ class SettingsPage {
 				);
 			}
 		}
+
 		$clean['post_type_configs'] = $type_configs;
+	}
 
-		$clean['delete_files_on_uninstall'] = ! empty( $input['delete_files_on_uninstall'] );
-
+	/**
+	 * Sanitise the Agent Detection tab fields, overlaying them onto $clean.
+	 *
+	 * @since  1.6.0
+	 * @param  array<string, mixed> $input Raw form input.
+	 * @param  array<string, mixed> $clean Options being built (mutated by reference).
+	 */
+	private function sanitize_agent_fields( array $input, array &$clean ): void {
 		$clean['ua_force_enabled'] = ! empty( $input['ua_force_enabled'] );
 
 		// UA agent strings: one per line, trim whitespace, drop empty lines.
@@ -210,10 +279,6 @@ class SettingsPage {
 		$ua_raw   = is_array( $ua_input ) ? implode( "\n", $ua_input ) : (string) $ua_input;
 		$ua_lines                  = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
 		$clean['ua_agent_strings'] = array_values( $ua_lines );
-
-		$this->maybe_flag_regeneration( $this->options, $clean );
-
-		return $clean;
 	}
 
 	/**
@@ -227,26 +292,26 @@ class SettingsPage {
 	 *
 	 * @since  1.2.0
 	 * @param  array<string, mixed> $old Existing saved options.
-	 * @param  array<string, mixed> $new Sanitised incoming options.
+	 * @param  array<string, mixed> $incoming Sanitised incoming options.
 	 */
-	private function maybe_flag_regeneration( array $old, array $new ): void {
+	private function maybe_flag_regeneration( array $old, array $incoming ): void {
 		$old_pt = (array) ( $old['post_types'] ?? array() );
-		$new_pt = (array) ( $new['post_types'] ?? array() );
+		$new_pt = (array) ( $incoming['post_types'] ?? array() );
 		sort( $old_pt );
 		sort( $new_pt );
 
 		$changed =
-			( $old['export_dir'] ?? null ) !== ( $new['export_dir'] ?? null )
-			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $new['include_taxonomies'] )
-			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $new['bundle_enabled'] )
+			( $old['export_dir'] ?? null ) !== ( $incoming['export_dir'] ?? null )
+			|| ! empty( $old['include_taxonomies'] ) !== ! empty( $incoming['include_taxonomies'] )
+			|| ! empty( $old['bundle_enabled'] ) !== ! empty( $incoming['bundle_enabled'] )
 			|| $old_pt !== $new_pt
-			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $new['post_type_configs'] ?? array() );
+			|| wp_json_encode( $old['post_type_configs'] ?? array() ) !== wp_json_encode( $incoming['post_type_configs'] ?? array() );
 
 		if ( ! $changed ) {
 			return;
 		}
 
-		$pending = array_values( (array) ( $new['post_types'] ?? array() ) );
+		$pending = array_values( (array) ( $incoming['post_types'] ?? array() ) );
 
 		if ( empty( $pending ) ) {
 			delete_transient( 'markdown_for_agents_needs_regen' );
@@ -265,19 +330,81 @@ class SettingsPage {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		$active = $this->active_tab();
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Markdown for Agents and Statistics', 'markdown-for-agents-and-statistics' ); ?></h1>
+
+			<p class="description" style="max-width:60em;">
+				<?php esc_html_e( 'Converts your published content to Markdown and serves it to AI agents that request it via HTTP content negotiation (Accept: text/markdown), cutting the tokens and server load needed to consume your pages. Use the tabs below to choose what is exported and how.', 'markdown-for-agents-and-statistics' ); ?>
+			</p>
+
+			<nav class="nav-tab-wrapper">
+				<?php foreach ( self::TABS as $slug => $label ) : ?>
+					<a href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'tab' => $slug ), admin_url( 'options-general.php' ) ) ); ?>"
+						class="nav-tab <?php echo $active === $slug ? 'nav-tab-active' : ''; ?>">
+						<?php echo esc_html( $label ); ?>
+					</a>
+				<?php endforeach; ?>
+			</nav>
+
 			<form method="post" action="options.php">
 				<?php
 				settings_fields( self::SETTINGS_GROUP );
-				do_settings_sections( self::PAGE_SLUG );
+				// Tell sanitize_options() which tab is being saved so it only
+				// re-evaluates that tab's fields and preserves the others.
+				printf( '<input type="hidden" name="%s[_active_tab]" value="%s">', esc_attr( Options::OPTION_KEY ), esc_attr( $active ) );
+
+				if ( 'fields' === $active ) {
+					$this->render_fields_tab();
+				} else {
+					do_settings_sections( $this->tab_page( $active ) );
+				}
+
 				submit_button();
 				?>
 			</form>
 			<?php $this->render_generate_buttons(); ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Render the Field Configuration tab: a section per enabled post type, all
+	 * expanded (moving them onto their own tab is what keeps the page manageable).
+	 *
+	 * @since  1.6.0
+	 */
+	private function render_fields_tab(): void {
+		$post_types = (array) ( $this->options['post_types'] ?? array() );
+
+		if ( empty( $post_types ) ) {
+			echo '<p>' . esc_html__( 'Enable one or more post types on the General tab to configure their fields.', 'markdown-for-agents-and-statistics' ) . '</p>';
+			return;
+		}
+
+		foreach ( $post_types as $type_slug ) {
+			$type_obj   = get_post_type_object( $type_slug );
+			$type_label = $type_obj ? $type_obj->label : $type_slug;
+			?>
+			<h2 class="title">
+				<?php
+				/* translators: %s: post type label */
+				printf( esc_html__( 'Field Configuration: %s', 'markdown-for-agents-and-statistics' ), esc_html( $type_label ) );
+				?>
+			</h2>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Frontmatter fields', 'markdown-for-agents-and-statistics' ); ?></th>
+					<td><?php $this->field_type_frontmatter_fields( $type_slug ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Content fields', 'markdown-for-agents-and-statistics' ); ?></th>
+					<td><?php $this->field_type_content_fields( $type_slug ); ?></td>
+				</tr>
+			</table>
+			<?php
+		}
 	}
 
 	/**

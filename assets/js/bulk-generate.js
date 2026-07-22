@@ -12,6 +12,56 @@
     var ALLOWED_ACTIONS = ['mfa_generate_batch', 'mfa_generate_taxonomy_batch'];
 
     /**
+     * Build (or replace) an expandable list of error details beneath a button.
+     *
+     * The AJAX response already carries a per-item {post_id|term_id, message}
+     * record for every failure (including genuine disk-write failures); this
+     * surfaces them instead of only a count. Details persist for the current
+     * session only — a fresh run of the same button clears them first.
+     *
+     * @param {HTMLButtonElement}                                             button
+     * @param {Array<{post_id?: number, term_id?: number, message: string}>} errors
+     */
+    function renderErrorDetails(button, errors) {
+        // Remove any list left over from a previous run of this button.
+        if (button.mfaErrorDetails && button.mfaErrorDetails.parentNode) {
+            button.mfaErrorDetails.parentNode.removeChild(button.mfaErrorDetails);
+        }
+        button.mfaErrorDetails = null;
+
+        if (!errors.length) {
+            return;
+        }
+
+        var details = document.createElement('details');
+        details.className = 'mfa-error-details';
+
+        var summary = document.createElement('summary');
+        summary.textContent = 'Show ' + errors.length + ' error' + (errors.length === 1 ? '' : 's');
+        details.appendChild(summary);
+
+        var list = document.createElement('ul');
+        list.style.margin = '0.5em 0 0 1.5em';
+        list.style.listStyle = 'disc';
+
+        errors.forEach(function (error) {
+            var id   = error.post_id || error.term_id || '';
+            var item = document.createElement('li');
+            item.textContent = (id ? '#' + id + ': ' : '') + (error.message || 'Unknown error');
+            list.appendChild(item);
+        });
+
+        details.appendChild(list);
+
+        // Insert after the button's containing paragraph, falling back to the button.
+        var anchor = button.parentNode || button;
+        if (anchor.parentNode) {
+            anchor.parentNode.insertBefore(details, anchor.nextSibling);
+        }
+        button.mfaErrorDetails = details;
+    }
+
+    /**
      * Send one batch request and recurse until all items are processed.
      *
      * @param {string}            action      AJAX action name.
@@ -69,6 +119,7 @@
                     : '';
                 button.textContent = 'Done: ' + accumulated.processed + ' processed' + errorSummary;
                 button.disabled = false;
+                renderErrorDetails(button, accumulated.errors);
                 if (onComplete) {
                     onComplete(true);
                 }
@@ -103,6 +154,7 @@
 
         button.disabled    = true;
         button.textContent = '0 / …';
+        renderErrorDetails(button, []);
 
         var accumulated = { processed: 0, errors: [] };
         sendBatch(action, postType, 0, accumulated, button);
@@ -146,6 +198,7 @@
 
             var step = queue[index];
             step.button.textContent = '0 / …';
+            renderErrorDetails(step.button, []);
 
             sendBatch(step.action, step.postType, 0, { processed: 0, errors: [] }, step.button, function (success) {
                 if (!success) {

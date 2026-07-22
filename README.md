@@ -248,6 +248,9 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list (OKF compatibility mode) |
 | `markdown_for_agents_index_content` | `(string $content, string $relative_path)` | Modify an `index.md` body before it is written |
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
+| `markdown_for_agents_converter_options` | `(array $options)` | Override the HTML→Markdown converter options |
+| `markdown_for_agents_cache_headers` | `(array $headers, string $filepath)` | Modify the cache-control headers sent with a Markdown response; map a header to `''` to omit it |
+| `markdown_for_agents_agent_categories` | `(array $map)` | Modify the intent-category → UA-substring map used to classify agents in stats |
 
 ---
 

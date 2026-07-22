@@ -53,7 +53,7 @@ class TaxonomyArchiveGenerator {
 	public function generate_term( \WP_Term $term ): bool {
 		$posts = $this->get_term_posts( $term );
 
-		$frontmatter = [
+		$frontmatter = array(
 			'title'      => html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' ),
 			'type'       => 'taxonomy_archive',
 			'taxonomy'   => $term->taxonomy,
@@ -61,7 +61,7 @@ class TaxonomyArchiveGenerator {
 			'term_id'    => $term->term_id,
 			'permalink'  => get_term_link( $term ),
 			'post_count' => count( $posts ),
-		];
+		);
 
 		if ( '' !== $term->description ) {
 			$frontmatter['description'] = $term->description;
@@ -150,13 +150,13 @@ class TaxonomyArchiveGenerator {
 	 * @return array{success: int, skipped: int, failed: int}
 	 */
 	public function generate_all( string $taxonomy = '' ): array {
-		$results    = [ 'success' => 0, 'skipped' => 0, 'failed' => 0 ];
+		$results    = array( 'success' => 0, 'skipped' => 0, 'failed' => 0 );
 		$taxonomies = $taxonomy
-			? [ $taxonomy ]
-			: array_keys( get_taxonomies( [ 'public' => true ] ) );
+			? array( $taxonomy )
+			: array_keys( get_taxonomies( array( 'public' => true ) ) );
 
 		foreach ( $taxonomies as $tax ) {
-			$terms = get_terms( [ 'taxonomy' => $tax, 'hide_empty' => false ] );
+			$terms = get_terms( array( 'taxonomy' => $tax, 'hide_empty' => false ) );
 
 			if ( is_wp_error( $terms ) || ! is_array( $terms ) ) {
 				continue;
@@ -187,33 +187,40 @@ class TaxonomyArchiveGenerator {
 	 */
 	public function generate_batch( int $offset, int $limit ): array {
 		if ( $limit <= 0 ) {
-			return [ 'total' => 0, 'processed' => 0, 'errors' => [] ];
+			return array( 'total' => 0, 'processed' => 0, 'errors' => array() );
 		}
 
 		$all_terms = $this->get_all_public_terms();
 		$total     = count( $all_terms );
 		$batch     = array_slice( $all_terms, $offset, $limit );
 		$processed = 0;
-		$errors    = [];
+		$errors    = array();
 
 		foreach ( $batch as $term ) {
 			try {
 				if ( $this->generate_term( $term ) ) {
 					++$processed;
+				} else {
+					// generate_term() has no skip path, so a false return means
+					// the filesystem write failed.
+					$errors[] = [
+						'term_id' => $term->term_id,
+						'message' => 'Failed to write Markdown archive to disk; check export directory permissions.',
+					];
 				}
 			} catch ( \Throwable $e ) {
-				$errors[] = [
+				$errors[] = array(
 					'term_id' => $term->term_id,
 					'message' => $e->getMessage(),
-				];
+				);
 			}
 		}
 
-		return [
+		return array(
 			'total'     => $total,
 			'processed' => $processed,
 			'errors'    => $errors,
-		];
+		);
 	}
 
 	// -----------------------------------------------------------------------
@@ -227,11 +234,11 @@ class TaxonomyArchiveGenerator {
 	 * @return \WP_Term[]
 	 */
 	private function get_all_public_terms(): array {
-		$taxonomies = array_keys( get_taxonomies( [ 'public' => true ] ) );
-		$all_terms  = [];
+		$taxonomies = array_keys( get_taxonomies( array( 'public' => true ) ) );
+		$all_terms  = array();
 
 		foreach ( $taxonomies as $tax ) {
-			$terms = get_terms( [ 'taxonomy' => $tax, 'hide_empty' => false ] );
+			$terms = get_terms( array( 'taxonomy' => $tax, 'hide_empty' => false ) );
 
 			if ( is_array( $terms ) && ! is_wp_error( $terms ) ) {
 				$all_terms = array_merge( $all_terms, $terms );
@@ -251,26 +258,26 @@ class TaxonomyArchiveGenerator {
 	private function get_term_posts( \WP_Term $term ): array {
 		$batch_size = 100;
 		$offset     = 0;
-		$all_posts  = [];
+		$all_posts  = array();
 
 		do {
 			$posts = get_posts( // phpcs:ignore WordPress.WP.PostsPerPage.posts_per_page_posts_per_page
-				[
+				array(
 					'post_type'      => ExportPolicy::enabled_post_types( $this->options ),
 					'post_status'    => 'publish',
 					'posts_per_page' => $batch_size,
 					'offset'         => $offset,
-					'tax_query'      => [ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
-						[
+					'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
+						array(
 							'taxonomy' => $term->taxonomy,
 							'field'    => 'term_id',
 							'terms'    => $term->term_id,
-						],
-					],
+						),
+					),
 					'orderby'        => 'date',
 					'order'          => 'DESC',
 					'no_found_rows'  => true,
-				]
+				)
 			);
 
 			$all_posts = array_merge( $all_posts, $posts );
@@ -292,12 +299,12 @@ class TaxonomyArchiveGenerator {
 		$name  = html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' );
 		$count = count( $posts );
 
-		$lines = [
+		$lines = array(
 			'# ' . $name,
 			'',
 			'Posts in this archive: ' . $count,
 			'',
-		];
+		);
 
 		$enabled_post_types = ExportPolicy::enabled_post_types( $this->options );
 

@@ -11,7 +11,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Queues actions and filters, then registers them all with WordPress on run().
  *
- * Following the dgwltd-boilerplate Loader pattern.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Core
@@ -42,11 +41,12 @@ class Loader {
 	 * @since  1.0.0
 	 */
 	public function run(): void {
-		foreach ( $this->filters as $hook ) {
-			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
-		}
 		foreach ( $this->actions as $hook ) {
 			add_action( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
+		}
+
+		foreach ( $this->filters as $hook ) {
+			add_filter( $hook['hook'], array( $hook['component'], $hook['callback'] ), $hook['priority'], $hook['accepted_args'] );
 		}
 	}
 
