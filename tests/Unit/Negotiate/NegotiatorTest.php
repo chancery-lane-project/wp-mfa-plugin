@@ -672,6 +672,179 @@ class NegotiatorTest extends TestCase {
         unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] );
     }
 
+    public function test_cache_headers_filter_receives_accept_header_access_method(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $filter_method = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] = static function ( array $headers, string $filepath, string $access_method ) use ( &$filter_method ): array {
+            $filter_method = $access_method;
+            return $headers;
+        };
+
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( 'accept-header', $filter_method );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] );
+    }
+
+    public function test_cache_headers_filter_receives_query_param_access_method(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_GET['output_format']           = 'md';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->method( 'log_access' );
+
+        $filter_method = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] = static function ( array $headers, string $filepath, string $access_method ) use ( &$filter_method ): array {
+            $filter_method = $access_method;
+            return $headers;
+        };
+
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( 'query-param', $filter_method );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] );
+    }
+
+    public function test_cache_headers_filter_receives_access_method_on_taxonomy_branch(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $filter_method = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] = static function ( array $headers, string $filepath, string $access_method ) use ( &$filter_method ): array {
+            $filter_method = $access_method;
+            return $headers;
+        };
+
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame( 'accept-header', $filter_method );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_cache_headers'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // output_html_headers — Link + Vary on the HTML response
+    // -----------------------------------------------------------------------
+
+    public function test_html_headers_sent_when_md_file_exists(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $GLOBALS['_mock_permalink']      = 'https://example.com/test-post/';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $this->make_negotiator()->output_html_headers();
+
+        $link_headers = array_values( array_filter(
+            $GLOBALS['_mock_sent_headers'],
+            static fn( string $h ): bool => str_starts_with( $h, 'Link: ' )
+        ) );
+        $this->assertCount( 1, $link_headers );
+        $this->assertStringContainsString( 'rel="alternate"', $link_headers[0] );
+        $this->assertStringContainsString( 'type="text/markdown"', $link_headers[0] );
+        $this->assertStringContainsString( 'output_format=md', $link_headers[0] );
+        $this->assertContains( 'Vary: Accept', $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public function test_html_headers_not_sent_when_md_file_missing(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/path/post.md' );
+
+        $this->make_negotiator()->output_html_headers();
+
+        $this->assertSame( [], $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public function test_html_headers_not_sent_for_excluded_post(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_meta'][1]['_markdown_for_agents_excluded'] = '1';
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+
+        $this->generator->expects( $this->never() )->method( 'get_export_path' );
+
+        $this->make_negotiator()->output_html_headers();
+
+        $this->assertSame( [], $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public function test_html_headers_sent_on_taxonomy_archive(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $this->make_negotiator()->output_html_headers();
+
+        $this->assertContains( 'Vary: Accept', $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public function test_html_headers_filter_can_omit_vary(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $post = $this->make_post();
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $post;
+        $GLOBALS['_mock_permalink']      = 'https://example.com/test-post/';
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_html_headers'] = static function ( array $headers ): array {
+            $headers['Vary'] = '';
+            return $headers;
+        };
+
+        $this->make_negotiator()->output_html_headers();
+
+        $this->assertNotContains( 'Vary: Accept', $GLOBALS['_mock_sent_headers'] );
+        $this->assertNotEmpty( array_filter(
+            $GLOBALS['_mock_sent_headers'],
+            static fn( string $h ): bool => str_starts_with( $h, 'Link: ' )
+        ) );
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_html_headers'] );
+    }
+
     public function test_code_path_completes_when_content_signal_filter_returns_empty_string(): void {
         $md_file = $this->tmp_dir . '/test-post.md';
         file_put_contents( $md_file, '# Test' );

@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -194,7 +194,8 @@ Yes. Several filters are available:
 * `markdown_for_agents_taxonomy_frontmatter` — modify frontmatter fields for a taxonomy archive
 * `markdown_for_agents_serve_enabled` — enable/disable serving for a specific post
 * `markdown_for_agents_serve_taxonomies` — enable/disable serving for taxonomy archive pages
-* `markdown_for_agents_cache_headers` — override the cache-related headers sent with the Markdown response
+* `markdown_for_agents_cache_headers` — override the cache-related headers sent with the Markdown response (receives the access method since 1.6.1)
+* `markdown_for_agents_html_headers` — modify or omit the `Link` and `Vary: Accept` headers added to HTML responses that have a Markdown alternate
 * `markdown_for_agents_file_generated` — action fired after a file is written
 * `markdown_for_agents_file_deleted` — action fired after a file is deleted
 
@@ -202,20 +203,34 @@ Yes. Several filters are available:
 
 By default the Markdown response is sent with `Cache-Control: private, no-store, max-age=0` (plus `X-LiteSpeed-Cache-Control`, `X-Accel-Expires` and `Vary: Accept, User-Agent`). This is deliberate: the Markdown is negotiated on the *same URL* as the HTML page, so a shared cache that ignores or normalises `Vary` could otherwise store the Markdown variant and replay it to ordinary browsers expecting HTML.
 
-If your CDN/cache layer honours `Vary` correctly (or you serve Markdown from distinct URLs), you can relax this with the `markdown_for_agents_cache_headers` filter. Map any header to an empty string to omit it entirely:
+The safe way to relax this is per access method, which the `markdown_for_agents_cache_headers` filter receives as its third argument (since 1.6.1). Requests via `?output_format=md` are on their own URL — and therefore their own cache key — so they can be cached publicly with no risk of variant confusion. Requests negotiated via the `Accept` header or detected by User-Agent share the page URL with the HTML and should stay private unless you are certain every cache layer in front of the site keys on `Accept`. Map any header to an empty string to omit it entirely:
 
 ```
-add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath ) {
-	$headers['Cache-Control']             = 'public, max-age=300';
-	$headers['X-LiteSpeed-Cache-Control'] = '';
-	$headers['X-Accel-Expires']           = '';
+add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath, string $access_method ) {
+	// Safe: ?output_format=md is a distinct URL with its own cache key.
+	if ( 'query-param' === $access_method ) {
+		$headers['Cache-Control']             = 'public, max-age=300';
+		$headers['X-LiteSpeed-Cache-Control'] = '';
+		$headers['X-Accel-Expires']           = '';
+	}
+	// 'accept-header' and 'ua' responses share the HTML page's URL — leave
+	// them private: a cache that ignores `Vary` (many do, including some
+	// managed WordPress hosts and CDNs) would replay Markdown to browsers.
 	return $headers;
-}, 10, 2 );
+}, 10, 3 );
 ```
+
+The default values on `$filepath` and `$access_method` are deliberate: plugin versions before 1.6.1 pass fewer arguments to this filter, and required parameters would fatal every Markdown response with an `ArgumentCountError` if the snippet outlives a plugin downgrade (or is deployed ahead of the upgrade). With the defaults it is a safe no-op on older versions and activates automatically on 1.6.1+.
 
 This filter governs only the cache-related headers listed above. The `Content-Signal` and `X-Markdown-Source` headers are sent separately and are unaffected (`Content-Signal` has its own `markdown_for_agents_content_signal` filter).
 
-Override with caution — incorrectly cached Markdown will be served to browsers.
+One caveat on caching the query-param URL: if a cache in front of the site is configured to *ignore query strings* when building cache keys, `?output_format=md` collapses onto the page URL's key and a public Markdown response could be served to browsers. The default therefore stays private; opt in only when you know your cache keys include the query string.
+
+= Why do HTML pages send `Vary: Accept` and a `Link` header? =
+
+Since 1.6.1, pages that have a Markdown alternate send two extra headers with the HTML response: `Link: <…?output_format=md>; rel="alternate"; type="text/markdown"` (protocol-level discovery, visible to HEAD requests and clients that do not parse HTML) and `Vary: Accept` (tells spec-correct shared caches not to replay a stored HTML variant to a client asking for `text/markdown` on the same URL — without it, a primed page cache answers agents with HTML before WordPress runs).
+
+Both can be modified or removed with the `markdown_for_agents_html_headers` filter (map a header to an empty string to omit it). You may want to omit `Vary: Accept` if your cache layer refuses to store responses whose `Vary` lists anything beyond `Accept-Encoding`, as full-page caching then stops working entirely; in that case rely on the query-param URL for agent access instead.
 
 = How do I generate taxonomy archives via WP-CLI? =
 
@@ -232,6 +247,10 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.6.1 =
+* Harden content negotiation against full-page caches that ignore `Vary` (observed on managed WordPress hosting: a cached HTML variant is served at the edge before WordPress runs, so `Accept: text/markdown` requests receive HTML). HTML responses for pages with a Markdown alternate now send `Vary: Accept` plus an HTTP `Link: <…>; rel="alternate"; type="text/markdown"` header, so HEAD-only clients and non-HTML-parsing agents can discover the query-param URL, which is immune to cache-variant confusion. New `markdown_for_agents_html_headers` filter to modify or omit either header.
+* The `markdown_for_agents_cache_headers` filter now receives the access method (`query-param`, `accept-header` or `ua`) as a third argument, so cache policy can be relaxed only for query-param requests (a distinct URL with its own cache key) while same-URL negotiated responses stay uncacheable. Defaults are unchanged.
 
 = 1.6.0 =
 * Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.

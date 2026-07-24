@@ -175,6 +175,9 @@ class Plugin {
 		$access_logger  = new AccessLogger( $stats_repo );
 		$negotiator     = new Negotiator( $options, $this->generator, $this->taxonomy_generator, $agent_detector, $access_logger );
 		$this->loader->add_action( 'template_redirect', $negotiator, 'maybe_serve_markdown', 1 );
+		// Priority 2 runs directly after maybe_serve_markdown, which exits when
+		// it serves Markdown — so these headers only ever reach HTML responses.
+		$this->loader->add_action( 'template_redirect', $negotiator, 'output_html_headers', 2 );
 		$this->loader->add_action( 'wp_head', $negotiator, 'output_link_tag', 1 );
 	}
 
