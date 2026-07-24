@@ -11,7 +11,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Queues actions and filters, then registers them all with WordPress on run().
  *
- *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Core
  */

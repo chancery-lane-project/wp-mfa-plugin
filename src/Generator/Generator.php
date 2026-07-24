@@ -218,9 +218,8 @@ class Generator {
 				if ( $this->generate_post( $post ) ) {
 					++$processed;
 				} elseif ( $this->is_eligible( $post ) ) {
-					// Eligible post that did not write means the filesystem write
-					// failed. (Ineligible posts return false too, but are an
-					// intentional skip, not an error.)
+					// Eligible post that did not write means the filesystem write failed.
+					// Ineligible posts return false too, but that is an intentional skip, not an error.
 					$errors[] = array(
 						'post_id' => $post_id,
 						'message' => 'Failed to write Markdown file to disk; check export directory permissions.',

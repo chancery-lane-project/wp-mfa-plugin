@@ -269,13 +269,13 @@ class SettingsPageTest extends TestCase {
 
     public function test_register_adds_discovery_section(): void {
         $this->make_page()->register();
-        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents'] ?? [];
+        $sections = $GLOBALS['_mock_settings_sections']['markdown-for-agents-general'] ?? [];
         $this->assertContains( 'markdown_for_agents_discovery', $sections );
     }
 
     public function test_register_adds_discovery_fields(): void {
         $this->make_page()->register();
-        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents'] ?? [];
+        $fields = $GLOBALS['_mock_settings_fields']['markdown-for-agents-general'] ?? [];
         $this->assertContains( 'markdown_for_agents_bundle_enabled', $fields );
         $this->assertNotContains( 'markdown_for_agents_okf_compat', $fields );
         $this->assertNotContains( 'markdown_for_agents_ard_enabled', $fields );
