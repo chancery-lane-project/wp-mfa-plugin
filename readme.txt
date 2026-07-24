@@ -251,6 +251,9 @@ wp markdown-agents generate-taxonomies --dry-run
 = 1.6.1 =
 * Harden content negotiation against full-page caches that ignore `Vary` (observed on managed WordPress hosting: a cached HTML variant is served at the edge before WordPress runs, so `Accept: text/markdown` requests receive HTML). HTML responses for pages with a Markdown alternate now send `Vary: Accept` plus an HTTP `Link: <…>; rel="alternate"; type="text/markdown"` header, so HEAD-only clients and non-HTML-parsing agents can discover the query-param URL, which is immune to cache-variant confusion. New `markdown_for_agents_html_headers` filter to modify or omit either header.
 * The `markdown_for_agents_cache_headers` filter now receives the access method (`query-param`, `accept-header` or `ua`) as a third argument, so cache policy can be relaxed only for query-param requests (a distinct URL with its own cache key) while same-URL negotiated responses stay uncacheable. Defaults are unchanged.
+* Performance and scaling fixes: bundle builds on large exports no longer risk timing out (the `.zip` writer now scales linearly with file count instead of quadratically), and internal links written against a post's previous slug are resolved correctly again.
+* Bulk generation errors are now surfaced in the admin UI, with per-item detail (post/term and reason) rather than a silent failure or bare count.
+* Add a "Settings" link to the plugin's entry on the Plugins list page.
 
 = 1.6.0 =
 * Add OKF (Open Knowledge Format) directory indexes: `index.md` listings generated at the export root and in every post-type and taxonomy directory, regenerated automatically as content changes. New `wp markdown-agents generate-indexes` command (with `--dry-run`); `status` and `delete --all` are index-aware.
