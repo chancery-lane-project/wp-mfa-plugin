@@ -320,6 +320,13 @@ if (!function_exists('sanitize_key')) {
     }
 }
 
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $title): string {
+        $title = strtolower(trim($title));
+        return trim(preg_replace('/-+/', '-', preg_replace('/[^a-z0-9_-]/', '-', $title) ?? $title) ?? $title, '-');
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     function sanitize_text_field(string $str): string {
         return trim(strip_tags($str)); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
@@ -418,6 +425,28 @@ if (!function_exists('get_posts')) {
 
         if (isset($args['name']) && '' !== $args['name']) {
             $posts = array_values(array_filter($posts, fn($p) => $p->post_name === $args['name']));
+        }
+
+        // Minimal meta_query support: AND of simple key/value equality clauses,
+        // matched against $GLOBALS['_mock_post_meta'][ID][key] (scalar or array).
+        foreach ((array) ($args['meta_query'] ?? []) as $clause) {
+            if (!is_array($clause) || !isset($clause['key'])) {
+                continue;
+            }
+
+            $posts = array_values(array_filter($posts, function ($p) use ($clause) {
+                if (!$p instanceof \WP_Post) {
+                    return false;
+                }
+
+                $stored = $GLOBALS['_mock_post_meta'][$p->ID][$clause['key']] ?? null;
+
+                if (null === $stored) {
+                    return false;
+                }
+
+                return in_array((string) ($clause['value'] ?? ''), array_map('strval', (array) $stored), true);
+            }));
         }
 
         return $posts;

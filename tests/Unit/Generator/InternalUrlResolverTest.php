@@ -20,6 +20,9 @@ class InternalUrlResolverTest extends TestCase {
 		$GLOBALS['_mock_taxonomies']          = [ 'category' => 'category' ];
 		$GLOBALS['_mock_taxonomy_terms']      = [];
 		$GLOBALS['_mock_term_link']           = [];
+		$GLOBALS['_mock_posts']               = [];
+		$GLOBALS['_mock_get_posts_args']      = [];
+		$GLOBALS['_mock_fired_actions']       = [];
 	}
 
 	protected function tearDown(): void {
@@ -30,8 +33,27 @@ class InternalUrlResolverTest extends TestCase {
 			$GLOBALS['_mock_url_to_postid_calls'],
 			$GLOBALS['_mock_taxonomies'],
 			$GLOBALS['_mock_taxonomy_terms'],
-			$GLOBALS['_mock_term_link']
+			$GLOBALS['_mock_term_link'],
+			$GLOBALS['_mock_posts'],
+			$GLOBALS['_mock_get_posts_args'],
+			$GLOBALS['_mock_fired_actions']
 		);
+	}
+
+	/**
+	 * Register a post that is reachable only by a superseded slug.
+	 */
+	private function register_old_slug( \WP_Post $post, string $old_slug ): void {
+		$GLOBALS['_mock_posts'][]                          = $post;
+		$GLOBALS['_mock_post_objects'][ $post->ID ]        = $post;
+		$GLOBALS['_mock_post_meta'][ $post->ID ]['_wp_old_slug'] = [ $old_slug ];
+	}
+
+	/**
+	 * @return list<array{0: string, 1: string}>
+	 */
+	private function unresolved_events(): array {
+		return $GLOBALS['_mock_fired_actions']['markdown_for_agents_unresolved_link'] ?? [];
 	}
 
 	private function make_post( array $props = [] ): \WP_Post {
@@ -165,6 +187,104 @@ class InternalUrlResolverTest extends TestCase {
 		$r->resolve( 'https://example.com/nowhere/' );
 
 		$this->assertSame( 1, $GLOBALS['_mock_url_to_postid_calls'] );
+	}
+
+	public function test_old_slug_resolves_to_current_export_path(): void {
+		$post = $this->make_post( [ 'post_name' => 'scope-1-2-and-3-emissions' ] );
+		$this->register_old_slug( $post, 'scope-emissions' );
+
+		$r = $this->resolver();
+
+		$this->assertSame(
+			'post/scope-1-2-and-3-emissions.md',
+			$r->resolve( 'https://example.com/glossary/scope-emissions/' )
+		);
+	}
+
+	public function test_old_slug_lookup_only_runs_when_url_to_postid_fails(): void {
+		$post = $this->make_post();
+		$GLOBALS['_mock_post_objects'][1] = $post;
+		$GLOBALS['_mock_url_to_postid']['https://example.com/my-post/'] = 1;
+
+		$r = $this->resolver();
+		$r->resolve( 'https://example.com/my-post/' );
+
+		$this->assertArrayNotHasKey( 'meta_query', $GLOBALS['_mock_get_posts_args'] ?? [] );
+	}
+
+	public function test_ambiguous_old_slug_returns_null(): void {
+		$this->register_old_slug( $this->make_post( [ 'ID' => 1, 'post_name' => 'first' ] ), 'shared' );
+		$this->register_old_slug( $this->make_post( [ 'ID' => 2, 'post_name' => 'second' ] ), 'shared' );
+
+		$r = $this->resolver();
+
+		$this->assertNull( $r->resolve( 'https://example.com/shared/' ) );
+	}
+
+	public function test_old_slug_match_still_honours_export_eligibility(): void {
+		$post = $this->make_post( [ 'post_type' => 'product' ] );
+		$this->register_old_slug( $post, 'old-name' );
+
+		$r = $this->resolver();
+
+		$this->assertNull( $r->resolve( 'https://example.com/old-name/' ) );
+	}
+
+	public function test_old_slug_lookup_is_skipped_for_pathless_urls(): void {
+		$r = $this->resolver();
+
+		$this->assertNull( $r->resolve( 'https://example.com/' ) );
+		$this->assertArrayNotHasKey( 'meta_query', $GLOBALS['_mock_get_posts_args'] ?? [] );
+	}
+
+	public function test_unresolved_internal_link_fires_action_with_not_found_reason(): void {
+		$r = $this->resolver();
+		$r->resolve( 'https://example.com/nowhere/' );
+
+		$this->assertSame(
+			[ [ 'https://example.com/nowhere/', 'not_found' ] ],
+			$this->unresolved_events()
+		);
+	}
+
+	public function test_unresolved_internal_link_reports_ineligible_when_post_matched(): void {
+		$post = $this->make_post( [ 'post_type' => 'product' ] );
+		$GLOBALS['_mock_post_objects'][1] = $post;
+		$GLOBALS['_mock_url_to_postid']['https://example.com/my-post/'] = 1;
+
+		$r = $this->resolver();
+		$r->resolve( 'https://example.com/my-post/' );
+
+		$this->assertSame(
+			[ [ 'https://example.com/my-post/', 'ineligible' ] ],
+			$this->unresolved_events()
+		);
+	}
+
+	public function test_external_url_does_not_fire_unresolved_action(): void {
+		$r = $this->resolver();
+		$r->resolve( 'https://elsewhere.org/other-post/' );
+
+		$this->assertSame( [], $this->unresolved_events() );
+	}
+
+	public function test_resolved_link_does_not_fire_unresolved_action(): void {
+		$post = $this->make_post();
+		$GLOBALS['_mock_post_objects'][1] = $post;
+		$GLOBALS['_mock_url_to_postid']['https://example.com/my-post/'] = 1;
+
+		$r = $this->resolver();
+		$r->resolve( 'https://example.com/my-post/' );
+
+		$this->assertSame( [], $this->unresolved_events() );
+	}
+
+	public function test_unresolved_action_fires_once_per_url(): void {
+		$r = $this->resolver();
+		$r->resolve( 'https://example.com/nowhere/' );
+		$r->resolve( 'https://example.com/nowhere/' );
+
+		$this->assertCount( 1, $this->unresolved_events() );
 	}
 
 	public function test_term_map_is_built_once_across_multiple_lookups(): void {
