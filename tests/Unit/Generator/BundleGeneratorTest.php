@@ -139,6 +139,26 @@ class BundleGeneratorTest extends TestCase {
         $this->assertArrayHasKey( 'manifest.json', $entries );
     }
 
+    public function test_build_packs_every_entry_of_a_many_file_tree(): void {
+        // Regression: the writer must flush all entries in one pass. A partial
+        // flush (or a dropped tail) would only show once the tree is larger
+        // than a single trivial file — the case the ZipArchive switch targets.
+        $expected = [];
+        for ( $i = 0; $i < 250; $i++ ) {
+            $rel = 'post/slug-' . $i . '.md';
+            $this->write_file( $rel, "# Item {$i}\n" );
+            $expected[] = $rel;
+        }
+
+        $this->assertTrue( $this->generator->build() );
+
+        $entries = $this->read_archive_entries( $this->generator->bundle_path() );
+        foreach ( $expected as $rel ) {
+            $this->assertArrayHasKey( $rel, $entries );
+        }
+        $this->assertCount( count( $expected ), $entries );
+    }
+
     public function test_build_handles_filenames_beyond_the_ustar_100_char_limit(): void {
         // Regression: PharData's tar writer is ustar-only and rejects names
         // over 100 characters — real clause slugs exceed that, which is why

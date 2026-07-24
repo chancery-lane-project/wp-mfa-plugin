@@ -106,25 +106,30 @@ class BundleGenerator {
 		$bundle_path = $this->bundle_path();
 		// ZIP rather than tar: PharData's tar writer is ustar-only, capping
 		// filenames at 100 characters — real post slugs exceed that. OKF §3
-		// permits zip explicitly, and PharData zip has no such limit.
+		// permits zip explicitly, and neither zip writer has that limit.
 		$tmp_zip = $bundle_path . '.tmp-' . getmypid() . '.zip';
 
 		try {
-			$phar     = new \PharData( $tmp_zip );
 			$base_url = Options::get_export_base_url( $this->options );
 
-			foreach ( $this->iterate_export_tree( $base ) as $relative_path => $absolute_path ) {
-				$content = (string) file_get_contents( $absolute_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+			// ZipArchive buffers entries and flushes once on close(), so a
+			// whole tree costs a single archive write. PharData::addFromString()
+			// re-serialises the ENTIRE archive to disk on every call, which is
+			// quadratic in file count: a real ~2,500-file export took ~90s and
+			// could exceed max_execution_time mid-request, freezing the bulk
+			// generator on its final batch. Prefer ZipArchive when ext-zip is
+			// available; fall back to the slow-but-correct PharData path only
+			// where it is not.
+			$written = class_exists( '\ZipArchive' )
+				? $this->write_with_ziparchive( $tmp_zip, $base, $base_url )
+				: $this->write_with_phardata( $tmp_zip, $base, $base_url );
 
-				if ( str_ends_with( $relative_path, '.md' ) ) {
-					$content = $this->rewrite_to_relative_links( $content, $relative_path, $base_url );
+			if ( ! $written ) {
+				if ( file_exists( $tmp_zip ) ) {
+					unlink( $tmp_zip ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 				}
-
-				$phar->addFromString( $relative_path, $content );
+				return false;
 			}
-
-			$phar->compressFiles( \Phar::GZ );
-			unset( $phar );
 
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename, WordPress.PHP.NoSilencedErrors.Discouraged -- Suppressed: a failed rename (cross-filesystem, permissions, disk full) is an expected, handled outcome, not a bug to surface as a PHP warning.
 			if ( ! @rename( $tmp_zip, $bundle_path ) ) {
@@ -149,6 +154,70 @@ class BundleGenerator {
 
 			return false;
 		}
+	}
+
+	/**
+	 * Write the export tree into a zip at $tmp_zip using ext-zip's ZipArchive.
+	 *
+	 * Entries are added in memory and written once on close(), giving a single
+	 * linear pass over the tree regardless of file count.
+	 *
+	 * @since  1.6.2
+	 * @param  string $tmp_zip  Destination archive path.
+	 * @param  string $base     Absolute export base directory.
+	 * @param  string $base_url Export base URL, no trailing slash.
+	 * @return bool True on success; false if the archive could not be opened or closed.
+	 */
+	private function write_with_ziparchive( string $tmp_zip, string $base, string $base_url ): bool {
+		$zip = new \ZipArchive();
+
+		if ( true !== $zip->open( $tmp_zip, \ZipArchive::CREATE | \ZipArchive::OVERWRITE ) ) {
+			return false;
+		}
+
+		foreach ( $this->iterate_export_tree( $base ) as $relative_path => $absolute_path ) {
+			$content = (string) file_get_contents( $absolute_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+			if ( str_ends_with( $relative_path, '.md' ) ) {
+				$content = $this->rewrite_to_relative_links( $content, $relative_path, $base_url );
+			}
+
+			$zip->addFromString( $relative_path, $content );
+		}
+
+		return $zip->close();
+	}
+
+	/**
+	 * Write the export tree into a zip at $tmp_zip using PharData.
+	 *
+	 * Fallback for environments without ext-zip. Correct but quadratic in file
+	 * count (each addFromString() re-serialises the whole archive), so it is
+	 * only used when ZipArchive is unavailable.
+	 *
+	 * @since  1.6.2
+	 * @param  string $tmp_zip  Destination archive path.
+	 * @param  string $base     Absolute export base directory.
+	 * @param  string $base_url Export base URL, no trailing slash.
+	 * @return bool Always true (throws on failure, caught by build()).
+	 */
+	private function write_with_phardata( string $tmp_zip, string $base, string $base_url ): bool {
+		$phar = new \PharData( $tmp_zip );
+
+		foreach ( $this->iterate_export_tree( $base ) as $relative_path => $absolute_path ) {
+			$content = (string) file_get_contents( $absolute_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+			if ( str_ends_with( $relative_path, '.md' ) ) {
+				$content = $this->rewrite_to_relative_links( $content, $relative_path, $base_url );
+			}
+
+			$phar->addFromString( $relative_path, $content );
+		}
+
+		$phar->compressFiles( \Phar::GZ );
+		unset( $phar );
+
+		return true;
 	}
 
 	/**
