@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.6.1
+Stable tag: 1.6.2
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -247,6 +247,12 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.6.2 =
+* Refresh the default AI User-Agent list from 13 strings to 70, sourced from the Cloudflare Radar bot directory. Radar verifies bot operators rather than accepting community reports, and its `AI_ASSISTANT`, `AI_SEARCH` and `AI_CRAWLER` categories map directly onto the plugin's existing On-demand, Search and Training intent categories. New entries include `MistralAI-User`, `Google-Agent`, `DuckAssistBot`, `meta-externalfetcher`, `Claude-SearchBot`, `Bravebot`, `Amzn-SearchBot`, `Cloudflare-AI-Search`, `KimiBot`, `PetalBot`, `GoogleOther`, `CloudVertexBot` and `ICC-Crawler`. Each entry in `Options::get_defaults()` is annotated with its source.
+* Fix a mismatch between detection and stats categorising: `OAI-SearchBot`, `Claude-User` and `Perplexity-User` were classified by the stats "intent" categories but were absent from the detection list, so the On-demand category could never be populated from User-Agent matches.
+* Extend the intent-category map to cover every shipped User-Agent string. The change is strictly append-only: all thirteen original User-Agent strings are retained and each still matches to the same stored label and resolves to the same category as in 1.6.1, so existing statistics are unaffected. New entries use specific rather than broad substrings, so no agent's history splits across two labels — `Applebot` is deliberately excluded for this reason, since it would shadow the existing `Applebot-Extended` label.
+* Existing installations keep their saved User-Agent list; the new defaults apply to fresh installs. To adopt them, drop the saved value so the defaults reapply: `wp option patch delete markdown_for_agents_options ua_agent_strings`. Note that emptying the settings textarea is not equivalent — that saves an empty list and stops User-Agent matching altogether.
 
 = 1.6.1 =
 * Harden content negotiation against full-page caches that ignore `Vary` (observed on managed WordPress hosting: a cached HTML variant is served at the edge before WordPress runs, so `Accept: text/markdown` requests receive HTML). HTML responses for pages with a Markdown alternate now send `Vary: Accept` plus an HTTP `Link: <…>; rel="alternate"; type="text/markdown"` header, so HEAD-only clients and non-HTML-parsing agents can discover the query-param URL, which is immune to cache-variant confusion. New `markdown_for_agents_html_headers` filter to modify or omit either header.
