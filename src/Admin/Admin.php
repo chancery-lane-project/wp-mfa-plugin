@@ -9,6 +9,8 @@ use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
+use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
 
 /**
  * Admin coordinator — wires SettingsPage and MetaBox and handles POST actions.
@@ -27,8 +29,11 @@ class Admin {
 	 * @param  array<string, mixed>  $options          Current plugin options.
 	 * @param  Generator             $generator        Generator instance; also used to write manifests before a bundle rebuild.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
-	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
+	 * @param  BundleGenerator|null  $bundle_generator Retained for constructor-signature compatibility; the bundle
+	 *                                                 zip/manifest rebuild now runs as BundleStage inside the job queue.
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
+	 * @param  GenerationJob|null    $generation_job   Optional job repository; absent means the AJAX job endpoints 500.
+	 * @param  StageFactory|null     $stage_factory    Optional stage-list builder; absent means the AJAX job endpoints 500.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -36,6 +41,8 @@ class Admin {
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly ?BundleGenerator $bundle_generator = null,
 		?ArdCatalog $ard_catalog = null,
+		private readonly ?GenerationJob $generation_job = null,
+		private readonly ?StageFactory $stage_factory = null,
 	) {
 		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
@@ -161,111 +168,87 @@ class Admin {
 	}
 
 	/**
-	 * Handle the AJAX batch-generate request.
+	 * Start a bulk generation job.
 	 *
-	 * Processes one paginated slice (offset + limit) for a post type and
-	 * returns JSON with total found, processed count, and any per-post errors.
+	 * Hooked to `wp_ajax_mfa_start_generation_job`. Returns immediately — all
+	 * work happens in the WP-Cron tick chain, so closing the tab is harmless.
 	 *
-	 * Hooked to `wp_ajax_mfa_generate_batch`.
-	 *
-	 * @since  1.1.0
+	 * @since  1.7.0
 	 */
-	public function handle_generate_batch_ajax(): void {
+	public function handle_start_generation_job_ajax(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
 			return;
 		}
 
-		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+		check_ajax_referer( 'mfa_generation_job', 'nonce' );
 
-		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$offset    = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$limit     = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-
-		if ( '' === $post_type ) {
-			wp_send_json_error( array( 'message' => 'post_type is required.' ), 400 );
+		if ( null === $this->generation_job || null === $this->stage_factory ) {
+			wp_send_json_error( array( 'message' => 'Generation queue unavailable.' ), 500 );
 			return;
 		}
 
-		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
+		$scope  = sanitize_text_field( wp_unslash( (string) ( $_POST['scope'] ?? '' ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$stages = $this->stage_factory->build_stage_list( $scope );
 
-		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( sprintf( 'WP Markdown for Agents: generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
+		if ( empty( $stages ) ) {
+			wp_send_json_error( array( 'message' => 'Nothing to generate for that scope.' ), 400 );
+			return;
 		}
 
-		// Final batch for this post type — drop it from the pending-regen list.
-		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
-			$this->needs_regen->clear( $post_type );
-			$this->maybe_rebuild_bundle();
+		$result = $this->generation_job->start( $stages );
+
+		if ( ! $result['ok'] ) {
+			// 409: a job is already live. The UI switches to that job's progress
+			// rather than showing an error.
+			wp_send_json_error(
+				array(
+					'message' => $result['message'],
+					'job'     => $this->public_job_record(),
+				),
+				409
+			);
+			return;
 		}
 
-		wp_send_json_success( $result );
-		return;
+		wp_send_json_success( $this->public_job_record() );
 	}
 
 	/**
-	 * Handle the AJAX taxonomy-batch-generate request.
+	 * Return the current job record for polling.
 	 *
-	 * Hooked to `wp_ajax_mfa_generate_taxonomy_batch`.
+	 * Hooked to `wp_ajax_mfa_job_status`. Read-only.
 	 *
-	 * @since  1.1.0
+	 * @since  1.7.0
 	 */
-	public function handle_generate_taxonomy_batch_ajax(): void {
+	public function handle_job_status_ajax(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
 			return;
 		}
 
-		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+		check_ajax_referer( 'mfa_generation_job', 'nonce' );
 
-		$offset = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$limit  = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-
-		$result = $this->taxonomy_generator->generate_batch( $offset, $limit );
-
-		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( sprintf( 'WP Markdown for Agents: taxonomy generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
-		}
-
-		// Final batch — rebuild the bundle, mirroring handle_generate_batch_ajax().
-		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
-			$this->maybe_rebuild_bundle();
-		}
-
-		wp_send_json_success( $result );
-		return;
-	}
-
-	/**
-	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
-	 * up. Called from the final batch of both AJAX bulk-generation handlers —
-	 * synchronous is acceptable here because the user is already waiting on
-	 * the final batch's response. Passed only_if_stale so that clicking
-	 * "Generate" repeatedly with no content changes in between doesn't
-	 * re-zip the whole export tree each time; any real change already
-	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
-	 * bundle here means there is genuinely nothing new to package.
-	 *
-	 * @since  1.6.0
-	 */
-	private function maybe_rebuild_bundle(): void {
-		if ( null === $this->bundle_generator ) {
+		if ( null === $this->generation_job ) {
+			wp_send_json_error( array( 'message' => 'Generation queue unavailable.' ), 500 );
 			return;
 		}
 
-		$result = $this->generator->rebuild_bundle( $this->bundle_generator, true );
+		wp_send_json_success( $this->public_job_record() );
+	}
 
-		if ( ! $result['manifests_ok'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( 'WP Markdown for Agents: manifest write failed during bundle rebuild; bundle may be stale.' );
-		}
+	/**
+	 * The job record minus its internal lock token.
+	 *
+	 * @since  1.7.0
+	 * @return array<string, mixed>
+	 */
+	private function public_job_record(): array {
+		$record = null !== $this->generation_job ? $this->generation_job->get() : array();
 
-		if ( Generator::BUNDLE_FAILED === $result['status'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
-		}
+		unset( $record['lock_token'] );
+
+		return $record;
 	}
 
 	/**
@@ -326,7 +309,7 @@ class Admin {
 				'mfa-bulk-generate',
 				'markdownForAgentsBulkGenerate',
 				array(
-					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
+					'nonce'   => wp_create_nonce( 'mfa_generation_job' ),
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				)
 			);
