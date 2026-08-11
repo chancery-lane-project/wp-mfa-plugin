@@ -423,14 +423,14 @@ class SettingsPage {
 		<h2 id="generate-markdown-files"><?php esc_html_e( 'Generate Markdown files', 'markdown-for-agents-and-statistics' ); ?></h2>
 		<p><?php esc_html_e( 'Regenerate everything — every enabled post type, then all taxonomy archives. This may take a while on large sites.', 'markdown-for-agents-and-statistics' ); ?></p>
 		<p>
-			<button type="button" class="button button-primary" data-generate-all="1">
+			<button type="button" class="button button-primary" data-mfa-scope="all">
 				<?php esc_html_e( 'Generate everything', 'markdown-for-agents-and-statistics' ); ?>
 			</button>
 		</p>
 		<p><?php esc_html_e( 'Or regenerate a single post type:', 'markdown-for-agents-and-statistics' ); ?></p>
 		<?php foreach ( $post_types as $post_type ) : ?>
 			<p>
-				<button type="button" class="button button-secondary" data-post-type="<?php echo esc_attr( $post_type ); ?>">
+				<button type="button" class="button button-secondary" data-mfa-scope="post_type:<?php echo esc_attr( $post_type ); ?>">
 					<?php
 					/* translators: %s: post type slug */
 					printf( esc_html__( 'Generate all: %s', 'markdown-for-agents-and-statistics' ), esc_html( $post_type ) );
@@ -442,10 +442,11 @@ class SettingsPage {
 		<h2><?php esc_html_e( 'Taxonomy Archives', 'markdown-for-agents-and-statistics' ); ?></h2>
 		<p><?php esc_html_e( 'Generate Markdown archive files for all public taxonomy terms.', 'markdown-for-agents-and-statistics' ); ?></p>
 		<p>
-			<button type="button" class="button button-secondary" data-action="mfa_generate_taxonomy_batch">
+			<button type="button" class="button button-secondary" data-mfa-scope="taxonomy">
 				<?php esc_html_e( 'Generate All Taxonomy Archives', 'markdown-for-agents-and-statistics' ); ?>
 			</button>
 		</p>
+		<div id="mfa-job-progress" class="mfa-job-progress" aria-live="polite"></div>
 		<?php
 	}
 

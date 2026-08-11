@@ -1,227 +1,261 @@
 /* global markdownForAgentsBulkGenerate */
-/* WordPress admin bulk-generate AJAX loop.
- * Intercepts clicks on [data-post-type] and [data-action] buttons, drives
- * sequential AJAX batch requests, and updates a live counter. A
- * [data-generate-all] button runs every post-type flow and then the
- * taxonomy flow in sequence.
+/* WordPress admin bulk-generation control.
+ *
+ * The browser no longer drives batches. Clicking a button POSTs a scope to
+ * start a server-side WP-Cron job, then this polls a read-only status endpoint
+ * until the job reports done or failed. Closing the tab does not stop the job,
+ * and reloading the page reconnects to whatever is running.
  */
 (function () {
     'use strict';
 
-    var BATCH_SIZE = 10;
-    var ALLOWED_ACTIONS = ['mfa_generate_batch', 'mfa_generate_taxonomy_batch'];
+    var POLL_INTERVAL   = 5000;
+    var MAX_POLL_ERRORS = 3;
 
-    /**
-     * Build (or replace) an expandable list of error details beneath a button.
-     *
-     * The AJAX response already carries a per-item {post_id|term_id, message}
-     * record for every failure (including genuine disk-write failures); this
-     * surfaces them instead of only a count. Details persist for the current
-     * session only — a fresh run of the same button clears them first.
-     *
-     * @param {HTMLButtonElement}                                             button
-     * @param {Array<{post_id?: number, term_id?: number, message: string}>} errors
-     */
-    function renderErrorDetails(button, errors) {
-        // Remove any list left over from a previous run of this button.
-        if (button.mfaErrorDetails && button.mfaErrorDetails.parentNode) {
-            button.mfaErrorDetails.parentNode.removeChild(button.mfaErrorDetails);
-        }
-        button.mfaErrorDetails = null;
+    var pollTimer  = null;
+    var pollErrors = 0;
 
-        if (!errors.length) {
-            return;
-        }
-
-        var details = document.createElement('details');
-        details.className = 'mfa-error-details';
-
-        var summary = document.createElement('summary');
-        summary.textContent = 'Show ' + errors.length + ' error' + (errors.length === 1 ? '' : 's');
-        details.appendChild(summary);
-
-        var list = document.createElement('ul');
-        list.style.margin = '0.5em 0 0 1.5em';
-        list.style.listStyle = 'disc';
-
-        errors.forEach(function (error) {
-            var id   = error.post_id || error.term_id || '';
-            var item = document.createElement('li');
-            item.textContent = (id ? '#' + id + ': ' : '') + (error.message || 'Unknown error');
-            list.appendChild(item);
-        });
-
-        details.appendChild(list);
-
-        // Insert after the button's containing paragraph, falling back to the button.
-        var anchor = button.parentNode || button;
-        if (anchor.parentNode) {
-            anchor.parentNode.insertBefore(details, anchor.nextSibling);
-        }
-        button.mfaErrorDetails = details;
+    function container() {
+        return document.getElementById('mfa-job-progress');
     }
 
-    /**
-     * Send one batch request and recurse until all items are processed.
-     *
-     * @param {string}            action      AJAX action name.
-     * @param {string|null}       postType    Post type slug, or null for taxonomy batches.
-     * @param {number}            offset
-     * @param {{processed: number, errors: Array}} accumulated
-     * @param {HTMLButtonElement} button
-     * @param {(function(boolean): void)=} onComplete Called once with success
-     *     when this flow finishes or errors. Optional.
-     */
-    function sendBatch(action, postType, offset, accumulated, button, onComplete) {
+    function post(action, extra, onSuccess, onError) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', markdownForAgentsBulkGenerate.ajaxurl, true);
         xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
 
-        function fail() {
-            button.textContent = 'Error — generation stopped';
-            button.disabled = false;
-            if (onComplete) {
-                onComplete(false);
-            }
-        }
-
         xhr.onload = function () {
-            if (xhr.status !== 200) {
-                fail();
-                return;
-            }
+            var response = null;
 
-            var response;
             try {
                 response = JSON.parse(xhr.responseText);
             } catch (e) {
-                fail();
+                response = null;
+            }
+
+            if (response && response.success) {
+                onSuccess(response.data || {}, xhr.status);
                 return;
             }
 
-            if (!response || !response.success) {
-                fail();
-                return;
-            }
-
-            var data = response.data;
-            accumulated.processed += parseInt(data.processed, 10);
-            accumulated.errors    = accumulated.errors.concat(data.errors);
-
-            var total = parseInt(data.total, 10);
-            button.textContent = accumulated.processed + ' / ' + total;
-
-            if (accumulated.processed < total) {
-                sendBatch(action, postType, offset + BATCH_SIZE, accumulated, button, onComplete);
-            } else {
-                var errorSummary = accumulated.errors.length
-                    ? ', ' + accumulated.errors.length + ' error(s)'
-                    : '';
-                button.textContent = 'Done: ' + accumulated.processed + ' processed' + errorSummary;
-                button.disabled = false;
-                renderErrorDetails(button, accumulated.errors);
-                if (onComplete) {
-                    onComplete(true);
-                }
-            }
+            onError(response && response.data ? response.data : {}, xhr.status);
         };
 
-        xhr.onerror = fail;
+        xhr.onerror = function () {
+            onError({}, 0);
+        };
 
-        var params = 'action='  + encodeURIComponent(action)
-            + '&nonce='         + encodeURIComponent(markdownForAgentsBulkGenerate.nonce)
-            + '&offset='        + encodeURIComponent(offset)
-            + '&limit='         + encodeURIComponent(BATCH_SIZE);
+        var params = 'action=' + encodeURIComponent(action)
+            + '&nonce=' + encodeURIComponent(markdownForAgentsBulkGenerate.nonce);
 
-        if (postType) {
-            params += '&post_type=' + encodeURIComponent(postType);
-        }
+        Object.keys(extra || {}).forEach(function (key) {
+            params += '&' + key + '=' + encodeURIComponent(extra[key]);
+        });
 
         xhr.send(params);
     }
 
-    /**
-     * @param {MouseEvent} event
-     */
-    function handleGenerateClick(event) {
-        var button   = /** @type {HTMLButtonElement} */ (event.currentTarget);
-        var postType = button.dataset.postType || null;
-        var action   = button.dataset.action || 'mfa_generate_batch';
-
-        if (ALLOWED_ACTIONS.indexOf(action) === -1) {
-            return;
-        }
-
-        button.disabled    = true;
-        button.textContent = '0 / …';
-        renderErrorDetails(button, []);
-
-        var accumulated = { processed: 0, errors: [] };
-        sendBatch(action, postType, 0, accumulated, button);
+    function setButtonsDisabled(disabled) {
+        document.querySelectorAll('button[data-mfa-scope]').forEach(function (button) {
+            button.disabled = disabled;
+        });
     }
 
-    /**
-     * Run every per-post-type flow and then the taxonomy flow, one after
-     * another, driving each flow's own button so its counter stays live.
-     *
-     * @param {MouseEvent} event
-     */
-    function handleGenerateAllClick(event) {
-        var allButton = /** @type {HTMLButtonElement} */ (event.currentTarget);
-        var queue = [];
+    function stageLabel(stage) {
+        if ('post_type' === stage.type) {
+            return 'Post type: ' + stage.slug;
+        }
+        if ('taxonomy' === stage.type) {
+            return 'Taxonomy archives';
+        }
+        if ('bundle' === stage.type) {
+            return 'Export bundle';
+        }
+        return stage.type;
+    }
 
-        document.querySelectorAll('button[data-post-type]').forEach(function (button) {
-            queue.push({ action: 'mfa_generate_batch', postType: button.dataset.postType, button: button });
-        });
-        document.querySelectorAll('button[data-action="mfa_generate_taxonomy_batch"]').forEach(function (button) {
-            queue.push({ action: 'mfa_generate_taxonomy_batch', postType: null, button: button });
-        });
+    function stageLine(stage, index, currentIndex) {
+        var total  = (null === stage.total || undefined === stage.total) ? '…' : stage.total;
+        var parts  = [stage.processed + ' / ' + total + ' processed'];
+        var marker = '';
 
-        if (!queue.length) {
+        if (parseInt(stage.skipped, 10) > 0) {
+            parts.push(stage.skipped + ' skipped');
+        }
+        if (parseInt(stage.error_count, 10) > 0) {
+            parts.push(stage.error_count + ' error(s)');
+        }
+        if ('unavailable' === stage.state) {
+            parts.push('unavailable — skipped');
+        }
+        if (index === currentIndex) {
+            marker = ' ← running';
+        }
+
+        return stageLabel(stage) + ': ' + parts.join(', ') + marker;
+    }
+
+    function render(job, notice) {
+        var target = container();
+
+        if (!target) {
             return;
         }
 
-        var total = queue.length;
-        allButton.disabled = true;
-        queue.forEach(function (step) {
-            step.button.disabled = true;
-        });
+        target.textContent = '';
 
-        function runNext(index) {
-            if (index >= queue.length) {
-                allButton.textContent = 'Done: ' + total + ' of ' + total + ' steps';
-                allButton.disabled = false;
-                return;
-            }
-
-            allButton.textContent = 'Running step ' + (index + 1) + ' of ' + total + '…';
-
-            var step = queue[index];
-            step.button.textContent = '0 / …';
-            renderErrorDetails(step.button, []);
-
-            sendBatch(step.action, step.postType, 0, { processed: 0, errors: [] }, step.button, function (success) {
-                if (!success) {
-                    allButton.textContent = 'Stopped at step ' + (index + 1) + ' of ' + total;
-                    allButton.disabled = false;
-                    return;
-                }
-                runNext(index + 1);
-            });
+        if (notice) {
+            var warning = document.createElement('p');
+            warning.className   = 'notice notice-warning';
+            warning.textContent = notice;
+            target.appendChild(warning);
         }
 
-        runNext(0);
+        if (!job || 'idle' === job.status || !job.stages || !job.stages.length) {
+            return;
+        }
+
+        var stages  = job.stages;
+        var current = Math.min(parseInt(job.stage_index, 10) || 0, stages.length - 1);
+        var heading = document.createElement('p');
+
+        if ('running' === job.status) {
+            heading.innerHTML = '<strong>Generating…</strong> stage ' + (current + 1) + ' of ' + stages.length
+                + ' — this continues on the server, so you can close this tab.';
+        } else if ('done' === job.status) {
+            heading.innerHTML = '<strong>Generation complete.</strong>';
+        } else {
+            heading.innerHTML = '<strong>Generation failed.</strong> ' + (job.message || '');
+        }
+
+        target.appendChild(heading);
+
+        var list = document.createElement('ul');
+        list.style.margin    = '0.5em 0 0 1.5em';
+        list.style.listStyle = 'disc';
+
+        stages.forEach(function (stage, index) {
+            var item = document.createElement('li');
+            item.textContent = stageLine(stage, index, current);
+            list.appendChild(item);
+        });
+
+        target.appendChild(list);
+
+        var errorCount = parseInt(job.error_count, 10) || 0;
+
+        if (errorCount && job.errors && job.errors.length) {
+            var details = document.createElement('details');
+            details.className = 'mfa-error-details';
+
+            var summary = document.createElement('summary');
+            summary.textContent = 'Show ' + errorCount + ' error' + (1 === errorCount ? '' : 's');
+            details.appendChild(summary);
+
+            var errorList = document.createElement('ul');
+            errorList.style.margin    = '0.5em 0 0 1.5em';
+            errorList.style.listStyle = 'disc';
+
+            if (errorCount > job.errors.length) {
+                var capped = document.createElement('li');
+                capped.textContent = '+' + (errorCount - job.errors.length) + ' earlier error(s) not shown';
+                errorList.appendChild(capped);
+            }
+
+            job.errors.forEach(function (error) {
+                var id   = error.post_id || error.term_id || '';
+                var item = document.createElement('li');
+                item.textContent = (id ? '#' + id + ': ' : '') + (error.message || 'Unknown error');
+                errorList.appendChild(item);
+            });
+
+            details.appendChild(errorList);
+            target.appendChild(details);
+        }
+    }
+
+    function stopPolling() {
+        if (pollTimer) {
+            window.clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function schedulePoll() {
+        stopPolling();
+        pollTimer = window.setTimeout(poll, POLL_INTERVAL);
+    }
+
+    function handleJob(job) {
+        render(job);
+
+        if (job && 'running' === job.status) {
+            setButtonsDisabled(true);
+            schedulePoll();
+            return;
+        }
+
+        setButtonsDisabled(false);
+        stopPolling();
+    }
+
+    function poll() {
+        post(
+            'mfa_job_status',
+            {},
+            function (job) {
+                pollErrors = 0;
+                handleJob(job);
+            },
+            function () {
+                pollErrors += 1;
+
+                if (pollErrors >= MAX_POLL_ERRORS) {
+                    // The job itself is very likely still running — a long run
+                    // can outlive this page's nonce. Do not report it as failed.
+                    stopPolling();
+                    setButtonsDisabled(false);
+                    render(null, 'Lost contact with the server. Reload this page to see current progress; any running job continues.');
+                    return;
+                }
+
+                schedulePoll();
+            }
+        );
+    }
+
+    function start(scope) {
+        setButtonsDisabled(true);
+        render(null, '');
+
+        post(
+            'mfa_start_generation_job',
+            { scope: scope },
+            function (job) {
+                pollErrors = 0;
+                handleJob(job);
+            },
+            function (data, status) {
+                if (409 === status && data && data.job) {
+                    // A job is already running: show that one instead of an error.
+                    handleJob(data.job);
+                    return;
+                }
+
+                setButtonsDisabled(false);
+                render(null, (data && data.message) ? data.message : 'Could not start generation.');
+            }
+        );
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        var buttons = document.querySelectorAll('button[data-post-type], button[data-action]');
-        buttons.forEach(function (button) {
-            button.addEventListener('click', handleGenerateClick);
+        document.querySelectorAll('button[data-mfa-scope]').forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                start(event.currentTarget.dataset.mfaScope);
+            });
         });
 
-        var allButton = document.querySelector('button[data-generate-all]');
-        if (allButton) {
-            allButton.addEventListener('click', handleGenerateAllClick);
-        }
+        // Reconnect to a job started before this page load.
+        poll();
     });
 }());
