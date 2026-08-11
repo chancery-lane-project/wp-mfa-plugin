@@ -19,6 +19,7 @@ class Admin {
 
 	private SettingsPage $settings_page;
 	private MetaBox $meta_box;
+	private NeedsRegenTracker $needs_regen;
 
 	/**
 	 * @since  1.0.0
@@ -37,6 +38,7 @@ class Admin {
 	) {
 		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
+		$this->needs_regen   = new NeedsRegenTracker();
 	}
 
 	/**
@@ -193,38 +195,12 @@ class Admin {
 
 		// Final batch for this post type — drop it from the pending-regen list.
 		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
-			$this->mark_post_type_regenerated( $post_type );
+			$this->needs_regen->clear( $post_type );
 			$this->maybe_rebuild_bundle();
 		}
 
 		wp_send_json_success( $result );
 		return;
-	}
-
-	/**
-	 * Remove a post type from the pending-regeneration transient, deleting
-	 * the transient entirely once every flagged type has been regenerated.
-	 *
-	 * @since  1.2.0
-	 * @param  string $post_type Slug just regenerated to completion.
-	 */
-	private function mark_post_type_regenerated( string $post_type ): void {
-		$pending = get_transient( 'markdown_for_agents_needs_regen' );
-
-		if ( ! is_array( $pending ) || empty( $pending ) ) {
-			return;
-		}
-
-		$remaining = array_values( array_diff( $pending, array( $post_type ) ) );
-
-		if ( empty( $remaining ) ) {
-			delete_transient( 'markdown_for_agents_needs_regen' );
-			return;
-		}
-
-		if ( $remaining !== $pending ) {
-			set_transient( 'markdown_for_agents_needs_regen', $remaining, 0 );
-		}
 	}
 
 	/**
