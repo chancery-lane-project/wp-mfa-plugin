@@ -214,6 +214,22 @@ class JobRunnerTest extends TestCase {
         $this->assertFalse( get_option( TickMutex::OPTION ) );
     }
 
+    public function test_a_throw_from_process_batch_fails_the_job_and_releases_the_mutex(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+        $this->factory->method( 'make' )
+            ->willReturn( new FakeStage( [], 10, null, 0, null, new \RuntimeException( 'wpdb exploded' ) ) );
+
+        $this->runner()->run_tick();
+
+        $record = $this->job->get();
+
+        $this->assertSame( 'failed', $record['status'] );
+        $this->assertStringContainsString( 'wpdb exploded', $record['message'] );
+        $this->assertCount( 1, $record['errors'] );
+        $this->assertFalse( get_option( TickMutex::OPTION ) );
+        $this->assertFalse( wp_next_scheduled( JobRunner::TICK_HOOK ) );
+    }
+
     public function test_tick_releases_the_mutex_when_a_stage_throws(): void {
         $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
         $this->factory->method( 'make' )

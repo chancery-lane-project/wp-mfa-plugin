@@ -129,7 +129,22 @@ class JobRunner {
 			$descriptor['state']        = 'running';
 			$record['stages'][ $index ] = $descriptor;
 
-			$batch = $stage->process_batch( (int) $record['cursor'], self::BATCH_LIMIT );
+			try {
+				$batch = $stage->process_batch( (int) $record['cursor'], self::BATCH_LIMIT );
+			} catch ( \Throwable $e ) {
+				// Per-item failures are already caught inside the stage, so a
+				// throw here is structural (a $wpdb error, say) rather than
+				// one bad post — fail the job rather than retrying it hourly
+				// against the same fault forever.
+				$stage_name = 'post_type' === $descriptor['type'] && ! empty( $descriptor['slug'] )
+					? $descriptor['type'] . ':' . $descriptor['slug']
+					: $descriptor['type'];
+
+				$record             = GenerationJob::append_errors( $record, array( array( 'message' => $e->getMessage() ) ) );
+				$record['status']   = 'failed';
+				$record['message']  = "Stage '{$stage_name}' failed while processing a batch: " . $e->getMessage();
+				break;
+			}
 
 			$descriptor['processed']   += (int) $batch['processed'];
 			$descriptor['skipped']     += (int) $batch['skipped'];
