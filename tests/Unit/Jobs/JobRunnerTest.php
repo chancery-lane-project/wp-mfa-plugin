@@ -290,4 +290,31 @@ class JobRunnerTest extends TestCase {
 
         $this->assertSame( [], $stage->cursors );
     }
+
+    public function test_completion_schedules_a_rebuild_when_the_tree_went_stale_again(): void {
+        $bundle = $this->createMock( \Tclp\WpMarkdownForAgents\Generator\BundleGenerator::class );
+        $bundle->method( 'is_stale' )->willReturn( true );
+
+        $this->given_job( [ $this->descriptor( 'bundle' ) ] );
+        $this->factory->method( 'make' )->willReturn( new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $runner = new JobRunner( $this->job, $this->mutex, $this->factory, new NeedsRegenTracker(), $this->clock, $bundle );
+        $runner->run_tick();
+
+        $this->assertSame( 'done', $this->job->get()['status'] );
+        $this->assertNotFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
+    public function test_completion_schedules_nothing_when_the_tree_is_fresh(): void {
+        $bundle = $this->createMock( \Tclp\WpMarkdownForAgents\Generator\BundleGenerator::class );
+        $bundle->method( 'is_stale' )->willReturn( false );
+
+        $this->given_job( [ $this->descriptor( 'bundle' ) ] );
+        $this->factory->method( 'make' )->willReturn( new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $runner = new JobRunner( $this->job, $this->mutex, $this->factory, new NeedsRegenTracker(), $this->clock, $bundle );
+        $runner->run_tick();
+
+        $this->assertFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
 }

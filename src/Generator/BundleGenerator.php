@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Generator;
 
 use Tclp\WpMarkdownForAgents\Core\Options;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 
 /**
  * Builds, maintains, and tears down the OKF `.zip` bundle.
@@ -269,7 +270,17 @@ class BundleGenerator {
 			return;
 		}
 
+		// Staleness is marked unconditionally, even during a job. Skipping this
+		// too would leave a change landing after the job's BundleStage neither
+		// marked nor scheduled, so the zip would stay wrong until some
+		// unrelated later change.
 		delete_option( self::HASH_OPTION );
+
+		if ( GenerationJob::is_running() ) {
+			// The running job's own BundleStage will rebuild; a debounced event
+			// here would rebuild the same zip a second time.
+			return;
+		}
 
 		if ( ! wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) ) {
 			wp_schedule_single_event( time() + 300, 'markdown_for_agents_rebuild_bundle' );

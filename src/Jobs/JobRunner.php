@@ -304,10 +304,22 @@ class JobRunner {
 	}
 
 	/**
-	 * Placeholder — filled in by the bundle-staleness task.
+	 * Called once, as the job flips to `done`.
+	 *
+	 * While the job ran, BundleGenerator::mark_stale_and_schedule() marked the
+	 * tree stale but deliberately scheduled nothing. Anything that changed
+	 * after the bundle stage ran therefore has no rebuild queued, so queue one
+	 * now through the normal debounced path.
 	 *
 	 * @since  1.7.0
 	 */
 	private function after_completion(): void {
+		if ( null === $this->bundle_generator || ! $this->bundle_generator->is_stale() ) {
+			return;
+		}
+
+		if ( false === wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) ) {
+			wp_schedule_single_event( $this->clock->now() + 300, 'markdown_for_agents_rebuild_bundle' );
+		}
 	}
 }
