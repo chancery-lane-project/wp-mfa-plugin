@@ -121,6 +121,32 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 'running', $this->job->get()['status'] );
     }
 
+    /**
+     * Pins the sanitisation contract: whatever reaches
+     * StageFactory::build_stage_list() has already been unslashed and
+     * stripped of tags/surrounding whitespace, not the raw $_POST value.
+     */
+    public function test_start_job_sanitises_a_messy_scope_before_reaching_the_stage_factory(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => " \ttaxonomy<script>evil</script>\\'\n" ];
+        $factory = $this->createMock( StageFactory::class );
+
+        $captured = null;
+        $factory->expects( $this->once() )
+            ->method( 'build_stage_list' )
+            ->willReturnCallback(
+                function ( string $scope ) use ( &$captured ): array {
+                    $captured = $scope;
+                    return [];
+                }
+            );
+
+        $this->admin_with_job( $factory )->handle_start_generation_job_ajax();
+
+        // stripslashes() drops the backslash, strip_tags() drops <script></script>
+        // but keeps its text content, trim() drops the leading tab and trailing newline.
+        $this->assertSame( "taxonomyevil'", $captured );
+    }
+
     public function test_starting_a_second_job_returns_409_with_the_live_record(): void {
         $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
         $factory = $this->createMock( StageFactory::class );
