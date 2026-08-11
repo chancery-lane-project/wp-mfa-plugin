@@ -238,7 +238,20 @@ class Admin {
 	}
 
 	/**
-	 * The job record minus its internal lock token.
+	 * Fields of the job record exposed to the browser.
+	 *
+	 * An allowlist rather than a denylist: internal bookkeeping such as
+	 * `lock_token`, `cursor`, and `schedule_failures` stays server-side by
+	 * default, so a field added later to GenerationJob's record shape does
+	 * not leak until someone deliberately adds it here. This is the public
+	 * contract polled by assets/js/bulk-generate.js — keep the two in sync.
+	 *
+	 * @since  1.7.0
+	 */
+	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message' );
+
+	/**
+	 * The job record, reduced to the fields the browser is allowed to see.
 	 *
 	 * @since  1.7.0
 	 * @return array<string, mixed>
@@ -246,9 +259,7 @@ class Admin {
 	private function public_job_record(): array {
 		$record = null !== $this->generation_job ? $this->generation_job->get() : array();
 
-		unset( $record['lock_token'] );
-
-		return $record;
+		return array_intersect_key( $record, array_flip( self::PUBLIC_JOB_FIELDS ) );
 	}
 
 	/**

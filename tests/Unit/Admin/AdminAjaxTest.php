@@ -191,6 +191,33 @@ class AdminAjaxTest extends TestCase {
         $this->assertArrayNotHasKey( 'lock_token', $data );
     }
 
+    /**
+     * public_job_record() is an allowlist, not a denylist: proves a field the
+     * allowlist does not name is hidden even though nothing ever unset() it.
+     * A denylist (unset('lock_token') alone) could never fail this test.
+     */
+    public function test_job_status_hides_an_internal_field_the_allowlist_does_not_name(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
+
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
+
+        // Simulate a field added later to GenerationJob's internal record
+        // shape, without anyone remembering to teach public_job_record() about it.
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ]['schedule_failures'] = 3;
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ]['some_future_internal_field'] = 'secret';
+
+        $admin->handle_job_status_ajax();
+
+        $data = $GLOBALS['_mock_json_response']['data'];
+
+        $this->assertArrayNotHasKey( 'schedule_failures', $data );
+        $this->assertArrayNotHasKey( 'some_future_internal_field', $data );
+    }
+
     public function test_job_status_requires_capability(): void {
         $GLOBALS['_mock_current_user_can'] = false;
         $_POST                             = [ 'nonce' => 'test' ];
