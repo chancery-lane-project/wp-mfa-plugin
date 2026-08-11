@@ -20,6 +20,15 @@ use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
  * - a legacy shared term belongs to more than one taxonomy, so term_id is
  *   not unique per archive file, while term_taxonomy_id is.
  *
+ * Note the deliberate asymmetry with PostTypeStage, which calls
+ * clean_post_cache() after every post: there is no equivalent here.
+ * generate_term() reaches get_term_posts(), which loads a term's posts in
+ * batches of 100, so those post objects stay in the object cache for the rest
+ * of the tick. Each batch is still bounded by $limit and every tick is a fresh
+ * PHP process, so this is left alone on purpose — if tick-level memory growth
+ * ever shows up on a large site, the purge belongs inside get_term_posts(),
+ * not here, since this stage never sees those post objects.
+ *
  * @since  1.7.0
  * @package Tclp\WpMarkdownForAgents\Jobs
  */

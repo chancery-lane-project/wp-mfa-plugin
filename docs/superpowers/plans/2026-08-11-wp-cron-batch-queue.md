@@ -1035,7 +1035,10 @@ class TaxonomyStageTest extends TestCase {
                 }
             );
 
-        $result = $this->stage()->process_batch( 0, 3 );
+        // Limit 4 against 3 rows: a short page, so this test asserts ordering
+        // without also tripping the full-page boundary that
+        // test_full_page_reports_not_done owns.
+        $result = $this->stage()->process_batch( 0, 4 );
 
         // A term_id cursor would have dropped post_tag 7 after category 40.
         $this->assertSame( [ '40:category', '7:post_tag', '41:category' ], $seen );
@@ -1531,6 +1534,8 @@ git commit -m "feat: add BundleStage so the zip rebuild runs as a cron tick"
 Two jobs in one small class: turn a scope string from the browser into the stage-descriptor list stored in the job record, and turn one stored descriptor back into a live `Stage` when a tick needs it. Descriptors are plain arrays because they round-trip through an option.
 
 Scope strings: `all`, `post_type:{slug}`, `taxonomy`. Every scope ends in exactly one `bundle` descriptor — matching today's behaviour, where *every* completed AJAX batch run (single post type or taxonomy) already triggers a rebuild.
+
+**Wiring constraint carried over from Task 3's review:** the `$options` array `StageFactory` passes to `PostTypeStage` **must** be the same array `Generator` was constructed with. `PostTypeStage` distinguishes an intentional skip from a write failure by re-deriving eligibility via `ExportPolicy::is_eligible( $post, $this->options )`, because `Generator::generate_post()` collapses both reasons into `false`. A divergent snapshot would misreport skips as write failures. `StageFactory` therefore takes `$options` once and hands the *same* value to every stage it builds — do not filter, merge, or re-read options inside the factory. (The structural fix — `generate_post()` returning a reason rather than a bool — touches CLI, admin single-regen and `save_post`, and is deliberately out of this plan's scope.)
 
 **Files:**
 - Create: `src/Jobs/StageFactory.php`
@@ -4755,6 +4760,12 @@ git commit -m "docs: bump to 1.7.0 and document markdown_for_agents_tick_budget"
 ```
 
 ---
+
+## Open follow-ups raised during execution
+
+- **Object-cache growth inside a time-boxed tick (Task 4 review, Minor).** `PostTypeStage` calls `clean_post_cache()` after each post because that was a known memory-growth path. `TaxonomyStage` has no equivalent, and `TaxonomyArchiveGenerator::generate_term()` reaches `get_term_posts()`, which loads a term's posts in batches of 100 — those post objects stay in the object cache. Previously each AJAX batch was its own request, so growth was bounded by one batch; a time-boxed tick (Task 10) now runs many batches in a single PHP process, so the ceiling is higher. Batches are still bounded by `$limit` and each tick is a fresh process, so this is unlikely to bite, but the asymmetry with `PostTypeStage` is undocumented. Action taken: documented in `TaxonomyStage`'s docblock. If a large site reports tick-level memory growth, the fix is a cache purge inside `get_term_posts()`, not in the stage.
+- **`Generator::generate_post()`'s two-reasons-one-bool return (Task 3 review, Important).** Recorded as a wiring constraint in Task 6 above rather than fixed; the structural fix touches CLI, admin single-regen and `save_post`.
+- **Loop-body duplication between `PostTypeStage` and `TaxonomyStage` (Task 4 review).** Reviewed and deliberately **not** extracted: the two loops share only their outer shape and diverge in skip semantics, error key, and cache handling, so a shared helper would be parameter-passing scaffolding around two already-short bodies. Revisit only if a third loop-shaped stage appears.
 
 ## Deliberately out of scope
 
