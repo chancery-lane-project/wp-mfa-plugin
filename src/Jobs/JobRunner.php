@@ -32,6 +32,12 @@ class JobRunner {
 	/** Seconds of work per tick, before max_execution_time is considered. */
 	private const MAX_BUDGET = 30;
 
+	/** Consecutive failed reschedules before the job is declared failed. */
+	public const MAX_SCHEDULE_FAILURES = 3;
+
+	/** Seconds without a tick before an admin request may nudge the chain. */
+	private const NUDGE_AFTER = 60;
+
 	/**
 	 * @since  1.7.0
 	 * @param  GenerationJob        $job              Job record repository.
@@ -208,15 +214,93 @@ class JobRunner {
 	}
 
 	/**
-	 * Placeholder — filled in by the scheduling task.
+	 * Same-process fallback for a chain whose scheduled event has gone missing.
+	 *
+	 * Hooked to `admin_init` on every admin request, deliberately not only the
+	 * plugin's settings screen — a lost chain should recover from anywhere in
+	 * wp-admin, and the guard below is two cheap reads. Runs a tick inline and
+	 * never schedules; scheduling here is what would race the cron path.
 	 *
 	 * @since  1.7.0
-	 * @param  array<string, mixed> $record
+	 */
+	public function maybe_nudge(): void {
+		$record = $this->job->get();
+
+		if ( 'running' !== $record['status'] ) {
+			return;
+		}
+
+		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+			return;
+		}
+
+		if ( ( $this->clock->now() - (int) $record['last_tick_at'] ) <= self::NUDGE_AFTER ) {
+			return;
+		}
+
+		$this->run_tick();
+	}
+
+	/**
+	 * Hourly backstop for a chain that died where no admin request will notice.
+	 *
+	 * Schedules a tick rather than running one inline: cron already has a
+	 * request to spend, and scheduling keeps this cheap.
+	 *
+	 * @since  1.7.0
+	 */
+	public function watchdog(): void {
+		$record = $this->job->get();
+
+		if ( 'running' !== $record['status'] ) {
+			return;
+		}
+
+		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+			return;
+		}
+
+		if ( ( $this->clock->now() - (int) $record['last_tick_at'] ) < GenerationJob::STALE_AFTER ) {
+			return;
+		}
+
+		wp_schedule_single_event( $this->clock->now(), self::TICK_HOOK );
+	}
+
+	/**
+	 * Queue the next tick, treating a refused schedule as a real failure.
+	 *
+	 * A call to wp_schedule_single_event() returns false when a duplicate
+	 * hook+args event exists within 10 minutes of the requested time, or
+	 * when pre_schedule_event vetoes it. Ignoring that return value is how
+	 * a chain dies silently with status stuck on `running`.
+	 *
+	 * @since  1.7.0
+	 * @param  array<string, mixed> $record    Current job record.
+	 * @param  string               $job_token Token this tick holds.
 	 */
 	private function maybe_reschedule( array $record, string $job_token ): void {
-		if ( false === wp_next_scheduled( self::TICK_HOOK ) ) {
-			wp_schedule_single_event( $this->clock->now() + 1, self::TICK_HOOK );
+		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+			return;
 		}
+
+		if ( wp_schedule_single_event( $this->clock->now() + 1, self::TICK_HOOK ) ) {
+			if ( 0 !== (int) $record['schedule_failures'] ) {
+				$record['schedule_failures'] = 0;
+				$this->job->save( $record, $job_token );
+			}
+
+			return;
+		}
+
+		$record['schedule_failures'] = (int) $record['schedule_failures'] + 1;
+
+		if ( $record['schedule_failures'] >= self::MAX_SCHEDULE_FAILURES ) {
+			$record['status']  = 'failed';
+			$record['message'] = 'Could not schedule the next batch. WP-Cron may be disabled or blocked on this site; check the cron configuration and start the job again.';
+		}
+
+		$this->job->save( $record, $job_token );
 	}
 
 	/**
