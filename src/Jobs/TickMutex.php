@@ -10,12 +10,23 @@ namespace Tclp\WpMarkdownForAgents\Jobs;
  * The wp_next_scheduled() guards elsewhere stop duplicate *pending cron
  * events*; they do not stop two ticks physically running at once — two admin
  * tabs whose admin_init nudges overlap will both see no scheduled event and
- * both hold the same valid job lock_token. This mutex stops that.
+ * both hold the same valid job lock_token. This mutex narrows that window but
+ * does not close it.
  *
- * The stored value is {token, acquired_at} rather than a bare timestamp: two
- * ticks that both find a stale lock would otherwise both delete and both
- * insert, the second delete removing the first tick's fresh lock, and both
- * would proceed. The token lets the loser of that race detect it and back off.
+ * The stored value is {token, acquired_at} rather than a bare timestamp, and
+ * acquire() re-reads the lock immediately before stealing a stale one, so a
+ * rival that has already renewed or re-acquired it by then is detected and
+ * backed off from. That re-read only protects the gap between the re-read and
+ * the delete, though: two overlapping steals that both judge the *same* stale
+ * identity, both re-read it unchanged, and only diverge afterwards can still
+ * both end up believing they hold the lock. The Options API has no atomic
+ * compare-and-delete to close this fully — that would need a $wpdb
+ * `DELETE ... WHERE option_name = %s AND option_value = %s`, checked by
+ * affected row count, which is deliberately not implemented here: the wpdb
+ * test mock would need to model the options table and its serialisation.
+ * The consequence of losing this narrow residual race is duplicated work and
+ * inflated counters after a crashed tick, not corruption — both ticks
+ * rewrite the same files with the same content.
  *
  * @since  1.7.0
  * @package Tclp\WpMarkdownForAgents\Jobs
@@ -52,6 +63,16 @@ class TickMutex {
 		if ( is_array( $held ) && ( $this->clock->now() - (int) ( $held['acquired_at'] ?? 0 ) ) < $this->window() ) {
 			// Another tick is legitimately running. Do nothing, schedule
 			// nothing — it will reschedule when it finishes.
+			return null;
+		}
+
+		// Re-read immediately before stealing: the staleness judgement above
+		// came from a snapshot, and if a rival has since renewed or
+		// re-acquired this same lock, deleting now would remove a lock that
+		// is not the one we judged abandoned. This narrows, but — per the
+		// class docblock — does not close, the race between two overlapping
+		// steals of the same stale lock.
+		if ( get_option( self::OPTION ) !== $held ) {
 			return null;
 		}
 

@@ -138,7 +138,16 @@ if (!function_exists('do_action')) {
 
 if (!function_exists('get_option')) {
     function get_option(string $option, mixed $default = false): mixed {
-        return $GLOBALS['_mock_options'][$option] ?? $default;
+        $value = $GLOBALS['_mock_options'][$option] ?? $default;
+
+        // Test seam: lets a test simulate a rival process changing the option
+        // between two reads within a single caller (e.g. TickMutex::acquire()'s
+        // staleness read and its later re-read before stealing).
+        if (isset($GLOBALS['_mock_get_option_side_effect']) && is_callable($GLOBALS['_mock_get_option_side_effect'])) {
+            ($GLOBALS['_mock_get_option_side_effect'])($option, $value);
+        }
+
+        return $value;
     }
 }
 
