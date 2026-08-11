@@ -16,6 +16,7 @@ class MockHarnessTest extends TestCase {
     protected function setUp(): void {
         $GLOBALS['_mock_options'] = [];
         reset_mock_scheduled_events();
+        reset_mock_job_globals();
         unset( $GLOBALS['_mock_schedule_single_event_return'] );
     }
 
@@ -56,6 +57,23 @@ class MockHarnessTest extends TestCase {
 
         $this->assertFalse( wp_schedule_single_event( 1000, 'mfa_hook' ) );
         $this->assertSame( [], $GLOBALS['_mock_scheduled_events'] );
+    }
+
+    /** Suppression must compare against the soonest matching event, not merely the first one inserted. */
+    public function test_schedule_single_event_compares_against_the_soonest_matching_event(): void {
+        $this->assertTrue( wp_schedule_single_event( 10_000, 'mfa_hook' ) );
+        $this->assertTrue( wp_schedule_single_event( 1_000, 'mfa_hook' ) );
+
+        // Nearest existing event is now 1_000 (inserted second); 1_500 is within
+        // 600s of that, even though it is 8_500s away from the first-inserted 10_000.
+        $this->assertFalse( wp_schedule_single_event( 1_500, 'mfa_hook' ) );
+    }
+
+    public function test_schedule_single_event_suppresses_at_the_exact_600_second_boundary(): void {
+        $this->assertTrue( wp_schedule_single_event( 1000, 'mfa_hook' ) );
+
+        $this->assertFalse( wp_schedule_single_event( 1600, 'mfa_hook' ) );
+        $this->assertFalse( wp_schedule_single_event( 400, 'mfa_hook' ) );
     }
 
     public function test_unschedule_hook_clears_every_event_for_that_hook(): void {

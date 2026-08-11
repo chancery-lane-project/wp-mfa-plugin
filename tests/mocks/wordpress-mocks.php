@@ -176,21 +176,38 @@ function reset_mock_scheduled_events(): void {
     $GLOBALS['_mock_scheduled_events'] = [];
 }
 
+if (!function_exists('wp_next_scheduled')) {
+    /** Returns the soonest matching event's timestamp, mirroring real WordPress — not merely the first inserted. */
+    function wp_next_scheduled(string $hook, array $args = []) {
+        $timestamps = array_column(
+            array_filter(
+                $GLOBALS['_mock_scheduled_events'] ?? [],
+                static fn($e) => $e['hook'] === $hook && $e['args'] === $args
+            ),
+            'timestamp'
+        );
+
+        return $timestamps ? min($timestamps) : false;
+    }
+}
+
 if (!function_exists('wp_schedule_single_event')) {
     /**
      * Mirrors two real behaviours the queue depends on: a forced-failure hook
      * for tests, and WordPress's suppression of a duplicate hook+args event
-     * scheduled within 10 minutes of an existing one (which returns false).
+     * scheduled within 10 minutes of the *next* matching event (inclusive),
+     * which returns false. Real WordPress compares against wp_next_scheduled(),
+     * not every matching event, so this does too.
      */
     function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool {
         if (isset($GLOBALS['_mock_schedule_single_event_return']) && !$GLOBALS['_mock_schedule_single_event_return']) {
             return false;
         }
 
-        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
-            if ($e['hook'] === $hook && $e['args'] === $args && abs($e['timestamp'] - $timestamp) < 600) {
-                return false;
-            }
+        $next = wp_next_scheduled($hook, $args);
+
+        if (false !== $next && abs($next - $timestamp) <= 10 * MINUTE_IN_SECONDS) {
+            return false;
         }
 
         $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => ''];
@@ -202,17 +219,6 @@ if (!function_exists('wp_schedule_event')) {
     function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool {
         $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => $recurrence];
         return true;
-    }
-}
-
-if (!function_exists('wp_next_scheduled')) {
-    function wp_next_scheduled(string $hook, array $args = []) {
-        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
-            if ($e['hook'] === $hook) {
-                return $e['timestamp'];
-            }
-        }
-        return false;
     }
 }
 
@@ -246,6 +252,15 @@ $GLOBALS['_mock_thumbnail']         = null;
 $GLOBALS['_mock_hierarchical_types'] = ['page'];
 $GLOBALS['_mock_post_parent']        = [];
 $GLOBALS['_mock_post_ancestors']     = [];
+$GLOBALS['_mock_post_counts']        = [];
+$GLOBALS['_mock_terms_by_id']        = [];
+$GLOBALS['_mock_password_counter']   = 0;
+
+function reset_mock_job_globals(): void {
+    $GLOBALS['_mock_post_counts']      = [];
+    $GLOBALS['_mock_terms_by_id']      = [];
+    $GLOBALS['_mock_password_counter'] = 0;
+}
 
 if (!function_exists('is_post_type_hierarchical')) {
     function is_post_type_hierarchical(string $post_type): bool {
