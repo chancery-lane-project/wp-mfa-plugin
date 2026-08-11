@@ -213,8 +213,7 @@ class AgentDetector {
 				'SemrushBot-OCOB',
 				'SemrushBot-SWA',
 				'WARDBot',
-				'ygs-scraper-bot',
-				'w4mwnpbXf3MFAbxOkJRw',
+				'ygs-scraper-bot'
 			),
 		);
 
