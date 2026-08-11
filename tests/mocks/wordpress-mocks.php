@@ -154,6 +154,13 @@ if (!function_exists('add_option')) {
         if (!isset($GLOBALS['_mock_options'][$option])) {
             $GLOBALS['_mock_options'][$option]         = $value;
             $GLOBALS['_mock_option_autoload'][$option] = is_string($autoload) ? ('yes' === $autoload) : $autoload;
+
+            // Test seam: lets a test simulate another process writing between
+            // our insert and our confirming read.
+            if (isset($GLOBALS['_mock_add_option_side_effect']) && is_callable($GLOBALS['_mock_add_option_side_effect'])) {
+                ($GLOBALS['_mock_add_option_side_effect'])($option, $value);
+            }
+
             return true;
         }
         return false;
