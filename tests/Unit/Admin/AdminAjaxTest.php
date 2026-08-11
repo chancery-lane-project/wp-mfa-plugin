@@ -145,6 +145,31 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 500, $GLOBALS['_mock_json_response']['status'] );
     }
 
+    /**
+     * The mock check_ajax_referer() dies (throws, per the mock's wp_die())
+     * on an invalid nonce, so the handler never reaches the job-start logic.
+     * Asserted via the observable consequence — no job record written — not
+     * via the mock's die mechanism itself.
+     */
+    public function test_start_job_rejects_an_invalid_nonce(): void {
+        $GLOBALS['_mock_verify_nonce'] = false;
+        $_POST                         = [ 'nonce' => 'bad', 'scope' => 'all' ];
+
+        $factory = $this->createMock( StageFactory::class );
+        $factory->expects( $this->never() )->method( 'build_stage_list' );
+
+        $admin = $this->admin_with_job( $factory );
+
+        try {
+            $admin->handle_start_generation_job_ajax();
+            $this->fail( 'Expected the invalid nonce to short-circuit the handler.' );
+        } catch ( \RuntimeException $e ) {
+            // Expected: the mock's check_ajax_referer() die path.
+        }
+
+        $this->assertSame( 'idle', $this->job->get()['status'] );
+    }
+
     // -----------------------------------------------------------------------
     // handle_job_status_ajax()
     // -----------------------------------------------------------------------
@@ -182,6 +207,23 @@ class AdminAjaxTest extends TestCase {
 
         $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
         $this->assertSame( 500, $GLOBALS['_mock_json_response']['status'] );
+    }
+
+    /** @see test_start_job_rejects_an_invalid_nonce() for why this asserts the consequence, not the mechanism. */
+    public function test_job_status_rejects_an_invalid_nonce(): void {
+        $GLOBALS['_mock_verify_nonce'] = false;
+        $_POST                         = [ 'nonce' => 'bad' ];
+
+        $admin = $this->admin_with_job();
+
+        try {
+            $admin->handle_job_status_ajax();
+            $this->fail( 'Expected the invalid nonce to short-circuit the handler.' );
+        } catch ( \RuntimeException $e ) {
+            // Expected: the mock's check_ajax_referer() die path.
+        }
+
+        $this->assertFalse( isset( $GLOBALS['_mock_json_response'] ) );
     }
 
     // -----------------------------------------------------------------------
