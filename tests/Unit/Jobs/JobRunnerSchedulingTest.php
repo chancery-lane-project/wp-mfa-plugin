@@ -163,6 +163,20 @@ class JobRunnerSchedulingTest extends TestCase {
         $this->assertSame( $this->clock->now(), wp_next_scheduled( JobRunner::TICK_HOOK ) );
     }
 
+    public function test_watchdog_rescue_resets_the_failure_counter(): void {
+        $this->given_unfinished_job();
+
+        $record                      = $this->job->get();
+        $record['schedule_failures'] = 2;
+        update_option( GenerationJob::OPTION, $record );
+
+        $this->clock->advance( GenerationJob::STALE_AFTER + 1 );
+
+        $this->runner()->watchdog();
+
+        $this->assertSame( 0, $this->job->get()['schedule_failures'] );
+    }
+
     public function test_watchdog_ignores_fresh_jobs_pending_events_and_idle_jobs(): void {
         $this->given_unfinished_job();
 

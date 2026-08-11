@@ -279,7 +279,18 @@ class JobRunner {
 			return;
 		}
 
-		wp_schedule_single_event( $this->clock->now(), self::TICK_HOOK );
+		if ( ! wp_schedule_single_event( $this->clock->now(), self::TICK_HOOK ) ) {
+			return;
+		}
+
+		// A successful reschedule here is strong evidence scheduling works
+		// fine; a stale schedule_failures count left over from an earlier
+		// unlucky tick would otherwise self-fail a perfectly healthy job once
+		// it later hits MAX_SCHEDULE_FAILURES for no real reason.
+		if ( 0 !== (int) $record['schedule_failures'] ) {
+			$record['schedule_failures'] = 0;
+			$this->job->save( $record, (string) $record['lock_token'] );
+		}
 	}
 
 	/**
