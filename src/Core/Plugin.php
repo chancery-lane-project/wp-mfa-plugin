@@ -24,6 +24,11 @@ use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
+use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
+use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
+use Tclp\WpMarkdownForAgents\Jobs\SystemClock;
+use Tclp\WpMarkdownForAgents\Jobs\TickMutex;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
@@ -156,6 +161,41 @@ class Plugin {
 				$generator->rebuild_bundle( $bundle_generator );
 			}
 		);
+
+		global $wpdb;
+
+		$clock          = new SystemClock();
+		$generation_job = new GenerationJob( $clock );
+		$stage_factory  = new StageFactory( $wpdb, $options, $generator, $taxonomy_generator, $bundle_generator );
+		$job_runner     = new JobRunner(
+			$generation_job,
+			new TickMutex( $clock ),
+			$stage_factory,
+			new NeedsRegenTracker(),
+			$clock,
+			$bundle_generator
+		);
+
+		$this->generation_job = $generation_job;
+		$this->stage_factory  = $stage_factory;
+
+		// The cron chain. Registered unconditionally: a job started in wp-admin
+		// is processed by whatever request happens to spawn cron next.
+		$this->loader->add_action( JobRunner::TICK_HOOK, $job_runner, 'run_tick' );
+		$this->loader->add_action( JobRunner::WATCHDOG_HOOK, $job_runner, 'watchdog' );
+
+		// Hourly backstop for a chain that lost its event. Registered here
+		// rather than on activation so existing installs pick it up on update.
+		add_action(
+			'init',
+			static function (): void {
+				if ( ! wp_next_scheduled( JobRunner::WATCHDOG_HOOK ) ) {
+					wp_schedule_event( time() + HOUR_IN_SECONDS, 'hourly', JobRunner::WATCHDOG_HOOK );
+				}
+			}
+		);
+
+		$this->job_runner = $job_runner;
 	}
 
 	/**
@@ -189,7 +229,7 @@ class Plugin {
 	 */
 	private function define_admin_hooks( array $options ): void {
 		$ard_catalog = new ArdCatalog( $this->bundle_generator );
-		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog );
+		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog, $this->generation_job, $this->stage_factory );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before
@@ -206,8 +246,10 @@ class Plugin {
 		$this->loader->add_action( 'admin_post_markdown_for_agents_generate', $admin, 'handle_generate_action' );
 		$this->loader->add_action( 'admin_post_markdown_for_agents_regenerate_post', $admin, 'handle_regenerate_post_action' );
 		$this->loader->add_action( 'admin_notices', $admin, 'display_admin_notices' );
-		$this->loader->add_action( 'wp_ajax_mfa_generate_batch', $admin, 'handle_generate_batch_ajax' );
-		$this->loader->add_action( 'wp_ajax_mfa_generate_taxonomy_batch', $admin, 'handle_generate_taxonomy_batch_ajax' );
+		$this->loader->add_action( 'wp_ajax_mfa_start_generation_job', $admin, 'handle_start_generation_job_ajax' );
+		$this->loader->add_action( 'wp_ajax_mfa_job_status', $admin, 'handle_job_status_ajax' );
+		// Same-process fallback when a running job has no pending cron event.
+		$this->loader->add_action( 'admin_init', $this->job_runner, 'maybe_nudge' );
 		$this->loader->add_action( 'wp_ajax_mfa_preview_post', $admin, 'handle_preview_post_ajax' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $admin, 'enqueue_scripts' );
 		$this->loader->add_filter( 'plugin_action_links_' . MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME, $admin, 'add_action_links' );
@@ -250,4 +292,7 @@ class Plugin {
 	private FileWriter $file_writer;
 	private IndexGenerator $index_generator;
 	private BundleGenerator $bundle_generator;
+	private GenerationJob $generation_job;
+	private StageFactory $stage_factory;
+	private JobRunner $job_runner;
 }
