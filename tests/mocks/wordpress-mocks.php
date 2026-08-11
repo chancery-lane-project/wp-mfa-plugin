@@ -150,9 +150,10 @@ if (!function_exists('update_option')) {
 }
 
 if (!function_exists('add_option')) {
-    function add_option(string $option, mixed $value): bool {
+    function add_option(string $option, mixed $value, string $deprecated = '', bool|string $autoload = true): bool {
         if (!isset($GLOBALS['_mock_options'][$option])) {
-            $GLOBALS['_mock_options'][$option] = $value;
+            $GLOBALS['_mock_options'][$option]         = $value;
+            $GLOBALS['_mock_option_autoload'][$option] = is_string($autoload) ? ('yes' === $autoload) : $autoload;
             return true;
         }
         return false;
