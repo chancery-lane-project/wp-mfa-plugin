@@ -33,6 +33,14 @@ if (!defined('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME')) {
     define('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', 'markdown-for-agents-and-statistics/markdown-for-agents.php');
 }
 
+if (!defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
 // ---------------------------------------------------------------------------
 // Hook tracking
 // ---------------------------------------------------------------------------
@@ -85,6 +93,24 @@ if (!function_exists('add_filter')) {
     function add_filter(string $hook, callable|array $callback, int $priority = 10, int $accepted_args = 1): bool {
         $GLOBALS['_mock_filters'][$hook][] = compact('callback', 'priority', 'accepted_args');
         return true;
+    }
+}
+
+if (!function_exists('remove_filter')) {
+    function remove_filter(string $hook, callable|array $callback, int $priority = 10): bool {
+        $found = false;
+        $kept  = [];
+
+        foreach ($GLOBALS['_mock_filters'][$hook] ?? [] as $registered) {
+            if ($registered['callback'] === $callback && $registered['priority'] === $priority) {
+                $found = true;
+                continue;
+            }
+            $kept[] = $registered;
+        }
+
+        $GLOBALS['_mock_filters'][$hook] = $kept;
+        return $found;
     }
 }
 
@@ -151,8 +177,30 @@ function reset_mock_scheduled_events(): void {
 }
 
 if (!function_exists('wp_schedule_single_event')) {
+    /**
+     * Mirrors two real behaviours the queue depends on: a forced-failure hook
+     * for tests, and WordPress's suppression of a duplicate hook+args event
+     * scheduled within 10 minutes of an existing one (which returns false).
+     */
     function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool {
-        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args];
+        if (isset($GLOBALS['_mock_schedule_single_event_return']) && !$GLOBALS['_mock_schedule_single_event_return']) {
+            return false;
+        }
+
+        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
+            if ($e['hook'] === $hook && $e['args'] === $args && abs($e['timestamp'] - $timestamp) < 600) {
+                return false;
+            }
+        }
+
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => ''];
+        return true;
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool {
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => $recurrence];
         return true;
     }
 }
@@ -165,6 +213,24 @@ if (!function_exists('wp_next_scheduled')) {
             }
         }
         return false;
+    }
+}
+
+if (!function_exists('wp_unschedule_hook')) {
+    function wp_unschedule_hook(string $hook): int {
+        $kept    = [];
+        $removed = 0;
+
+        foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
+            if ($e['hook'] === $hook) {
+                ++$removed;
+                continue;
+            }
+            $kept[] = $e;
+        }
+
+        $GLOBALS['_mock_scheduled_events'] = $kept;
+        return $removed;
     }
 }
 
@@ -875,6 +941,9 @@ if (!class_exists('wpdb')) {
     class wpdb {
         public string $prefix = 'wp_';
         public string $charset = 'utf8mb4';
+        public string $posts         = 'wp_posts';
+        public string $terms         = 'wp_terms';
+        public string $term_taxonomy = 'wp_term_taxonomy';
 
         /** @var list<array{query: string, args: list<mixed>}> */
         public array $queries = [];
@@ -884,6 +953,12 @@ if (!class_exists('wpdb')) {
         public $mock_get_results = [];
         /** @var mixed */
         public $mock_get_var = null;
+        /** @var list<mixed> Queued get_col() return values, consumed in order. */
+        public array $mock_get_col_queue = [];
+        /** @var mixed Fallback once the queue is empty. */
+        public $mock_get_col = [];
+        /** @var list<mixed> Queued get_results() return values, consumed in order. */
+        public array $mock_get_results_queue = [];
 
         public function prepare(string $query, mixed ...$args): string {
             $this->queries[] = ['query' => $query, 'args' => $args];
@@ -908,7 +983,22 @@ if (!class_exists('wpdb')) {
 
         public function get_results(string|null $query = null, string $output = 'OBJECT'): array {
             $this->queries[] = ['query' => $query, 'args' => []];
+
+            if ($this->mock_get_results_queue) {
+                return (array) array_shift($this->mock_get_results_queue);
+            }
+
             return $this->mock_get_results;
+        }
+
+        public function get_col(string|null $query = null, int $column_offset = 0): array {
+            $this->queries[] = ['query' => $query, 'args' => []];
+
+            if ($this->mock_get_col_queue) {
+                return (array) array_shift($this->mock_get_col_queue);
+            }
+
+            return (array) $this->mock_get_col;
         }
 
         public function get_var(string|null $query = null): mixed {
@@ -1188,6 +1278,29 @@ if (!function_exists('get_term_link')) {
                 ?? 'https://example.com/' . $term->taxonomy . '/' . $term->slug . '/';
         }
         return 'https://example.com/term/' . (int) $term . '/';
+    }
+}
+
+if (!function_exists('wp_count_posts')) {
+    function wp_count_posts(string $type = 'post', string $perm = ''): object {
+        return (object) ($GLOBALS['_mock_post_counts'][$type] ?? ['publish' => 0]);
+    }
+}
+
+if (!function_exists('get_term')) {
+    function get_term(int|\WP_Term $term, string $taxonomy = ''): \WP_Term|\WP_Error|null {
+        if ($term instanceof \WP_Term) {
+            return $term;
+        }
+
+        return $GLOBALS['_mock_terms_by_id'][$term] ?? null;
+    }
+}
+
+if (!function_exists('wp_generate_password')) {
+    function wp_generate_password(int $length = 12, bool $special_chars = true, bool $extra_special_chars = false): string {
+        $GLOBALS['_mock_password_counter'] = ($GLOBALS['_mock_password_counter'] ?? 0) + 1;
+        return 'mocktoken' . $GLOBALS['_mock_password_counter'];
     }
 }
 
