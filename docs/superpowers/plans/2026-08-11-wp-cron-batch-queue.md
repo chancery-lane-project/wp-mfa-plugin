@@ -38,11 +38,11 @@
 | `TickMutex.php` | Token-based acquire / heartbeat / release over `markdown_for_agents_job_tick_lock` |
 | `JobRunner.php` | The tick: mutex → time-boxed batch loop → stage advance → reschedule / watchdog / nudge |
 
-**New — `src/Admin/NeedsRegenTracker.php`:** the `markdown_for_agents_needs_regen` transient logic, lifted out of `Admin`'s `private` method so `JobRunner` can call it.
+**New — `src/Core/NeedsRegenTracker.php`:** the `markdown_for_agents_needs_regen` transient logic, lifted out of `Admin`'s `private` method so `JobRunner` can call it. Filed under `Core\` rather than `Admin\` (a Task 7 review finding): both the admin UI and the background queue depend on it, so `Admin\` would point `Jobs\JobRunner` at the admin-UI layer. It also owns the transient key as `NeedsRegenTracker::TRANSIENT`, which `Admin::display_regen_notice()` and `SettingsPage`'s flagging path both now use.
 
 **Modified:** `src/Generator/Generator.php` (retire `generate_batch()`), `src/Generator/TaxonomyArchiveGenerator.php` (retire `generate_batch()` + `get_all_public_terms()`), `src/Generator/BundleGenerator.php` (staleness guard), `src/Admin/Admin.php` (two new AJAX handlers replace three methods), `src/Admin/SettingsPage.php` (button markup), `src/Core/Plugin.php` (wiring), `src/Core/Deactivator.php` (cleanup), `assets/js/bulk-generate.js` (rewrite), `src/CLI/Commands.php` (untouched by default — see Task 16).
 
-**Tests:** `tests/Unit/Jobs/{ClockTest,PostTypeStageTest,TaxonomyStageTest,BundleStageTest,StageFactoryTest,GenerationJobTest,TickMutexTest,JobRunnerTest,JobRunnerSchedulingTest}.php`, `tests/Unit/Admin/NeedsRegenTrackerTest.php`, `tests/Support/FrozenClock.php` (test double, autoloaded via the `Tclp\WpMarkdownForAgents\Tests\` PSR-4 dev mapping), plus updates to `AdminAjaxTest`, `GeneratorTest`, `TaxonomyArchiveGeneratorTest`, `BundleGeneratorTest`.
+**Tests:** `tests/Unit/Jobs/{ClockTest,PostTypeStageTest,TaxonomyStageTest,BundleStageTest,StageFactoryTest,GenerationJobTest,TickMutexTest,JobRunnerTest,JobRunnerSchedulingTest}.php`, `tests/Unit/Core/NeedsRegenTrackerTest.php`, `tests/Support/FrozenClock.php` (test double, autoloaded via the `Tclp\WpMarkdownForAgents\Tests\` PSR-4 dev mapping), plus updates to `AdminAjaxTest`, `GeneratorTest`, `TaxonomyArchiveGeneratorTest`, `BundleGeneratorTest`.
 
 ---
 
@@ -1808,8 +1808,8 @@ git commit -m "feat: add StageFactory mapping scopes to stage lists"
 `SettingsPage.php:317-321` also writes this transient when settings change; leave that alone for now (it is a flag-many, not a clear-one, and is out of scope).
 
 **Files:**
-- Create: `src/Admin/NeedsRegenTracker.php`
-- Create: `tests/Unit/Admin/NeedsRegenTrackerTest.php`
+- Create: `src/Core/NeedsRegenTracker.php`
+- Create: `tests/Unit/Core/NeedsRegenTrackerTest.php`
 - Modify: `src/Admin/Admin.php:211-228` (delete the private method, delegate)
 
 - [ ] **Step 1: Write the failing test**
@@ -1819,13 +1819,13 @@ git commit -m "feat: add StageFactory mapping scopes to stage lists"
 
 declare(strict_types=1);
 
-namespace Tclp\WpMarkdownForAgents\Tests\Unit\Admin;
+namespace Tclp\WpMarkdownForAgents\Tests\Unit\Core;
 
 use PHPUnit\Framework\TestCase;
-use Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 
 /**
- * @covers \Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker
+ * @covers \Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker
  */
 class NeedsRegenTrackerTest extends TestCase {
 
@@ -1870,19 +1870,19 @@ class NeedsRegenTrackerTest extends TestCase {
 
 - [ ] **Step 2: Run it and watch it fail**
 
-Run: `vendor/bin/phpunit tests/Unit/Admin/NeedsRegenTrackerTest.php`
+Run: `vendor/bin/phpunit tests/Unit/Core/NeedsRegenTrackerTest.php`
 Expected: FAIL — `Class "…Admin\NeedsRegenTracker" not found`.
 
 - [ ] **Step 3: Implement**
 
-`src/Admin/NeedsRegenTracker.php` — move the body of `Admin::mark_post_type_regenerated()` across unchanged:
+`src/Core/NeedsRegenTracker.php` — move the body of `Admin::mark_post_type_regenerated()` across unchanged:
 
 ```php
 <?php
 
 declare(strict_types=1);
 
-namespace Tclp\WpMarkdownForAgents\Admin;
+namespace Tclp\WpMarkdownForAgents\Core;
 
 /**
  * Owns the `markdown_for_agents_needs_regen` transient that drives the
@@ -1949,7 +1949,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/Admin/NeedsRegenTracker.php src/Admin/Admin.php tests/Unit/Admin/NeedsRegenTrackerTest.php
+git add src/Core/NeedsRegenTracker.php src/Admin/Admin.php tests/Unit/Core/NeedsRegenTrackerTest.php
 git commit -m "refactor: extract NeedsRegenTracker from Admin
 
 JobRunner needs to clear a regenerated post type; the old logic was a
@@ -2832,7 +2832,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Jobs;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
-use Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
@@ -3137,7 +3137,7 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Jobs;
 
-use Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 
 /**
@@ -3412,7 +3412,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Jobs;
 
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
-use Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
@@ -4220,7 +4220,7 @@ with `use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;`, `use Tclp\WpMarkdownFor
 
 - [ ] **Step 4: Wire the queue in `Plugin.php`**
 
-Add the imports (`Jobs\GenerationJob`, `Jobs\JobRunner`, `Jobs\StageFactory`, `Jobs\SystemClock`, `Admin\NeedsRegenTracker`) and build the queue at the end of `define_generator()`, after `$bundle_generator` exists:
+Add the imports (`Jobs\GenerationJob`, `Jobs\JobRunner`, `Jobs\StageFactory`, `Jobs\SystemClock`, `Core\NeedsRegenTracker`) and build the queue at the end of `define_generator()`, after `$bundle_generator` exists:
 
 ```php
 		global $wpdb;

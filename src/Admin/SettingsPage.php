@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
@@ -314,11 +315,11 @@ class SettingsPage {
 		$pending = array_values( (array) ( $incoming['post_types'] ?? array() ) );
 
 		if ( empty( $pending ) ) {
-			delete_transient( 'markdown_for_agents_needs_regen' );
+			delete_transient( NeedsRegenTracker::TRANSIENT );
 			return;
 		}
 
-		set_transient( 'markdown_for_agents_needs_regen', $pending, 0 );
+		set_transient( NeedsRegenTracker::TRANSIENT, $pending, 0 );
 	}
 
 	/**

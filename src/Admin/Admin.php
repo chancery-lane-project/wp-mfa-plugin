@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
@@ -393,7 +394,7 @@ class Admin {
 	 * @since  1.2.0
 	 */
 	private function display_regen_notice(): void {
-		$pending = get_transient( 'markdown_for_agents_needs_regen' );
+		$pending = get_transient( NeedsRegenTracker::TRANSIENT );
 
 		if ( ! is_array( $pending ) || empty( $pending ) ) {
 			return;

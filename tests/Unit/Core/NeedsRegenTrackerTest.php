@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Tclp\WpMarkdownForAgents\Tests\Unit\Admin;
+namespace Tclp\WpMarkdownForAgents\Tests\Unit\Core;
 
 use PHPUnit\Framework\TestCase;
-use Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 
 /**
- * @covers \Tclp\WpMarkdownForAgents\Admin\NeedsRegenTracker
+ * @covers \Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker
  */
 class NeedsRegenTrackerTest extends TestCase {
 

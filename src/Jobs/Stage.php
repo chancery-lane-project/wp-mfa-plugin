@@ -17,6 +17,25 @@ namespace Tclp\WpMarkdownForAgents\Jobs;
  *    called once when the stage becomes current, so batch cost stays flat
  *    however far into the run the cursor is.
  *
+ * A stage's *progress* is tracked separately from the stage itself, as a plain
+ * array called a stage descriptor, because it has to round-trip through a
+ * WordPress option between ticks. That shape is:
+ *
+ *     array{
+ *         type: 'post_type'|'taxonomy'|'bundle',
+ *         slug?: string,          // post_type stages only
+ *         total: int|null,        // null until count_total() has run once
+ *         processed: int,
+ *         skipped: int,
+ *         error_count: int,
+ *         state: 'pending'|'running'|'done'|'unavailable',
+ *     }
+ *
+ * Descriptors are authored in exactly one place — StageFactory::descriptor() —
+ * and only ever read or counter-mutated elsewhere (GenerationJob persists them,
+ * JobRunner advances them). Keep it that way: if a second place starts building
+ * them, the shape needs a named home instead of this docblock.
+ *
  * @since  1.7.0
  * @package Tclp\WpMarkdownForAgents\Jobs
  */

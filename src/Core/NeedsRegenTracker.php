@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tclp\WpMarkdownForAgents\Admin;
+namespace Tclp\WpMarkdownForAgents\Core;
 
 /**
  * Owns the `markdown_for_agents_needs_regen` transient that drives the
@@ -12,13 +12,19 @@ namespace Tclp\WpMarkdownForAgents\Admin;
  * finishes regenerating it — the old call site was a private Admin method
  * reachable only from the retired AJAX handler.
  *
+ * Lives in Core rather than Admin deliberately: both the admin UI (which flags
+ * post types on a settings change and renders the notice) and the background
+ * job queue (which clears them as stages complete) depend on it, so filing it
+ * under Admin would point Jobs\JobRunner at the admin-UI layer.
+ *
  * @since  1.7.0
- * @package Tclp\WpMarkdownForAgents\Admin
+ * @package Tclp\WpMarkdownForAgents\Core
  */
 class NeedsRegenTracker {
 
 	/**
-	 * Transient key, shared with SettingsPage's notice renderer.
+	 * Transient key. The single source of truth — SettingsPage flags post types
+	 * here on a settings change and Admin renders the notice from it.
 	 *
 	 * @since  1.7.0
 	 */

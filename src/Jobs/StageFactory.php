@@ -117,6 +117,8 @@ final class StageFactory {
 	private function descriptor( string $type, string $slug = '' ): array {
 		$descriptor = array(
 			'type'        => $type,
+			// null, not 0: the total is unknown until the stage becomes current
+			// and JobRunner calls count_total() once. Zero would be a real count.
 			'total'       => null,
 			'processed'   => 0,
 			'skipped'     => 0,
