@@ -1985,6 +1985,7 @@ use Tclp\WpMarkdownForAgents\Tests\Support\FrozenClock;
  */
 class GenerationJobTest extends TestCase {
 
+    private int $now;
     private FrozenClock $clock;
     private GenerationJob $job;
 
@@ -1993,7 +1994,11 @@ class GenerationJobTest extends TestCase {
         $GLOBALS['_mock_option_autoload']  = [];
         reset_mock_scheduled_events();
 
-        $this->clock = new FrozenClock( 1_000_000 );
+        // is_running() is deliberately wall-clock based, so this suite's frozen
+        // clock has to sit near real time for staleness comparisons to mean
+        // anything. Every timestamp assertion below is relative to $this->now.
+        $this->now   = time();
+        $this->clock = new FrozenClock( $this->now );
         $this->job   = new GenerationJob( $this->clock );
     }
 
@@ -2024,9 +2029,9 @@ class GenerationJobTest extends TestCase {
         $this->assertNotSame( '', $record['lock_token'] );
         $this->assertSame( 0, $record['stage_index'] );
         $this->assertSame( 0, $record['cursor'] );
-        $this->assertSame( 1_000_000, $record['last_tick_at'] );
+        $this->assertSame( $this->now, $record['last_tick_at'] );
         $this->assertCount( 2, $record['stages'] );
-        $this->assertSame( 1_000_000, wp_next_scheduled( JobRunner::TICK_HOOK ) );
+        $this->assertSame( $this->now, wp_next_scheduled( JobRunner::TICK_HOOK ) );
         $this->assertTrue( GenerationJob::is_running() );
     }
 
@@ -2052,12 +2057,20 @@ class GenerationJobTest extends TestCase {
         $this->job->start( $this->stages() );
         $first = $this->job->get()['lock_token'];
 
-        $this->clock->advance( GenerationJob::STALE_AFTER + 1 );
+        // Simulate the tick having fatalled: its last write is now old enough
+        // that nothing is going to reschedule it. Staling the stored record is
+        // what actually happens in production — advancing the clock instead
+        // would leave last_tick_at in the future.
+        $record                 = $this->job->get();
+        $record['last_tick_at'] = $this->now - ( GenerationJob::STALE_AFTER + 1 );
+        update_option( GenerationJob::OPTION, $record );
+
         $result = $this->job->start( $this->stages() );
 
         $this->assertTrue( $result['ok'] );
         $this->assertNotSame( $first, $this->job->get()['lock_token'] );
-        $this->assertFalse( GenerationJob::is_running() );  // stale-at-now
+        // The superseding job is live.
+        $this->assertTrue( GenerationJob::is_running() );
     }
 
     public function test_is_running_ignores_a_stale_running_record(): void {
@@ -2080,7 +2093,7 @@ class GenerationJobTest extends TestCase {
         $this->clock->advance( 5 );
         $this->assertTrue( $this->job->save( $record, $token ) );
         $this->assertSame( 42, $this->job->get()['cursor'] );
-        $this->assertSame( 1_000_005, $this->job->get()['last_tick_at'] );
+        $this->assertSame( $this->now + 5, $this->job->get()['last_tick_at'] );
 
         $record['cursor'] = 99;
         $this->assertFalse( $this->job->save( $record, 'not-the-token' ) );
