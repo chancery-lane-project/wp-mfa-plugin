@@ -39,6 +39,16 @@ class JobRunner {
 	private const NUDGE_AFTER = 60;
 
 	/**
+	 * Seconds of work an admin_init nudge may spend inline.
+	 *
+	 * Much smaller than the cron budget: the nudge exists to get a dead chain
+	 * moving again, not to make maximum progress in one request — an admin
+	 * who merely loaded a wp-admin page should not wait out a 30s budget
+	 * before the page renders. The next cron tick or nudge continues the work.
+	 */
+	public const NUDGE_BUDGET = 5;
+
+	/**
 	 * @since  1.7.0
 	 * @param  GenerationJob        $job              Job record repository.
 	 * @param  TickMutex            $mutex            Guards against two concurrent ticks.
@@ -62,8 +72,14 @@ class JobRunner {
 	 * Hooked to self::TICK_HOOK, and called directly by the admin_init nudge.
 	 *
 	 * @since  1.7.0
+	 * @param  int|null $budget_override Seconds this tick may spend, bypassing
+	 *                                    the usual max_execution_time-derived
+	 *                                    default (still subject to the
+	 *                                    markdown_for_agents_tick_budget
+	 *                                    filter). Null for the normal cron
+	 *                                    budget; the nudge passes NUDGE_BUDGET.
 	 */
-	public function run_tick(): void {
+	public function run_tick( ?int $budget_override = null ): void {
 		$mutex_token = $this->mutex->acquire();
 
 		if ( null === $mutex_token ) {
@@ -73,7 +89,7 @@ class JobRunner {
 		}
 
 		try {
-			$this->process( $mutex_token );
+			$this->process( $mutex_token, $budget_override );
 		} finally {
 			$this->mutex->release( $mutex_token );
 		}
@@ -81,9 +97,10 @@ class JobRunner {
 
 	/**
 	 * @since  1.7.0
-	 * @param  string $mutex_token Token held for this tick.
+	 * @param  string   $mutex_token      Token held for this tick.
+	 * @param  int|null $budget_override  See run_tick().
 	 */
-	private function process( string $mutex_token ): void {
+	private function process( string $mutex_token, ?int $budget_override = null ): void {
 		$record = $this->job->get();
 
 		if ( 'running' !== $record['status'] ) {
@@ -92,7 +109,7 @@ class JobRunner {
 
 		$job_token = (string) $record['lock_token'];
 		$started   = $this->clock->monotonic();
-		$budget    = $this->budget();
+		$budget    = $this->budget( $budget_override );
 
 		while ( true ) {
 			$stage_count = count( $record['stages'] );
@@ -213,19 +230,34 @@ class JobRunner {
 	 * Checked only between batches — a batch is never interrupted.
 	 *
 	 * @since  1.7.0
+	 * @param  int|null $override When given (the nudge's NUDGE_BUDGET), used as
+	 *                            the pre-filter default instead of the usual
+	 *                            max_execution_time-derived one, and reported to
+	 *                            the filter as the 'nudge' context rather than
+	 *                            'cron'.
 	 */
-	private function budget(): int {
-		$max_exec = (int) ini_get( 'max_execution_time' );
-		$budget   = $max_exec > 0 ? max( 10, (int) ( $max_exec * 0.6 ) ) : self::MAX_BUDGET;
-		$budget   = min( $budget, self::MAX_BUDGET );
+	private function budget( ?int $override = null ): int {
+		if ( null !== $override ) {
+			$budget  = $override;
+			$context = 'nudge';
+		} else {
+			$max_exec = (int) ini_get( 'max_execution_time' );
+			$budget   = $max_exec > 0 ? max( 10, (int) ( $max_exec * 0.6 ) ) : self::MAX_BUDGET;
+			$budget   = min( $budget, self::MAX_BUDGET );
+			$context  = 'cron';
+		}
 
 		/**
 		 * Filter the wall-clock seconds one generation tick may spend.
 		 *
 		 * @since  1.7.0
-		 * @param  int $budget Seconds.
+		 * @param  int    $budget  Seconds.
+		 * @param  string $context 'cron' for a normal WP-Cron tick, 'nudge' for
+		 *                         the inline admin_init recovery tick — tune
+		 *                         them independently, e.g. keep the nudge short
+		 *                         regardless of this filter's other uses.
 		 */
-		return max( 1, (int) apply_filters( 'markdown_for_agents_tick_budget', $budget ) );
+		return max( 1, (int) apply_filters( 'markdown_for_agents_tick_budget', $budget, $context ) );
 	}
 
 	/**
@@ -253,7 +285,7 @@ class JobRunner {
 			return;
 		}
 
-		$this->run_tick();
+		$this->run_tick( self::NUDGE_BUDGET );
 	}
 
 	/**

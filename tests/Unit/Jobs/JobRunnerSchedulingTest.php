@@ -154,6 +154,49 @@ class JobRunnerSchedulingTest extends TestCase {
         $this->assertSame( [], $stage->cursors );
     }
 
+    public function test_nudge_spends_its_own_short_budget_not_the_cron_one(): void {
+        $this->job->start( [ [ 'type' => 'post_type', 'slug' => 'post', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
+        reset_mock_scheduled_events();
+
+        $stage = new FakeStage(
+            array_fill( 0, 10, [ 'processed' => 1, 'skipped' => 0, 'errors' => [], 'next_cursor' => 1, 'done' => false ] ),
+            100,
+            $this->clock,
+            3   // 3s per batch
+        );
+        $this->factory->method( 'make' )->willReturn( $stage );
+        $this->clock->advance( 61 );
+
+        $this->runner()->maybe_nudge();
+
+        // NUDGE_BUDGET is 5s: after one 3s batch elapsed is 3s (< 5, continue),
+        // after a second it is 6s (>= 5, stop) — two batches, not the six a
+        // 30s cron-style budget would allow before an admin page finally
+        // renders.
+        $this->assertCount( 2, $stage->cursors );
+    }
+
+    public function test_the_tick_budget_filter_receives_the_context(): void {
+        $this->given_unfinished_job();
+
+        $seen = [];
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_tick_budget'] = static function ( $value, string $context ) use ( &$seen ) {
+            $seen[] = $context;
+            return $value;
+        };
+
+        try {
+            $this->runner()->run_tick();
+            reset_mock_scheduled_events(); // simulate the tick's own event going missing
+            $this->clock->advance( 61 );
+            $this->runner()->maybe_nudge();
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_tick_budget'] );
+        }
+
+        $this->assertSame( [ 'cron', 'nudge' ], $seen );
+    }
+
     public function test_watchdog_schedules_a_tick_for_a_stale_running_job(): void {
         $this->given_unfinished_job();
         $this->clock->advance( GenerationJob::STALE_AFTER + 1 );
