@@ -24,8 +24,13 @@ class GenerationJob {
 	/**
 	 * Seconds without a tick after which a `running` job is presumed dead.
 	 *
-	 * Comfortably longer than one tick's time budget plus the tick mutex's
-	 * staleness window, so a slow-but-healthy job is never superseded.
+	 * Invariant, held by construction rather than by margin: TickMutex::window()
+	 * is never shorter than this constant, so the mutex cannot expire before
+	 * the job is considered dead. If it could, a second tick could steal the
+	 * lock while the job record still held the first tick's valid lock_token,
+	 * and both would write. With the mutex outliving the job, a superseding
+	 * start() rotates the token before the mutex can be stolen, so a wedged
+	 * tick's progress is discarded rather than duplicated.
 	 *
 	 * @since  1.7.0
 	 */

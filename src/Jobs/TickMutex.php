@@ -130,12 +130,23 @@ class TickMutex {
 	 * Deliberately generous: a tick slower than its own budget is exactly the
 	 * scenario this queue exists to survive, so it must not be stolen from.
 	 *
+	 * The floor is GenerationJob::STALE_AFTER, on every host: the mutex must
+	 * never expire before the job is considered dead, or a second tick could
+	 * steal the lock while the first still holds a valid lock_token, and both
+	 * would write. This is a flat floor, not a scaled one — a host with
+	 * max_execution_time of 30s, say, would otherwise compute a 60s window
+	 * here and go on to hit exactly that race, so recovery from a genuinely
+	 * wedged tick on that host is pushed from a 5-minute worst case out to
+	 * STALE_AFTER's 10 minutes. Discarding a wedged tick's progress for twice
+	 * as long is the accepted price for never risking it running concurrently
+	 * with a new one.
+	 *
 	 * @since  1.7.0
 	 */
 	public function window(): int {
 		$max_exec = (int) ini_get( 'max_execution_time' );
 
-		return max( 300, $max_exec * 2 );
+		return max( GenerationJob::STALE_AFTER, $max_exec * 2 );
 	}
 
 	/**

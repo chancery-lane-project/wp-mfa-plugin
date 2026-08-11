@@ -135,7 +135,7 @@ class TickMutexTest extends TestCase {
         $this->assertFalse( get_option( TickMutex::OPTION ) );
     }
 
-    public function test_window_is_never_shorter_than_five_minutes(): void {
-        $this->assertGreaterThanOrEqual( 300, $this->mutex->window() );
+    public function test_window_is_never_shorter_than_the_jobs_stale_after(): void {
+        $this->assertGreaterThanOrEqual( \Tclp\WpMarkdownForAgents\Jobs\GenerationJob::STALE_AFTER, $this->mutex->window() );
     }
 }
