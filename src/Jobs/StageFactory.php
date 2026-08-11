@@ -15,10 +15,13 @@ use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
  * Descriptors are plain arrays because they are stored in the job option and
  * read back one tick at a time; nothing serialisable-unfriendly may go in them.
  *
+ * Not final: JobRunner's tick tests double this so they can return stage
+ * doubles instead of stages that would hit the database.
+ *
  * @since  1.7.0
  * @package Tclp\WpMarkdownForAgents\Jobs
  */
-final class StageFactory {
+class StageFactory {
 
 	/**
 	 * @since  1.7.0
