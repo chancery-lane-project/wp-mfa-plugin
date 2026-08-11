@@ -71,6 +71,8 @@ class PostTypeStageTest extends TestCase {
 
         $sql = $this->wpdb->queries[0]['query'];
 
+        $this->assertStringContainsString( 'post_type = %s', $sql );
+        $this->assertStringContainsString( "post_status = 'publish'", $sql );
         $this->assertStringContainsString( 'ID > %d', $sql );
         $this->assertStringContainsString( 'ORDER BY ID ASC', $sql );
         $this->assertStringContainsString( 'LIMIT %d', $sql );

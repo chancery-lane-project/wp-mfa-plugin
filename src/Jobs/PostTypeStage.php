@@ -29,7 +29,13 @@ final class PostTypeStage implements Stage {
 	 * @since  1.7.0
 	 * @param  \wpdb                $wpdb      WordPress database handle.
 	 * @param  Generator            $generator Writes each post's Markdown.
-	 * @param  array<string, mixed> $options   Plugin options, for eligibility checks.
+	 * @param  array<string, mixed> $options   Plugin options, for eligibility checks. MUST be
+	 *                                         the same options array given to $generator: the
+	 *                                         eligible-vs-skip classification below re-derives,
+	 *                                         via ExportPolicy::is_eligible(), which of the two
+	 *                                         reasons generate_post() returned false for. A
+	 *                                         divergent snapshot would misreport an intentional
+	 *                                         skip as a write failure.
 	 * @param  string               $post_type Post type slug this stage walks.
 	 */
 	public function __construct(
