@@ -138,7 +138,7 @@ class JobRunner {
 					$descriptor['total'] = $stage->count_total();
 				} catch ( \Throwable $e ) {
 					$record['status']  = 'failed';
-					$record['message'] = 'Could not count items for this stage: ' . $e->getMessage();
+					$record['message'] = "Could not count items for stage '" . $this->stage_name( $descriptor ) . "': " . $e->getMessage();
 					break;
 				}
 			}
@@ -153,13 +153,9 @@ class JobRunner {
 				// throw here is structural (a $wpdb error, say) rather than
 				// one bad post — fail the job rather than retrying it hourly
 				// against the same fault forever.
-				$stage_name = 'post_type' === $descriptor['type'] && ! empty( $descriptor['slug'] )
-					? $descriptor['type'] . ':' . $descriptor['slug']
-					: $descriptor['type'];
-
 				$record             = GenerationJob::append_errors( $record, array( array( 'message' => $e->getMessage() ) ) );
 				$record['status']   = 'failed';
-				$record['message']  = "Stage '{$stage_name}' failed while processing a batch: " . $e->getMessage();
+				$record['message']  = "Stage '" . $this->stage_name( $descriptor ) . "' failed while processing a batch: " . $e->getMessage();
 				break;
 			}
 
@@ -222,6 +218,18 @@ class JobRunner {
 		}
 
 		$this->maybe_reschedule( $record, $job_token );
+	}
+
+	/**
+	 * Human-readable name for a stage descriptor, for failure messages.
+	 *
+	 * @since  1.7.0
+	 * @param  array<string, mixed> $descriptor Stage descriptor.
+	 */
+	private function stage_name( array $descriptor ): string {
+		return 'post_type' === $descriptor['type'] && ! empty( $descriptor['slug'] )
+			? $descriptor['type'] . ':' . $descriptor['slug']
+			: (string) $descriptor['type'];
 	}
 
 	/**
