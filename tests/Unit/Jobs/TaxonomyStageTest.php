@@ -91,6 +91,9 @@ class TaxonomyStageTest extends TestCase {
                 }
             );
 
+        // Limit 4 against 3 rows: a short page, so this test asserts ordering
+        // without also tripping the full-page boundary that
+        // test_full_page_reports_not_done owns.
         $result = $this->stage()->process_batch( 0, 4 );
 
         // A term_id cursor would have dropped post_tag 7 after category 40.
