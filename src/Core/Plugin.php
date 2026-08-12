@@ -229,7 +229,7 @@ class Plugin {
 	 */
 	private function define_admin_hooks( array $options ): void {
 		$ard_catalog = new ArdCatalog( $this->bundle_generator );
-		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $this->bundle_generator, $ard_catalog, $this->generation_job, $this->stage_factory );
+		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $ard_catalog, $this->generation_job, $this->stage_factory );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before

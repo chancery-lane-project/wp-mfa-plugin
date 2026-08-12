@@ -75,7 +75,6 @@ class AdminAjaxTest extends TestCase {
             $this->generator,
             $this->taxonomy_generator,
             null,
-            null,
             $this->job,
             $this->factory
         );

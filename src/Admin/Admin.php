@@ -6,7 +6,6 @@ namespace Tclp\WpMarkdownForAgents\Admin;
 
 use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
-use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
@@ -29,8 +28,6 @@ class Admin {
 	 * @param  array<string, mixed>  $options          Current plugin options.
 	 * @param  Generator             $generator        Generator instance; also used to write manifests before a bundle rebuild.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
-	 * @param  BundleGenerator|null  $bundle_generator Retained for constructor-signature compatibility; the bundle
-	 *                                                 zip/manifest rebuild now runs as BundleStage inside the job queue.
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
 	 * @param  GenerationJob|null    $generation_job   Optional job repository; absent means the AJAX job endpoints 500.
 	 * @param  StageFactory|null     $stage_factory    Optional stage-list builder; absent means the AJAX job endpoints 500.
@@ -39,7 +36,6 @@ class Admin {
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
-		private readonly ?BundleGenerator $bundle_generator = null,
 		?ArdCatalog $ard_catalog = null,
 		private readonly ?GenerationJob $generation_job = null,
 		private readonly ?StageFactory $stage_factory = null,
