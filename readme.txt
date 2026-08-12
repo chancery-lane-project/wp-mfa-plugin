@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.6.1
+Stable tag: 1.7.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -247,6 +247,15 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.7.0 =
+* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it keeps going after you close the tab or the page loses contact with the server.
+* Fixed a bug where a run containing posts skipped for good reason (password-protected, draft, excluded from export) could run forever instead of finishing.
+* Bulk generation no longer slows down the further it progresses through a large site.
+* Generating taxonomy archives no longer loads every term of every public taxonomy into memory before starting, and the export bundle (`.zip`) is rebuilt in its own step rather than tacked onto whichever request happens to finish last.
+* A run that is interrupted (e.g. by a server restart) now resumes automatically, without needing to be started again by hand.
+* Progress now shows skipped counts separately from errors, and starting a second run while one is already in progress shows that run's live progress instead of an error.
+* Added the `markdown_for_agents_tick_budget` filter, for site owners who want to tune how many seconds each background tick may spend.
 
 = 1.6.1 =
 * Harden content negotiation against full-page caches that ignore `Vary` (observed on managed WordPress hosting: a cached HTML variant is served at the edge before WordPress runs, so `Accept: text/markdown` requests receive HTML). HTML responses for pages with a Markdown alternate now send `Vary: Accept` plus an HTTP `Link: <…>; rel="alternate"; type="text/markdown"` header, so HEAD-only clients and non-HTML-parsing agents can discover the query-param URL, which is immune to cache-variant confusion. New `markdown_for_agents_html_headers` filter to modify or omit either header.

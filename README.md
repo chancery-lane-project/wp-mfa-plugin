@@ -247,6 +247,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
 | `markdown_for_agents_converter_options` | `(array $options)` | Override the HTML→Markdown converter options |
 | `markdown_for_agents_agent_categories` | `(array $map)` | Modify the intent-category → UA-substring map used to classify agents in stats |
+| `markdown_for_agents_tick_budget` | `(int $seconds, string $context)` | Wall-clock seconds one bulk-generation background tick may spend; checked only between batches, never mid-batch, so a single very slow item can still overrun it. `$context` is `cron` for a normal scheduled tick or `nudge` for the short inline catch-up run triggered from an admin request. Defaults to 30s (or 60% of `max_execution_time` when that is lower) for `cron`, 5s for `nudge` |
 
 ---
 
