@@ -69,12 +69,16 @@ class JobRunner {
 	/**
 	 * One cron tick.
 	 *
-	 * Hooked to self::TICK_HOOK. Deliberately declares no parameters: WordPress
-	 * invokes hooked callbacks via call_user_func_array(), and a typed optional
-	 * parameter here is a trap — a bare do_action( self::TICK_HOOK ) does not
-	 * reliably call this with zero arguments, and under strict_types that can
-	 * be a fatal TypeError rather than the harmless extra argument PHP would
-	 * otherwise ignore. See tick() for the budget-carrying internal path.
+	 * Hooked to self::TICK_HOOK. Deliberately declares no parameters: real
+	 * WP-Cron dispatch (do_action_ref_array() with this hook's empty args
+	 * array) always calls this with zero arguments, so that path was never at
+	 * risk. But a direct do_action( self::TICK_HOOK ) with no further
+	 * arguments — a normal enough way for a site owner or another plugin to
+	 * force a tick — hands WP_Hook's callback dispatch an empty string for a
+	 * would-be first parameter, and a typed optional parameter here turned
+	 * that into a fatal TypeError under strict_types rather than the harmless
+	 * extra argument PHP would otherwise ignore. See tick() for the
+	 * budget-carrying internal path.
 	 *
 	 * @since  1.7.0
 	 */
