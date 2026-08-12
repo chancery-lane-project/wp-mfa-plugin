@@ -115,8 +115,15 @@
             return;
         }
 
-        var stages  = job.stages;
-        var current = Math.min(parseInt(job.stage_index, 10) || 0, stages.length - 1);
+        var stages = job.stages;
+
+        // Only a running job has a current stage. When the job is done,
+        // stage_index has advanced past the last stage, and clamping it to the
+        // final index would mark that stage "running" on a finished run.
+        var current = ('running' === job.status)
+            ? Math.min(parseInt(job.stage_index, 10) || 0, stages.length - 1)
+            : -1;
+
         var heading = document.createElement('p');
 
         if ('running' === job.status) {
