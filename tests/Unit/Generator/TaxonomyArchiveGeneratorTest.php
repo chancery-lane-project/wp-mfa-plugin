@@ -378,65 +378,6 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // generate_batch — response shape
-    // -----------------------------------------------------------------------
-
-    public function test_generate_batch_returns_correct_shape(): void {
-        $term = $this->make_term();
-        $GLOBALS['_mock_taxonomy_terms']['category'] = [ $term ];
-
-        $this->yaml_formatter->method( 'format' )->willReturn( '' );
-        $this->file_writer->method( 'write' )->willReturn( true );
-
-        $result = $this->generator->generate_batch( 0, 10 );
-
-        $this->assertArrayHasKey( 'total', $result );
-        $this->assertArrayHasKey( 'processed', $result );
-        $this->assertArrayHasKey( 'errors', $result );
-        $this->assertIsInt( $result['total'] );
-        $this->assertIsInt( $result['processed'] );
-        $this->assertIsArray( $result['errors'] );
-    }
-
-    public function test_generate_batch_records_error_when_write_fails(): void {
-        // A failed filesystem write must surface as an error, not vanish.
-        $term = $this->make_term( [ 'term_id' => 7 ] );
-        $GLOBALS['_mock_taxonomy_terms']['category'] = [ $term ];
-
-        $this->yaml_formatter->method( 'format' )->willReturn( '' );
-        $this->file_writer->method( 'write' )->willReturn( false );
-
-        $result = $this->generator->generate_batch( 0, 10 );
-
-        $this->assertSame( 0, $result['processed'] );
-        $this->assertCount( 1, $result['errors'] );
-        $this->assertSame( 7, $result['errors'][0]['term_id'] );
-        $this->assertStringContainsString( 'write', $result['errors'][0]['message'] );
-    }
-
-    public function test_generate_batch_with_zero_limit_returns_empty(): void {
-        $result = $this->generator->generate_batch( 0, 0 );
-        $this->assertSame( ['total' => 0, 'processed' => 0, 'errors' => []], $result );
-    }
-
-    public function test_generate_batch_paginates_correctly(): void {
-        $terms = [
-            $this->make_term( ['term_id' => 1, 'slug' => 'term-1'] ),
-            $this->make_term( ['term_id' => 2, 'slug' => 'term-2'] ),
-            $this->make_term( ['term_id' => 3, 'slug' => 'term-3'] ),
-        ];
-        $GLOBALS['_mock_taxonomy_terms']['category'] = $terms;
-
-        $this->yaml_formatter->method( 'format' )->willReturn( '' );
-        $this->file_writer->method( 'write' )->willReturn( true );
-
-        // Fetch second page: offset=2, limit=2 — should return 1 term
-        $result = $this->generator->generate_batch( 2, 2 );
-        $this->assertSame( 3, $result['total'] );
-        $this->assertSame( 1, $result['processed'] );
-    }
-
-    // -----------------------------------------------------------------------
     // on_delete_term
     // -----------------------------------------------------------------------
 

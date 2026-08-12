@@ -59,6 +59,16 @@ class TaxonomyStageTest extends TestCase {
         $this->assertStringContainsString( 'COUNT(', $this->wpdb->queries[0]['query'] );
     }
 
+    public function test_zero_limit_returns_done_with_no_query(): void {
+        $result = $this->stage()->process_batch( 0, 0 );
+
+        $this->assertSame(
+            [ 'processed' => 0, 'skipped' => 0, 'errors' => [], 'next_cursor' => 0, 'done' => true ],
+            $result
+        );
+        $this->assertSame( [], $this->wpdb->queries );
+    }
+
     public function test_batch_query_is_cursor_paginated_over_term_taxonomy_id(): void {
         $this->given_rows( [ [ 'term_taxonomy_id' => 5, 'term_id' => 5, 'taxonomy' => 'category' ] ] );
         $this->taxonomy_generator->method( 'generate_term' )->willReturn( true );

@@ -81,6 +81,16 @@ class PostTypeStageTest extends TestCase {
         $this->assertSame( [ 'post', 3, 2 ], $this->wpdb->queries[0]['args'] );
     }
 
+    public function test_zero_limit_returns_done_with_no_query(): void {
+        $result = $this->stage()->process_batch( 0, 0 );
+
+        $this->assertSame(
+            [ 'processed' => 0, 'skipped' => 0, 'errors' => [], 'next_cursor' => 0, 'done' => true ],
+            $result
+        );
+        $this->assertSame( [], $this->wpdb->queries );
+    }
+
     public function test_full_page_reports_not_done_and_advances_cursor(): void {
         $this->wpdb->mock_get_col_queue = [ [ '4', '5' ] ];
         $this->given_post( 4 );
