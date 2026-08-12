@@ -257,6 +257,13 @@ if (!function_exists('wp_unschedule_hook')) {
     }
 }
 
+if (!function_exists('wp_clear_scheduled_hook')) {
+    /** Older sibling of wp_unschedule_hook(): same effect for our purposes (args matching is not exercised by anything in this plugin). */
+    function wp_clear_scheduled_hook(string $hook, array $args = []): int|bool {
+        return wp_unschedule_hook($hook);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Post / taxonomy mocks (configurable via $GLOBALS)
 // ---------------------------------------------------------------------------

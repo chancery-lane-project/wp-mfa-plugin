@@ -27,6 +27,17 @@ delete_option( 'markdown_for_agents_db_version' );
 delete_transient( 'markdown_for_agents_needs_regen' );
 wp_clear_scheduled_hook( 'markdown_for_agents_rebuild_bundle' );
 
+// A half-finished bulk-generation job must not survive uninstall either —
+// its cron events would be orphaned and its tick lock would block any future
+// reinstall. Literal option/hook names, not GenerationJob::OPTION etc.: the
+// plugin autoloader is not loaded at this point in the file (it is required
+// below, conditionally, only for the bundle path), so referencing those
+// classes here would fatal. Do not "tidy" these into constants.
+delete_option( 'markdown_for_agents_job' );
+delete_option( 'markdown_for_agents_job_tick_lock' );
+wp_clear_scheduled_hook( 'markdown_for_agents_process_batch' );
+wp_clear_scheduled_hook( 'markdown_for_agents_job_watchdog' );
+
 // Drop the access-stats table.
 global $wpdb;
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}mfa_access_stats" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
