@@ -77,6 +77,8 @@ Navigate to **Settings → Markdown for Agents**.
 | Field configuration | Per-post-type frontmatter and content field mappings |
 | Build downloadable bundle | Maintains a `.zip` of the export tree with relative internal links, generates `manifest.json`, and displays an ARD discovery catalog panel (`ai-catalog.json`, for manual deployment to `/.well-known/`) (off by default; no other toggle required) |
 
+Bulk generation (the "Generate everything" / per-post-type / taxonomy buttons) runs in the background via WP-Cron, so it needs WP-Cron working on the site. If `DISABLE_WP_CRON` is set and a system cron calls `wp-cron.php` instead, that cron must run as the same user as the web server, or the files it writes will fail permission checks.
+
 ---
 
 ## File structure

@@ -76,6 +76,14 @@ No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
 
+= Does bulk generation need anything special on my host? =
+
+Bulk generation (the "Generate everything" and per-post-type/taxonomy buttons)
+runs in the background via WP-Cron, so WP-Cron needs to be working on the site.
+If you have set `DISABLE_WP_CRON` and use a system cron to call `wp-cron.php`
+instead, that cron must run as the same user as your web server, or the files
+it writes will fail permission checks.
+
 = AI agents are getting HTML instead of Markdown. Why? =
 
 Almost always this is a CDN, firewall, or page cache sitting in front of
