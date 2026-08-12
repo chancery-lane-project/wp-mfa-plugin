@@ -298,6 +298,25 @@ class JobRunnerTest extends TestCase {
         $this->assertSame( 'done', $record['status'] );
     }
 
+    /**
+     * Regression: run_tick() is a WordPress action callback, invoked via
+     * call_user_func_array() with whatever WP_Hook passes for a bare
+     * do_action( self::TICK_HOOK ) — which is not reliably zero arguments.
+     * A typed optional parameter here previously turned that into a fatal
+     * TypeError under strict_types the moment a real cron tick fired; PHP
+     * silently discards an extra argument to a method that declares none.
+     */
+    public function test_run_tick_is_safe_when_called_with_wordpresss_calling_convention(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+        $stage = new FakeStage( [ $this->page( 1, 1, true ) ], 1 );
+        $this->factory->method( 'make' )->willReturn( $stage );
+
+        call_user_func_array( [ $this->runner(), 'run_tick' ], [ '' ] );
+
+        $this->assertSame( [ 0 ], $stage->cursors );
+        $this->assertSame( 'done', $this->job->get()['status'] );
+    }
+
     public function test_an_idle_job_does_no_work(): void {
         $stage = new FakeStage( [ $this->page( 1, 1, false ) ], 5 );
         $this->factory->method( 'make' )->willReturn( $stage );

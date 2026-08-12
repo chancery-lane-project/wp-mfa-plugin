@@ -69,8 +69,20 @@ class JobRunner {
 	/**
 	 * One cron tick.
 	 *
-	 * Hooked to self::TICK_HOOK, and called directly by the admin_init nudge.
+	 * Hooked to self::TICK_HOOK. Deliberately declares no parameters: WordPress
+	 * invokes hooked callbacks via call_user_func_array(), and a typed optional
+	 * parameter here is a trap — a bare do_action( self::TICK_HOOK ) does not
+	 * reliably call this with zero arguments, and under strict_types that can
+	 * be a fatal TypeError rather than the harmless extra argument PHP would
+	 * otherwise ignore. See tick() for the budget-carrying internal path.
 	 *
+	 * @since  1.7.0
+	 */
+	public function run_tick(): void {
+		$this->tick( null );
+	}
+
+	/**
 	 * @since  1.7.0
 	 * @param  int|null $budget_override Seconds this tick may spend, bypassing
 	 *                                    the usual max_execution_time-derived
@@ -79,7 +91,7 @@ class JobRunner {
 	 *                                    filter). Null for the normal cron
 	 *                                    budget; the nudge passes NUDGE_BUDGET.
 	 */
-	public function run_tick( ?int $budget_override = null ): void {
+	private function tick( ?int $budget_override ): void {
 		$mutex_token = $this->mutex->acquire();
 
 		if ( null === $mutex_token ) {
@@ -293,7 +305,7 @@ class JobRunner {
 			return;
 		}
 
-		$this->run_tick( self::NUDGE_BUDGET );
+		$this->tick( self::NUDGE_BUDGET );
 	}
 
 	/**

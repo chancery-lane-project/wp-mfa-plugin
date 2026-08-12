@@ -220,6 +220,32 @@ class JobRunnerSchedulingTest extends TestCase {
         $this->assertSame( 0, $this->job->get()['schedule_failures'] );
     }
 
+    /**
+     * Regression: watchdog() and maybe_nudge() are also WordPress action
+     * callbacks. Both already declare no parameters, so an extra argument
+     * from WP_Hook's calling convention is silently discarded by PHP — unlike
+     * run_tick(), which had a typed optional parameter and fatalled under
+     * strict_types the moment a real cron tick fired it. Confirming the
+     * still-safe cases alongside the fix rather than assuming they stay so.
+     */
+    public function test_watchdog_is_safe_when_called_with_wordpresss_calling_convention(): void {
+        $this->given_unfinished_job();
+        $this->clock->advance( GenerationJob::STALE_AFTER + 1 );
+
+        call_user_func_array( [ $this->runner(), 'watchdog' ], [ '' ] );
+
+        $this->assertSame( $this->clock->now(), wp_next_scheduled( JobRunner::TICK_HOOK ) );
+    }
+
+    public function test_nudge_is_safe_when_called_with_wordpresss_calling_convention(): void {
+        $stage = $this->given_unfinished_job();
+        $this->clock->advance( 61 );
+
+        call_user_func_array( [ $this->runner(), 'maybe_nudge' ], [ '' ] );
+
+        $this->assertNotSame( [], $stage->cursors );
+    }
+
     public function test_watchdog_ignores_fresh_jobs_pending_events_and_idle_jobs(): void {
         $this->given_unfinished_job();
 
