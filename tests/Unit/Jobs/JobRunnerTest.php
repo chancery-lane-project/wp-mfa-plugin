@@ -243,13 +243,14 @@ class JobRunnerTest extends TestCase {
 
         $this->assertSame( 'failed', $record['status'] );
         $this->assertStringContainsString( 'count exploded', $record['message'] );
+        $this->assertNull( $record['attempt_started_at'] );
     }
 
     public function test_a_superseded_job_stops_without_rescheduling(): void {
         $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
 
-        // A save() refused mid-tick means start() superseded this chain with a
-        // new lock token. The tick must stop dead and schedule nothing.
+        // A save() refused means start() superseded this chain with a new
+        // lock token. The tick must stop dead and schedule nothing.
         // Mocked rather than staged through the option: the runner reads the
         // token from the record it loads, so the token can only diverge
         // *after* that read — which no test can reach from outside.
@@ -266,6 +267,8 @@ class JobRunnerTest extends TestCase {
                 'schedule_failures' => 0,
                 'last_tick_at'      => 1_000_000,
                 'message'           => '',
+                'attempt_started_at' => null,
+                'dead_attempts'      => 0,
             ]
         );
         $job->method( 'save' )->willReturn( false );
@@ -276,10 +279,11 @@ class JobRunnerTest extends TestCase {
         $runner = new JobRunner( $job, $this->mutex, $this->factory, new NeedsRegenTracker(), $this->clock );
         $runner->run_tick();
 
-        // One batch may already have run before the refused save; what matters
-        // is that nothing was scheduled and no second batch was attempted.
+        // save() is refused from the very first call — the attempt marker
+        // set before the batch loop — so no batch ever runs; what matters is
+        // that nothing was scheduled and the mutex was still released.
         $this->assertFalse( wp_next_scheduled( JobRunner::TICK_HOOK ) );
-        $this->assertCount( 1, $stage->cursors );
+        $this->assertSame( [], $stage->cursors );
         $this->assertFalse( get_option( TickMutex::OPTION ) );
     }
 
@@ -351,5 +355,88 @@ class JobRunnerTest extends TestCase {
         $runner->run_tick();
 
         $this->assertFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
+    // -------------------------------------------------------------------
+    // Dead-attempt detection: a PHP fatal kills the process before any
+    // catch/finally/shutdown handler of ours runs, so these are simulated by
+    // seeding the record with the marker already set, rather than trying to
+    // kill PHP mid-test.
+    // -------------------------------------------------------------------
+
+    public function test_a_tick_that_finds_the_marker_set_increments_dead_attempts(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'gone' ) ] );
+
+        $record                        = $this->job->get();
+        $record['attempt_started_at'] = $this->clock->now() - 10;
+        update_option( GenerationJob::OPTION, $record );
+
+        // An unavailable stage never reaches the batch loop's own
+        // "progress resets the counter" line, so the increment is observable
+        // in isolation rather than immediately masked by this same tick.
+        $this->factory->method( 'make' )->willReturn( null );
+
+        $this->runner()->run_tick();
+
+        $this->assertSame( 1, $this->job->get()['dead_attempts'] );
+    }
+
+    public function test_three_consecutive_dead_attempts_fail_the_job(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+
+        $record                        = $this->job->get();
+        $record['attempt_started_at'] = $this->clock->now() - 10;
+        $record['dead_attempts']      = JobRunner::MAX_DEAD_ATTEMPTS - 1;
+        update_option( GenerationJob::OPTION, $record );
+
+        $stage = new FakeStage( [ $this->page( 1, 1, false ) ], 10 );
+        $this->factory->method( 'make' )->willReturn( $stage );
+
+        $this->runner()->run_tick();
+
+        $record = $this->job->get();
+
+        $this->assertSame( 'failed', $record['status'] );
+        $this->assertStringContainsString( "Stage 'post_type:post'", $record['message'] );
+        $this->assertNull( $record['attempt_started_at'] );
+        // The job failed before ever attempting a batch this tick.
+        $this->assertSame( [], $stage->cursors );
+    }
+
+    public function test_progress_resets_the_dead_attempts_counter(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+
+        $record                   = $this->job->get();
+        $record['dead_attempts'] = 2;
+        update_option( GenerationJob::OPTION, $record );
+
+        $this->factory->method( 'make' )->willReturn( new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $this->runner()->run_tick();
+
+        $this->assertSame( 0, $this->job->get()['dead_attempts'] );
+    }
+
+    public function test_marker_is_cleared_on_the_done_path(): void {
+        $this->given_job( [ $this->descriptor( 'bundle' ) ] );
+        $this->factory->method( 'make' )->willReturn( new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $this->runner()->run_tick();
+
+        $record = $this->job->get();
+        $this->assertSame( 'done', $record['status'] );
+        $this->assertNull( $record['attempt_started_at'] );
+    }
+
+    public function test_marker_is_cleared_when_the_tick_simply_runs_out_of_budget(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+        $stage = new FakeStage( [ $this->page( 1, 1, false ) ], 10, $this->clock, 60 );
+        $this->factory->method( 'make' )->willReturn( $stage );
+
+        $this->runner()->run_tick();
+
+        $record = $this->job->get();
+        $this->assertSame( 'running', $record['status'] );
+        $this->assertNull( $record['attempt_started_at'] );
     }
 }

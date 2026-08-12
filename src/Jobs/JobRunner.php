@@ -35,6 +35,14 @@ class JobRunner {
 	/** Consecutive failed reschedules before the job is declared failed. */
 	public const MAX_SCHEDULE_FAILURES = 3;
 
+	/**
+	 * Consecutive ticks that die without clearing their attempt marker before
+	 * the job is declared failed. See the attempt_started_at handling in
+	 * process(): a try/catch cannot catch a PHP fatal, so this is detected by
+	 * the *next* tick finding a marker the previous one never cleared.
+	 */
+	public const MAX_DEAD_ATTEMPTS = 3;
+
 	/** Seconds without a tick before an admin request may nudge the chain. */
 	private const NUDGE_AFTER = 60;
 
@@ -135,8 +143,54 @@ class JobRunner {
 		}
 
 		$job_token = (string) $record['lock_token'];
-		$started   = $this->clock->monotonic();
-		$budget    = $this->budget( $budget_override );
+
+		if ( null !== $record['attempt_started_at'] ) {
+			// The previous tick set this marker and never cleared it — it
+			// died without a trace. A try/catch cannot catch this: a PHP
+			// fatal (an exhausted memory limit, an exceeded
+			// max_execution_time, an Error thrown elsewhere during our
+			// batch) kills the process before any catch, finally, or
+			// shutdown handler of ours runs. Detecting it on the next tick
+			// to find the marker still set is the only option.
+			$record['dead_attempts'] = (int) $record['dead_attempts'] + 1;
+
+			if ( $record['dead_attempts'] >= self::MAX_DEAD_ATTEMPTS ) {
+				$index      = (int) $record['stage_index'];
+				$descriptor = $record['stages'][ $index ] ?? array( 'type' => 'unknown' );
+				$message    = "Stage '" . $this->stage_name( $descriptor ) . "' repeatedly stopped without finishing. "
+					. 'This usually means a PHP fatal error such as an exhausted memory limit or an exceeded '
+					. 'max_execution_time — check the server error log.';
+
+				$record['status']             = 'failed';
+				$record['message']            = $message;
+				$record['attempt_started_at'] = null;
+
+				// Deliberately unconditional, not behind WP_DEBUG like the
+				// rest of the plugin's logging: this is rare, actionable, and
+				// the only trace a site owner gets of an uncatchable fatal.
+				// Do not "fix" this to match the WP_DEBUG convention — that
+				// would silence the one signal this failure mode produces.
+				error_log( '[Markdown for Agents] ' . $message ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+
+				$this->job->save( $record, $job_token );
+				return;
+			}
+
+			$record['attempt_started_at'] = null;
+		}
+
+		// Mark this tick as having attempted work, before the first
+		// process_batch() call below. Cleared before every normal exit —
+		// done, failed, or simply out of budget — so only a death mid-tick
+		// leaves it set for the next tick to find.
+		$record['attempt_started_at'] = $this->clock->now();
+
+		if ( ! $this->job->save( $record, $job_token ) ) {
+			return;
+		}
+
+		$started = $this->clock->monotonic();
+		$budget  = $this->budget( $budget_override );
 
 		while ( true ) {
 			$stage_count = count( $record['stages'] );
@@ -186,6 +240,11 @@ class JobRunner {
 				break;
 			}
 
+			// A batch completed: real progress, not a dead attempt. Reset the
+			// counter so intermittent deaths do not accumulate towards a
+			// false failure — the same lesson as watchdog()'s schedule_failures.
+			$record['dead_attempts'] = 0;
+
 			$descriptor['processed']   += (int) $batch['processed'];
 			$descriptor['skipped']     += (int) $batch['skipped'];
 			$descriptor['error_count'] += count( $batch['errors'] );
@@ -230,6 +289,11 @@ class JobRunner {
 				break;
 			}
 		}
+
+		// The tick is ending normally here — done, failed, or simply out of
+		// budget with more work still to do — so clear the marker regardless
+		// of which. Only a death inside the loop above leaves it set.
+		$record['attempt_started_at'] = null;
 
 		if ( ! $this->job->save( $record, $job_token ) ) {
 			return;

@@ -86,16 +86,18 @@ class GenerationJob {
 		}
 
 		$record = array(
-			'status'            => 'running',
-			'lock_token'        => wp_generate_password( 20, false ),
-			'stages'            => $stages,
-			'stage_index'       => 0,
-			'cursor'            => 0,
-			'errors'            => array(),
-			'error_count'       => 0,
-			'schedule_failures' => 0,
-			'last_tick_at'      => $this->clock->now(),
-			'message'           => '',
+			'status'             => 'running',
+			'lock_token'         => wp_generate_password( 20, false ),
+			'stages'             => $stages,
+			'stage_index'        => 0,
+			'cursor'             => 0,
+			'errors'             => array(),
+			'error_count'        => 0,
+			'schedule_failures'  => 0,
+			'last_tick_at'       => $this->clock->now(),
+			'message'            => '',
+			'attempt_started_at' => null,
+			'dead_attempts'      => 0,
 		);
 
 		$this->write( $record );
@@ -213,16 +215,27 @@ class GenerationJob {
 	 */
 	private static function idle_record(): array {
 		return array(
-			'status'            => 'idle',
-			'lock_token'        => '',
-			'stages'            => array(),
-			'stage_index'       => 0,
-			'cursor'            => 0,
-			'errors'            => array(),
-			'error_count'       => 0,
-			'schedule_failures' => 0,
-			'last_tick_at'      => 0,
-			'message'           => '',
+			'status'             => 'idle',
+			'lock_token'         => '',
+			'stages'             => array(),
+			'stage_index'        => 0,
+			'cursor'             => 0,
+			'errors'             => array(),
+			'error_count'        => 0,
+			'schedule_failures'  => 0,
+			'last_tick_at'       => 0,
+			'message'            => '',
+			// Non-null means a tick set this immediately before a
+			// process_batch() call and never got the chance to clear it — a
+			// PHP fatal killed the process mid-batch. array_merge() in get()
+			// backfills this default onto records written before this field
+			// existed, so an old idle/failed/done record reads as "no attempt
+			// in flight" rather than a phantom dead attempt.
+			'attempt_started_at' => null,
+			// Consecutive ticks that found the marker above still set.
+			// Resets to 0 the moment any tick completes a batch, so
+			// intermittent deaths do not accumulate into a false failure.
+			'dead_attempts'      => 0,
 		);
 	}
 }
