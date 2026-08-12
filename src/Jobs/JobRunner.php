@@ -39,6 +39,17 @@ class JobRunner {
 	private const NUDGE_AFTER = 60;
 
 	/**
+	 * Seconds past its own scheduled time before a pending tick event is
+	 * treated as stuck rather than merely upcoming.
+	 *
+	 * A broken-cron host does not lose its event — it never runs it, so it
+	 * sits pending forever. Without this, every recovery path (the nudge, the
+	 * watchdog, and the tick's own reschedule) sees "an event is pending" and
+	 * backs off permanently, believing a healthy chain is about to run.
+	 */
+	private const OVERDUE_AFTER = 60;
+
+	/**
 	 * Seconds of work an admin_init nudge may spend inline.
 	 *
 	 * Much smaller than the cron budget: the nudge exists to get a dead chain
@@ -237,6 +248,29 @@ class JobRunner {
 	}
 
 	/**
+	 * Is a tick event pending, and not stuck?
+	 *
+	 * @since  1.7.0
+	 */
+	private function has_fresh_pending_tick(): bool {
+		$next = wp_next_scheduled( self::TICK_HOOK );
+
+		return false !== $next && $next > ( $this->clock->now() - self::OVERDUE_AFTER );
+	}
+
+	/**
+	 * Clear a stuck tick event, if one is pending, so a fresh schedule is not
+	 * refused as a near-duplicate.
+	 *
+	 * @since  1.7.0
+	 */
+	private function clear_overdue_tick(): void {
+		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+			wp_clear_scheduled_hook( self::TICK_HOOK );
+		}
+	}
+
+	/**
 	 * Human-readable name for a stage descriptor, for failure messages.
 	 *
 	 * @since  1.7.0
@@ -301,7 +335,7 @@ class JobRunner {
 			return;
 		}
 
-		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+		if ( $this->has_fresh_pending_tick() ) {
 			return;
 		}
 
@@ -327,13 +361,15 @@ class JobRunner {
 			return;
 		}
 
-		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+		if ( $this->has_fresh_pending_tick() ) {
 			return;
 		}
 
 		if ( ( $this->clock->now() - (int) $record['last_tick_at'] ) < GenerationJob::STALE_AFTER ) {
 			return;
 		}
+
+		$this->clear_overdue_tick();
 
 		if ( ! wp_schedule_single_event( $this->clock->now(), self::TICK_HOOK ) ) {
 			return;
@@ -362,9 +398,11 @@ class JobRunner {
 	 * @param  string               $job_token Token this tick holds.
 	 */
 	private function maybe_reschedule( array $record, string $job_token ): void {
-		if ( false !== wp_next_scheduled( self::TICK_HOOK ) ) {
+		if ( $this->has_fresh_pending_tick() ) {
 			return;
 		}
+
+		$this->clear_overdue_tick();
 
 		if ( wp_schedule_single_event( $this->clock->now() + 1, self::TICK_HOOK ) ) {
 			if ( 0 !== (int) $record['schedule_failures'] ) {

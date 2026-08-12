@@ -140,6 +140,49 @@ class JobRunnerSchedulingTest extends TestCase {
         $this->assertSame( [], $stage->cursors );
     }
 
+    /**
+     * A broken-cron host does not lose its event, it never runs it — the
+     * event sits pending forever. Without treating an overdue event as "not
+     * really pending", every recovery path sees "an event is pending" and
+     * backs off permanently, believing a healthy chain is about to run.
+     */
+    public function test_nudge_runs_inline_when_the_pending_event_is_overdue(): void {
+        $stage = $this->given_unfinished_job();
+        wp_schedule_single_event( $this->clock->now(), JobRunner::TICK_HOOK );
+        $this->clock->advance( 121 ); // past NUDGE_AFTER (60) and OVERDUE_AFTER (60)
+
+        $this->runner()->maybe_nudge();
+
+        $this->assertNotSame( [], $stage->cursors );
+    }
+
+    public function test_watchdog_clears_an_overdue_event_and_schedules_a_fresh_one(): void {
+        $this->given_unfinished_job();
+        wp_schedule_single_event( $this->clock->now(), JobRunner::TICK_HOOK );
+        $this->clock->advance( GenerationJob::STALE_AFTER + 61 ); // stale job, overdue event
+
+        $this->runner()->watchdog();
+
+        // Not just "something is scheduled" — the stale event must actually
+        // have been replaced, not merely joined by a second one.
+        $this->assertCount( 1, $GLOBALS['_mock_scheduled_events'] );
+        $this->assertSame( $this->clock->now(), wp_next_scheduled( JobRunner::TICK_HOOK ) );
+    }
+
+    public function test_reschedule_replaces_an_overdue_event_rather_than_counting_a_failure(): void {
+        $this->given_unfinished_job();
+        // A dead prior cycle's event that never fired.
+        wp_schedule_single_event( $this->clock->now(), JobRunner::TICK_HOOK );
+        $this->clock->advance( 61 ); // overdue, but well inside the 10-minute suppression window
+
+        $this->runner()->run_tick();
+
+        $record = $this->job->get();
+
+        $this->assertSame( 0, $record['schedule_failures'] );
+        $this->assertSame( $this->clock->now() + 1, wp_next_scheduled( JobRunner::TICK_HOOK ) );
+    }
+
     public function test_nudge_does_nothing_for_a_recent_tick_or_an_idle_job(): void {
         $stage = $this->given_unfinished_job();
         $this->clock->advance( 30 );
