@@ -90,6 +90,14 @@ Two things to check: whether `DISABLE_WP_CRON` is set with no system cron
 actually running behind it, and whether a firewall or HTTP auth on the site is
 blocking the loopback request WordPress makes to its own `wp-cron.php`.
 
+= How do I stop a bulk generation run that's in progress? =
+
+There is no cancel button, but deactivating the plugin (Plugins screen, no CLI
+needed) stops a run immediately: it clears the job and unschedules its
+background events. Reactivating leaves already-generated files untouched, and
+you can start a new run from Settings. Note this is blunt — deactivating also
+stops the plugin serving Markdown to agents until you reactivate it.
+
 = AI agents are getting HTML instead of Markdown. Why? =
 
 Almost always this is a CDN, firewall, or page cache sitting in front of

@@ -81,6 +81,8 @@ Bulk generation (the "Generate everything" / per-post-type / taxonomy buttons) r
 
 If WP-Cron is not working, a run sits at `running` with little or no progress rather than failing outright, since there is no page load to trigger the next batch. Check whether `DISABLE_WP_CRON` is set with no system cron behind it, and whether a firewall or HTTP auth blocks the loopback request WordPress makes to its own `wp-cron.php`.
 
+There is no cancel button, but deactivating the plugin stops a run in progress: it clears the job record and unschedules its background events. Reactivating leaves already-generated files untouched. This is blunt — it also stops Markdown serving while deactivated.
+
 ---
 
 ## File structure
