@@ -3,8 +3,10 @@
  *
  * The browser no longer drives batches. Clicking a button POSTs a scope to
  * start a server-side WP-Cron job, then this polls a read-only status endpoint
- * until the job reports done or failed. Closing the tab does not stop the job,
- * and reloading the page reconnects to whatever is running.
+ * until the job reports done or failed. The job runs independently of this page
+ * as long as WP-Cron is working on the site; where it is not, the admin_init
+ * nudge means progress only advances while a wp-admin page is open. Reloading
+ * reconnects to whatever is running.
  */
 (function () {
     'use strict';
