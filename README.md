@@ -79,6 +79,8 @@ Navigate to **Settings → Markdown for Agents**.
 
 Bulk generation (the "Generate everything" / per-post-type / taxonomy buttons) runs in the background via WP-Cron, so it needs WP-Cron working on the site. If `DISABLE_WP_CRON` is set and a system cron calls `wp-cron.php` instead, that cron must run as the same user as the web server, or the files it writes will fail permission checks.
 
+If WP-Cron is not working, a run sits at `running` with little or no progress rather than failing outright, since there is no page load to trigger the next batch. Check whether `DISABLE_WP_CRON` is set with no system cron behind it, and whether a firewall or HTTP auth blocks the loopback request WordPress makes to its own `wp-cron.php`.
+
 ---
 
 ## File structure

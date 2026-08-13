@@ -84,6 +84,12 @@ If you have set `DISABLE_WP_CRON` and use a system cron to call `wp-cron.php`
 instead, that cron must run as the same user as your web server, or the files
 it writes will fail permission checks.
 
+If WP-Cron is not working, a run sits at "running" with little or no progress
+instead of failing outright — there is no page load to trigger the next batch.
+Two things to check: whether `DISABLE_WP_CRON` is set with no system cron
+actually running behind it, and whether a firewall or HTTP auth on the site is
+blocking the loopback request WordPress makes to its own `wp-cron.php`.
+
 = AI agents are getting HTML instead of Markdown. Why? =
 
 Almost always this is a CDN, firewall, or page cache sitting in front of
@@ -257,7 +263,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Changelog ==
 
 = 1.7.0 =
-* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it keeps going after you close the tab or the page loses contact with the server.
+* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it continues in the background provided WP-Cron is working on the site. If WP-Cron is not working, progress only advances while a wp-admin page is open.
 * Fixed a bug where a run containing posts skipped for good reason (password-protected, draft, excluded from export) could run forever instead of finishing.
 * Bulk generation no longer slows down the further it progresses through a large site.
 * Generating taxonomy archives no longer loads every term of every public taxonomy into memory before starting, and the export bundle (`.zip`) is rebuilt in its own step rather than tacked onto whichever request happens to finish last.

@@ -128,7 +128,7 @@
 
         if ('running' === job.status) {
             heading.innerHTML = '<strong>Generating…</strong> stage ' + (current + 1) + ' of ' + stages.length
-                + ' — this continues on the server, so you can close this tab.';
+                + ' — this continues in the background as long as WP-Cron is running on this site.';
         } else if ('done' === job.status) {
             heading.innerHTML = '<strong>Generation complete.</strong>';
         } else {

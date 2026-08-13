@@ -167,7 +167,10 @@ class Admin {
 	 * Start a bulk generation job.
 	 *
 	 * Hooked to `wp_ajax_mfa_start_generation_job`. Returns immediately — all
-	 * work happens in the WP-Cron tick chain, so closing the tab is harmless.
+	 * work happens in the WP-Cron tick chain, so closing the tab is harmless
+	 * provided WP-Cron is actually running on the site; if it is not, progress
+	 * only advances while a wp-admin page (including this one, via the
+	 * admin_init nudge) is open.
 	 *
 	 * @since  1.7.0
 	 */
