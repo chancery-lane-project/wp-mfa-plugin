@@ -12,6 +12,13 @@
     var POLL_INTERVAL   = 5000;
     var MAX_POLL_ERRORS = 3;
 
+    // 3 minutes: long enough that one slow tick (the server-side budget caps
+    // a single tick at 30s) or a quiet cron minute never trips this, short
+    // enough that someone watching this page finds out quickly that nothing
+    // is advancing rather than waiting out the 1-hour watchdog interval,
+    // which only helps when cron runs at all — the case this warns about.
+    var STALL_WARNING_SECONDS = 180;
+
     var pollTimer  = null;
     var pollErrors = 0;
 
@@ -136,6 +143,15 @@
         }
 
         target.appendChild(heading);
+
+        if ('running' === job.status && parseInt(job.seconds_since_tick, 10) > STALL_WARNING_SECONDS) {
+            var minutes = Math.round(parseInt(job.seconds_since_tick, 10) / 60);
+            var stall   = document.createElement('p');
+            stall.className   = 'notice notice-warning';
+            stall.textContent = 'No progress for ' + minutes + ' minute' + (1 === minutes ? '' : 's')
+                + ' — WP-Cron may not be running on this site. See the plugin readme.';
+            target.appendChild(stall);
+        }
 
         var list = document.createElement('ul');
         list.style.margin    = '0.5em 0 0 1.5em';

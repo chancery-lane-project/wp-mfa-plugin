@@ -8,8 +8,10 @@ use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Jobs\Clock;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
+use Tclp\WpMarkdownForAgents\Jobs\SystemClock;
 
 /**
  * Admin coordinator — wires SettingsPage and MetaBox and handles POST actions.
@@ -31,6 +33,7 @@ class Admin {
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
 	 * @param  GenerationJob|null    $generation_job   Optional job repository; absent means the AJAX job endpoints 500.
 	 * @param  StageFactory|null     $stage_factory    Optional stage-list builder; absent means the AJAX job endpoints 500.
+	 * @param  Clock                 $clock            Time source for public_job_record()'s seconds_since_tick.
 	 */
 	public function __construct(
 		private readonly array $options,
@@ -39,6 +42,7 @@ class Admin {
 		?ArdCatalog $ard_catalog = null,
 		private readonly ?GenerationJob $generation_job = null,
 		private readonly ?StageFactory $stage_factory = null,
+		private readonly Clock $clock = new SystemClock(),
 	) {
 		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
@@ -252,13 +256,28 @@ class Admin {
 	/**
 	 * The job record, reduced to the fields the browser is allowed to see.
 	 *
+	 * Adds a computed `seconds_since_tick` for a running (or just-finished)
+	 * job — how the browser tells "working, be patient" apart from "cron is
+	 * dead and nothing will ever advance this", which otherwise both render
+	 * as `running` with no progress. `last_tick_at` itself stays out of the
+	 * allowlist deliberately: sending a raw timestamp for the browser to
+	 * subtract its own clock from would misfire on any machine with a
+	 * skewed clock, so the subtraction happens here, server-side, against
+	 * this same request's clock.
+	 *
 	 * @since  1.7.0
 	 * @return array<string, mixed>
 	 */
 	private function public_job_record(): array {
 		$record = null !== $this->generation_job ? $this->generation_job->get() : array();
 
-		return array_intersect_key( $record, array_flip( self::PUBLIC_JOB_FIELDS ) );
+		$public = array_intersect_key( $record, array_flip( self::PUBLIC_JOB_FIELDS ) );
+
+		if ( isset( $record['status'] ) && 'idle' !== $record['status'] ) {
+			$public['seconds_since_tick'] = max( 0, $this->clock->now() - (int) ( $record['last_tick_at'] ?? 0 ) );
+		}
+
+		return $public;
 	}
 
 	/**

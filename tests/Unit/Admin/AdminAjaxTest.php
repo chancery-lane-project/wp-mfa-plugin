@@ -76,7 +76,8 @@ class AdminAjaxTest extends TestCase {
             $this->taxonomy_generator,
             null,
             $this->job,
-            $this->factory
+            $this->factory,
+            $this->clock
         );
     }
 
@@ -241,6 +242,32 @@ class AdminAjaxTest extends TestCase {
 
         $this->assertArrayNotHasKey( 'schedule_failures', $data );
         $this->assertArrayNotHasKey( 'some_future_internal_field', $data );
+    }
+
+    public function test_job_status_includes_seconds_since_tick_but_not_last_tick_at(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
+
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
+
+        $this->clock->advance( 90 );
+        $admin->handle_job_status_ajax();
+
+        $data = $GLOBALS['_mock_json_response']['data'];
+
+        $this->assertSame( 90, $data['seconds_since_tick'] );
+        $this->assertArrayNotHasKey( 'last_tick_at', $data );
+    }
+
+    public function test_job_status_omits_seconds_since_tick_when_no_job_is_running(): void {
+        $_POST = [ 'nonce' => 'test' ];
+
+        $this->admin_with_job()->handle_job_status_ajax();
+
+        $this->assertArrayNotHasKey( 'seconds_since_tick', $GLOBALS['_mock_json_response']['data'] );
     }
 
     public function test_job_status_requires_capability(): void {

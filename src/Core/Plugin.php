@@ -24,6 +24,7 @@ use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
+use Tclp\WpMarkdownForAgents\Jobs\Clock;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
@@ -178,6 +179,7 @@ class Plugin {
 
 		$this->generation_job = $generation_job;
 		$this->stage_factory  = $stage_factory;
+		$this->clock          = $clock;
 
 		// The cron chain. Registered unconditionally: a job started in wp-admin
 		// is processed by whatever request happens to spawn cron next.
@@ -229,7 +231,7 @@ class Plugin {
 	 */
 	private function define_admin_hooks( array $options ): void {
 		$ard_catalog = new ArdCatalog( $this->bundle_generator );
-		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $ard_catalog, $this->generation_job, $this->stage_factory );
+		$admin       = new Admin( $options, $this->generator, $this->taxonomy_generator, $ard_catalog, $this->generation_job, $this->stage_factory, $this->clock );
 
 		// Registered unconditionally — exclusion meta must be saved regardless of
 		// is_admin() or auto_generate setting. Priority 5 runs before
@@ -295,4 +297,5 @@ class Plugin {
 	private GenerationJob $generation_job;
 	private StageFactory $stage_factory;
 	private JobRunner $job_runner;
+	private Clock $clock;
 }
