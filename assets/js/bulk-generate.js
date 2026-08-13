@@ -14,12 +14,23 @@
     var POLL_INTERVAL   = 5000;
     var MAX_POLL_ERRORS = 3;
 
-    // 3 minutes: long enough that one slow tick (the server-side budget caps
-    // a single tick at 30s) or a quiet cron minute never trips this, short
-    // enough that someone watching this page finds out quickly that nothing
-    // is advancing rather than waiting out the 1-hour watchdog interval,
-    // which only helps when cron runs at all — the case this warns about.
-    var STALL_WARNING_SECONDS = 180;
+    // 20 minutes. The binding constraint is a realistic system-cron sweep
+    // interval, not a single tick's 30s budget: on DISABLE_WP_CRON with a
+    // real system cron (one of the most commonly *recommended* production
+    // setups, and the one our own FAQ tells people to check for), the
+    // standard sweep is every 5 or 15 minutes, so a tick finishing and
+    // waiting for the next sweep is normal, healthy behaviour that can
+    // leave seconds_since_tick sitting at 300-900s. 1200s clears a
+    // 15-minute sweep with 5 minutes of margin.
+    //
+    // Deliberately NOT tied to GenerationJob::STALE_AFTER (600s) even
+    // though that constant answers a related-sounding question: that 600s
+    // is *shorter* than a 15-minute sweep and would false-fire on exactly
+    // the setup this threshold exists to tolerate. STALE_AFTER answers
+    // "should a superseding start() be allowed"; this answers "should a
+    // human be told something looks wrong" — different questions with
+    // different safe answers, so do not "simplify" this into STALE_AFTER.
+    var STALL_WARNING_SECONDS = 1200;
 
     var pollTimer  = null;
     var pollErrors = 0;
@@ -151,7 +162,8 @@
             var stall   = document.createElement('p');
             stall.className   = 'notice notice-warning';
             stall.textContent = 'No progress for ' + minutes + ' minute' + (1 === minutes ? '' : 's')
-                + ' — WP-Cron may not be running on this site. See the plugin readme.';
+                + ' — WP-Cron may not be running on this site. See "Does bulk generation need '
+                + 'anything special on my host?" in the plugin readme (Plugins → View details).';
             target.appendChild(stall);
         }
 

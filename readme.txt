@@ -271,7 +271,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Changelog ==
 
 = 1.7.0 =
-* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it continues in the background provided WP-Cron is working on the site. If WP-Cron is not working, progress only advances while a wp-admin page is open.
+* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it continues in the background provided WP-Cron is working on the site. If WP-Cron is not working, progress only advances while a wp-admin page is open (see the FAQ for what to check).
 * Fixed a bug where a run containing posts skipped for good reason (password-protected, draft, excluded from export) could run forever instead of finishing.
 * Bulk generation no longer slows down the further it progresses through a large site.
 * Generating taxonomy archives no longer loads every term of every public taxonomy into memory before starting, and the export bundle (`.zip`) is rebuilt in its own step rather than tacked onto whichever request happens to finish last.
