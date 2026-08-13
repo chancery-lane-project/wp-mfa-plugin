@@ -33,7 +33,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * Content negotiation (`Accept: text/markdown`, `?output_format=md`, or known AI User-Agents)
 * **Taxonomy archive support** — category, tag, and custom taxonomy term pages served as Markdown post listings
 * Automatic Markdown generation on post save; taxonomy archives auto-update when any post in the term changes
-* AJAX bulk generation with live progress counter — no page timeouts on large sites
+* Background bulk generation — runs as a WP-Cron job with live progress, so it survives closing the tab and never times out a page request
 * Per-post-type field configuration — choose which meta/ACF fields go in frontmatter or body
 * ACF support with dot notation for nested group fields (e.g. `group.subfield`)
 * Content fields option — use ACF fields as the body content instead of post_content

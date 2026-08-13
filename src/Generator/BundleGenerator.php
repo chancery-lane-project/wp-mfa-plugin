@@ -117,8 +117,9 @@ class BundleGenerator {
 			// whole tree costs a single archive write. PharData::addFromString()
 			// re-serialises the ENTIRE archive to disk on every call, which is
 			// quadratic in file count: a real ~2,500-file export took ~90s and
-			// could exceed max_execution_time mid-request, freezing the bulk
-			// generator on its final batch. Prefer ZipArchive when ext-zip is
+			// could exceed max_execution_time mid-request — which is what used
+			// to freeze bulk generation, before the rebuild moved into its own
+			// background tick. Prefer ZipArchive when ext-zip is
 			// available; fall back to the slow-but-correct PharData path only
 			// where it is not.
 			$written = class_exists( '\ZipArchive' )

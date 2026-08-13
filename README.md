@@ -23,7 +23,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Content negotiation** - serves Markdown on `Accept: text/markdown`, `?output_format=md`, or known AI User-Agent strings
 - **Taxonomy archive support** - category, tag, and custom taxonomy archives served as Markdown post listings
 - **Auto-generation** - files regenerated on post save; taxonomy archives regenerated when any post in the term changes
-- **Bulk generation** - generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
+- **Bulk generation** - generate all files from the admin settings page as a background WP-Cron job (start it and close the tab; the page polls for progress) or synchronously via WP-CLI
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
 - **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
 - **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync

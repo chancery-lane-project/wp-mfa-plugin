@@ -287,9 +287,9 @@ class SettingsPage {
 	 *
 	 * Compares old vs new options on the keys that influence generated file
 	 * contents or location. When any differ, stores the snapshot of currently
-	 * enabled post types as the pending set; the AJAX bulk-generate handler
-	 * removes types from this set as they complete and clears the transient
-	 * once the set is empty.
+	 * enabled post types as the pending set. JobRunner clears each type from
+	 * that set (via Core\NeedsRegenTracker) as its stage finishes, and the
+	 * transient is deleted once the set is empty.
 	 *
 	 * @since  1.2.0
 	 * @param  array<string, mixed> $old Existing saved options.
