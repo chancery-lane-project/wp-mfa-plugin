@@ -123,14 +123,98 @@ class AgentDetector {
 	 * Categories are checked in array order, so on-demand (human-triggered) is
 	 * listed first. Override via the `markdown_for_agents_agent_categories` filter.
 	 *
+	 * Treat this map as append-only. Categories are derived from labels already
+	 * written to the stats table, so removing an entry retrospectively drops that
+	 * bot's history into 'unknown'. The four category keys are fixed — StatsPage
+	 * renders one tile per key and coerces anything else to 'unknown'.
+	 *
 	 * @since  1.5.0
 	 * @return array<string, string[]>
 	 */
 	private function get_agent_categories(): array {
 		$defaults = array(
-			'on-demand' => array( 'ChatGPT-User', 'Claude-User', 'Claude-Web', 'Perplexity-User', 'Gemini-User' ),
-			'search'    => array( 'OAI-SearchBot', 'PerplexityBot', 'Applebot-Extended' ),
-			'training'  => array( 'GPTBot', 'ClaudeBot', 'CCBot', 'Google-Extended', 'Bytespider', 'meta-externalagent', 'Amazonbot', 'cohere-ai', 'anthropic-ai' ),
+			'on-demand' => array(
+				// Baseline.
+				'ChatGPT-User',
+				'Claude-User',
+				'Claude-Web',
+				'Perplexity-User',
+				'Gemini-User',
+				// Cloudflare Radar AI_ASSISTANT.
+				'meta-externalfetcher',
+				'MistralAI-User',
+				'Google-Agent',
+				'DuckAssistBot',
+				'Devin',
+				'TwinAgent',
+				'ApifyWebsiteContentCrawler',
+				'ChathiveCrawler',
+				'CledaraBot',
+				'EasyScan',
+				'HarkBot',
+				'HIFIBot',
+				'QATechBot',
+				'Instapaper',
+				'Nava/',
+				'Retool/',
+			),
+			'search'    => array(
+				// Baseline.
+				'OAI-SearchBot',
+				'PerplexityBot',
+				'Applebot-Extended',
+				// Cloudflare Radar AI_SEARCH.
+				'Claude-SearchBot',
+				'Bravebot',
+				'Amzn-SearchBot',
+				'Cloudflare-AI-Search',
+				'Anomura',
+				'Element451Bot',
+				'KernelSearchBot',
+				'ShapBot',
+				'alphalens-bot',
+			),
+			'training'  => array(
+				// Baseline.
+				'GPTBot',
+				'ClaudeBot',
+				'CCBot',
+				'Google-Extended',
+				'Bytespider',
+				'meta-externalagent',
+				'Amazonbot',
+				'cohere-ai',
+				'anthropic-ai',
+				// Cloudflare Radar AI_CRAWLER.
+				'KimiBot',
+				'PetalBot',
+				'GoogleOther',
+				'CloudVertexBot',
+				'ICC-Crawler',
+				'Cotoyogi',
+				'atlassian-bot',
+				'LinerBot',
+				'magpie-crawler',
+				'bigsur.ai',
+				'QualifiedBot',
+				'Awario',
+				'amazon-kendra-',
+				'Anchor Browser',
+				'BorderxBot',
+				'CitibotSiteCrawler',
+				'CloudflareBrowserRenderingCrawler',
+				'netEstate NE Crawler',
+				'FishBot',
+				'make.com',
+				'NavuBot',
+				'Novellum',
+				'AdpResearchBot',
+				'SelectikaScraper',
+				'SemrushBot-OCOB',
+				'SemrushBot-SWA',
+				'WARDBot',
+				'ygs-scraper-bot'
+			),
 		);
 
 		return (array) apply_filters( 'markdown_for_agents_agent_categories', $defaults );
