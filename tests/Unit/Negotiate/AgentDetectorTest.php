@@ -157,4 +157,80 @@ class AgentDetectorTest extends TestCase {
 
         unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_categories'] );
     }
+
+    // ---------------------------------------------------------------------
+    // Stats continuity guarantees
+    // ---------------------------------------------------------------------
+
+    /**
+     * Every shipped UA string must resolve to a real category.
+     *
+     * Detection and categorisation are two separate lists; when they drift, an
+     * agent is either served Markdown but filed under "Unknown" in the stats,
+     * or categorised but never detectable in the first place.
+     */
+    public function test_every_default_ua_string_is_categorised(): void {
+        $detector = new AgentDetector( \Tclp\WpMarkdownForAgents\Core\Options::get_defaults() );
+
+        foreach ( \Tclp\WpMarkdownForAgents\Core\Options::get_defaults()['ua_agent_strings'] as $string ) {
+            $this->assertNotSame(
+                'unknown',
+                $detector->categorise_agent( $string ),
+                sprintf( 'UA string "%s" is detected but has no category mapping.', $string )
+            );
+        }
+    }
+
+    /**
+     * Categorising is derived from labels already stored in the stats table, so
+     * dropping a mapping rewrites history into "Unknown".
+     */
+    public function test_categorise_agent_still_maps_every_legacy_agent(): void {
+        $legacy = [
+            'ChatGPT-User'       => 'on-demand',
+            'Claude-User'        => 'on-demand',
+            'Claude-Web'         => 'on-demand',
+            'Perplexity-User'    => 'on-demand',
+            'Gemini-User'        => 'on-demand',
+            'OAI-SearchBot'      => 'search',
+            'PerplexityBot'      => 'search',
+            'Applebot-Extended'  => 'search',
+            'GPTBot'             => 'training',
+            'ClaudeBot'          => 'training',
+            'CCBot'              => 'training',
+            'Google-Extended'    => 'training',
+            'Bytespider'         => 'training',
+            'meta-externalagent' => 'training',
+            'Amazonbot'          => 'training',
+            'cohere-ai'          => 'training',
+            'anthropic-ai'       => 'training',
+        ];
+
+        foreach ( $legacy as $agent => $expected ) {
+            $this->assertSame( $expected, $this->make_detector()->categorise_agent( $agent ), $agent );
+        }
+    }
+
+    /**
+     * A stored label must stay stable across releases, so no shipped UA string
+     * may be a substring of another — the first match wins in detect_agent(),
+     * so an overlapping pair would relabel one of the bots mid-history and
+     * split its stats into two series.
+     */
+    public function test_no_default_ua_string_shadows_another(): void {
+        $strings = \Tclp\WpMarkdownForAgents\Core\Options::get_defaults()['ua_agent_strings'];
+
+        foreach ( $strings as $a ) {
+            foreach ( $strings as $b ) {
+                if ( $a === $b ) {
+                    continue;
+                }
+
+                $this->assertFalse(
+                    stripos( $a, $b ) !== false,
+                    sprintf( 'UA string "%s" contains "%s"; whichever is listed first wins and the label becomes unstable.', $a, $b )
+                );
+            }
+        }
+    }
 }
