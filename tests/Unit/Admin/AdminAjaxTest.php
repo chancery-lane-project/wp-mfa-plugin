@@ -8,12 +8,15 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Admin\Admin;
 use Tclp\WpMarkdownForAgents\Core\Options;
-use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
+use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
+use Tclp\WpMarkdownForAgents\Tests\Support\FrozenClock;
 
 /**
- * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::handle_generate_batch_ajax
+ * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::handle_start_generation_job_ajax
+ * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::handle_job_status_ajax
  * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::enqueue_scripts
  * @covers \Tclp\WpMarkdownForAgents\Admin\Admin::handle_preview_post_ajax
  */
@@ -26,6 +29,13 @@ class AdminAjaxTest extends TestCase {
     private TaxonomyArchiveGenerator $taxonomy_generator;
 
     private Admin $admin;
+
+    private FrozenClock $clock;
+
+    private GenerationJob $job;
+
+    /** @var StageFactory&MockObject */
+    private StageFactory $factory;
 
     protected function setUp(): void {
         $this->generator          = $this->createMock( Generator::class );
@@ -43,6 +53,8 @@ class AdminAjaxTest extends TestCase {
         $GLOBALS['_mock_post_objects']     = [];
         $GLOBALS['_mock_current_screen']   = null;
         $GLOBALS['_mock_transients']       = [];
+        $GLOBALS['_mock_options']          = [];
+        reset_mock_scheduled_events();
         $_POST = [];
     }
 
@@ -52,304 +64,245 @@ class AdminAjaxTest extends TestCase {
         $GLOBALS['_mock_current_user_can'] = true;
     }
 
-    // -----------------------------------------------------------------------
-    // handle_generate_batch_ajax()
-    // -----------------------------------------------------------------------
+    /** Build an Admin wired to a real GenerationJob and a mocked StageFactory. */
+    private function admin_with_job( ?StageFactory $factory = null ): Admin {
+        $this->clock   = new FrozenClock( 1_000_000 );
+        $this->job     = new GenerationJob( $this->clock );
+        $this->factory = $factory ?? $this->createMock( StageFactory::class );
 
-    public function test_valid_request_returns_batch_result(): void {
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
-
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
-
-        $this->admin->handle_generate_batch_ajax();
-
-        $response = $GLOBALS['_mock_json_response'];
-        $this->assertTrue( $response['success'] );
-        $this->assertSame( 5, $response['data']['total'] );
-        $this->assertSame( 5, $response['data']['processed'] );
-        $this->assertSame( [], $response['data']['errors'] );
+        return new Admin(
+            Options::get_defaults(),
+            $this->generator,
+            $this->taxonomy_generator,
+            null,
+            $this->job,
+            $this->factory,
+            $this->clock
+        );
     }
 
-    public function test_invalid_nonce_triggers_wp_die(): void {
-        $GLOBALS['_mock_verify_nonce'] = false;
-        $_POST['nonce']                = 'bad-nonce';
+    // -----------------------------------------------------------------------
+    // handle_start_generation_job_ajax()
+    // -----------------------------------------------------------------------
 
-        $this->expectException( \RuntimeException::class );
-
-        $this->admin->handle_generate_batch_ajax();
-    }
-
-    public function test_non_admin_user_receives_json_error_403(): void {
+    public function test_start_job_requires_capability(): void {
         $GLOBALS['_mock_current_user_can'] = false;
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-        ];
+        $_POST                             = [ 'nonce' => 'test', 'scope' => 'all' ];
 
-        $this->admin->handle_generate_batch_ajax();
+        $this->admin_with_job()->handle_start_generation_job_ajax();
 
-        $response = $GLOBALS['_mock_json_response'];
-        $this->assertFalse( $response['success'] );
-        $this->assertSame( 403, $response['status'] );
+        $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 403, $GLOBALS['_mock_json_response']['status'] );
     }
 
-    public function test_missing_post_type_returns_400(): void {
-        $_POST = [
-            'nonce'  => 'test',
-            'offset' => '0',
-            'limit'  => '10',
-        ];
+    public function test_start_job_rejects_an_unknown_scope(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'nonsense' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )->willReturn( [] );
 
-        $this->admin->handle_generate_batch_ajax();
+        $this->admin_with_job( $factory )->handle_start_generation_job_ajax();
 
-        $response = $GLOBALS['_mock_json_response'];
-        $this->assertFalse( $response['success'] );
-        $this->assertSame( 400, $response['status'] );
+        $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 400, $GLOBALS['_mock_json_response']['status'] );
     }
 
-    public function test_post_type_is_sanitised(): void {
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'bad type!@#',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
+    public function test_start_job_writes_a_running_record_and_returns_it(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->expects( $this->once() )
+            ->method( 'build_stage_list' )
+            ->with( 'taxonomy' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
 
-        $captured_post_type = null;
-        $this->generator->method( 'generate_batch' )
+        $this->admin_with_job( $factory )->handle_start_generation_job_ajax();
+
+        $this->assertTrue( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 'running', $GLOBALS['_mock_json_response']['data']['status'] );
+        $this->assertSame( 'running', $this->job->get()['status'] );
+    }
+
+    /**
+     * Pins the sanitisation contract: whatever reaches
+     * StageFactory::build_stage_list() has already been unslashed and
+     * stripped of tags/surrounding whitespace, not the raw $_POST value.
+     */
+    public function test_start_job_sanitises_a_messy_scope_before_reaching_the_stage_factory(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => " \ttaxonomy<script>evil</script>\\'\n" ];
+        $factory = $this->createMock( StageFactory::class );
+
+        $captured = null;
+        $factory->expects( $this->once() )
+            ->method( 'build_stage_list' )
             ->willReturnCallback(
-                function ( string $pt ) use ( &$captured_post_type ): array {
-                    $captured_post_type = $pt;
-                    return [ 'total' => 0, 'processed' => 0, 'errors' => [] ];
+                function ( string $scope ) use ( &$captured ): array {
+                    $captured = $scope;
+                    return [];
                 }
             );
 
-        $this->admin->handle_generate_batch_ajax();
+        $this->admin_with_job( $factory )->handle_start_generation_job_ajax();
 
-        // sanitize_key strips spaces and special characters.
-        $this->assertSame( 'badtype', $captured_post_type );
+        // stripslashes() drops the backslash, strip_tags() drops <script></script>
+        // but keeps its text content, trim() drops the leading tab and trailing newline.
+        $this->assertSame( "taxonomyevil'", $captured );
     }
 
-    public function test_limit_is_capped_at_50(): void {
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '200',
-        ];
+    public function test_starting_a_second_job_returns_409_with_the_live_record(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
 
-        $captured_limit = null;
-        $this->generator->method( 'generate_batch' )
-            ->willReturnCallback(
-                function ( string $pt, int $offset, int $limit ) use ( &$captured_limit ): array {
-                    $captured_limit = $limit;
-                    return [ 'total' => 0, 'processed' => 0, 'errors' => [] ];
-                }
-            );
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
+        $admin->handle_start_generation_job_ajax();
 
-        $this->admin->handle_generate_batch_ajax();
-
-        $this->assertSame( 50, $captured_limit );
+        $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 409, $GLOBALS['_mock_json_response']['status'] );
+        $this->assertSame( 'running', $GLOBALS['_mock_json_response']['data']['job']['status'] );
     }
 
-    public function test_final_batch_clears_post_type_from_pending_regen(): void {
-        set_transient( 'markdown_for_agents_needs_regen', [ 'post', 'page' ], 0 );
+    public function test_start_job_returns_500_when_the_queue_is_not_wired_up(): void {
+        $_POST = [ 'nonce' => 'test', 'scope' => 'all' ];
 
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
+        $this->admin->handle_start_generation_job_ajax();
 
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
-
-        $this->admin->handle_generate_batch_ajax();
-
-        $this->assertSame( [ 'page' ], get_transient( 'markdown_for_agents_needs_regen' ) );
+        $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 500, $GLOBALS['_mock_json_response']['status'] );
     }
 
-    public function test_final_batch_for_last_pending_type_deletes_transient(): void {
-        set_transient( 'markdown_for_agents_needs_regen', [ 'post' ], 0 );
+    /**
+     * The mock check_ajax_referer() dies (throws, per the mock's wp_die())
+     * on an invalid nonce, so the handler never reaches the job-start logic.
+     * Asserted via the observable consequence — no job record written — not
+     * via the mock's die mechanism itself.
+     */
+    public function test_start_job_rejects_an_invalid_nonce(): void {
+        $GLOBALS['_mock_verify_nonce'] = false;
+        $_POST                         = [ 'nonce' => 'bad', 'scope' => 'all' ];
 
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->expects( $this->never() )->method( 'build_stage_list' );
 
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 3, 'processed' => 3, 'errors' => [] ] );
+        $admin = $this->admin_with_job( $factory );
 
-        $this->admin->handle_generate_batch_ajax();
+        try {
+            $admin->handle_start_generation_job_ajax();
+            $this->fail( 'Expected the invalid nonce to short-circuit the handler.' );
+        } catch ( \RuntimeException $e ) {
+            // Expected: the mock's check_ajax_referer() die path.
+        }
 
-        $this->assertFalse( get_transient( 'markdown_for_agents_needs_regen' ) );
-    }
-
-    public function test_non_final_batch_does_not_clear_pending_regen(): void {
-        set_transient( 'markdown_for_agents_needs_regen', [ 'post' ], 0 );
-
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
-
-        // total exceeds offset+limit — more batches to come.
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
-
-        $this->admin->handle_generate_batch_ajax();
-
-        $this->assertSame( [ 'post' ], get_transient( 'markdown_for_agents_needs_regen' ) );
-    }
-
-    public function test_handle_generate_taxonomy_batch_ajax_returns_batch_result(): void {
-        $this->taxonomy_generator->expects( $this->once() )
-            ->method( 'generate_batch' )
-            ->with( 2, 10 )
-            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
-
-        $_POST['offset'] = '2';
-        $_POST['limit']  = '10';
-
-        $this->admin->handle_generate_taxonomy_batch_ajax();
-
-        $response = $GLOBALS['_mock_json_response'];
-        $this->assertTrue( $response['success'] );
-        $this->assertSame( 50, $response['data']['total'] );
-        $this->assertSame( 10, $response['data']['processed'] );
+        $this->assertSame( 'idle', $this->job->get()['status'] );
     }
 
     // -----------------------------------------------------------------------
-    // Bundle rebuild on final batch
+    // handle_job_status_ajax()
     // -----------------------------------------------------------------------
 
-    public function test_final_post_batch_rebuilds_bundle_via_coordinator(): void {
-        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+    public function test_job_status_returns_the_record_without_the_lock_token(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
 
-        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
+        $admin->handle_job_status_ajax();
 
-        $generator = $this->createMock( Generator::class );
-        $generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
-        $generator->expects( $this->once() )
-            ->method( 'rebuild_bundle' )
-            ->with( $bundle_generator, true )
-            ->willReturn(
-                [
-                    'status'       => Generator::BUNDLE_BUILT,
-                    'manifests_ok' => true,
-                ]
-            );
+        $data = $GLOBALS['_mock_json_response']['data'];
 
-        $admin = new Admin( $options, $generator, $this->taxonomy_generator, $bundle_generator );
-
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
-
-        $admin->handle_generate_batch_ajax();
+        $this->assertTrue( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 'running', $data['status'] );
+        $this->assertArrayNotHasKey( 'lock_token', $data );
     }
 
-    public function test_non_final_post_batch_does_not_rebuild_bundle(): void {
-        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+    /**
+     * public_job_record() is an allowlist, not a denylist: proves a field the
+     * allowlist does not name is hidden even though nothing ever unset() it.
+     * A denylist (unset('lock_token') alone) could never fail this test.
+     */
+    public function test_job_status_hides_an_internal_field_the_allowlist_does_not_name(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
 
-        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
 
-        $this->generator->expects( $this->never() )->method( 'rebuild_bundle' );
+        // Simulate a field added later to GenerationJob's internal record
+        // shape, without anyone remembering to teach public_job_record() about it.
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ]['schedule_failures'] = 3;
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ]['some_future_internal_field'] = 'secret';
 
-        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+        $admin->handle_job_status_ajax();
 
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
+        $data = $GLOBALS['_mock_json_response']['data'];
 
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
-
-        $admin->handle_generate_batch_ajax();
+        $this->assertArrayNotHasKey( 'schedule_failures', $data );
+        $this->assertArrayNotHasKey( 'some_future_internal_field', $data );
     }
 
-    public function test_final_post_batch_does_not_build_bundle_when_no_generator(): void {
-        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+    public function test_job_status_includes_seconds_since_tick_but_not_last_tick_at(): void {
+        $_POST   = [ 'nonce' => 'test', 'scope' => 'taxonomy' ];
+        $factory = $this->createMock( StageFactory::class );
+        $factory->method( 'build_stage_list' )
+            ->willReturn( [ [ 'type' => 'taxonomy', 'total' => null, 'processed' => 0, 'skipped' => 0, 'error_count' => 0, 'state' => 'pending' ] ] );
 
-        // No BundleGenerator wired up — must not error.
-        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, null );
+        $admin = $this->admin_with_job( $factory );
+        $admin->handle_start_generation_job_ajax();
 
-        $_POST = [
-            'nonce'     => 'test',
-            'post_type' => 'post',
-            'offset'    => '0',
-            'limit'     => '10',
-        ];
+        $this->clock->advance( 90 );
+        $admin->handle_job_status_ajax();
 
-        $this->generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 5, 'processed' => 5, 'errors' => [] ] );
+        $data = $GLOBALS['_mock_json_response']['data'];
 
-        $admin->handle_generate_batch_ajax();
-
-        $response = $GLOBALS['_mock_json_response'];
-        $this->assertTrue( $response['success'] );
+        $this->assertSame( 90, $data['seconds_since_tick'] );
+        $this->assertArrayNotHasKey( 'last_tick_at', $data );
     }
 
-    public function test_final_taxonomy_batch_rebuilds_bundle_via_coordinator(): void {
-        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+    public function test_job_status_omits_seconds_since_tick_when_no_job_is_running(): void {
+        $_POST = [ 'nonce' => 'test' ];
 
-        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $this->admin_with_job()->handle_job_status_ajax();
 
-        $this->generator->expects( $this->once() )
-            ->method( 'rebuild_bundle' )
-            ->with( $bundle_generator, true )
-            ->willReturn(
-                [
-                    'status'       => Generator::BUNDLE_BUILT,
-                    'manifests_ok' => true,
-                ]
-            );
-
-        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
-
-        $this->taxonomy_generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 10, 'processed' => 10, 'errors' => [] ] );
-
-        $_POST['offset'] = '0';
-        $_POST['limit']  = '10';
-
-        $admin->handle_generate_taxonomy_batch_ajax();
+        $this->assertArrayNotHasKey( 'seconds_since_tick', $GLOBALS['_mock_json_response']['data'] );
     }
 
-    public function test_non_final_taxonomy_batch_does_not_rebuild_bundle(): void {
-        $options = array_merge( Options::get_defaults(), [ 'bundle_enabled' => true ] );
+    public function test_job_status_requires_capability(): void {
+        $GLOBALS['_mock_current_user_can'] = false;
+        $_POST                             = [ 'nonce' => 'test' ];
 
-        $bundle_generator = $this->createMock( BundleGenerator::class );
+        $this->admin_with_job()->handle_job_status_ajax();
 
-        $this->generator->expects( $this->never() )->method( 'rebuild_bundle' );
+        $this->assertSame( 403, $GLOBALS['_mock_json_response']['status'] );
+    }
 
-        $admin = new Admin( $options, $this->generator, $this->taxonomy_generator, $bundle_generator );
+    public function test_job_status_returns_500_when_the_queue_is_not_wired_up(): void {
+        $_POST = [ 'nonce' => 'test' ];
 
-        $this->taxonomy_generator->method( 'generate_batch' )
-            ->willReturn( [ 'total' => 50, 'processed' => 10, 'errors' => [] ] );
+        $this->admin->handle_job_status_ajax();
 
-        $_POST['offset'] = '0';
-        $_POST['limit']  = '10';
+        $this->assertFalse( $GLOBALS['_mock_json_response']['success'] );
+        $this->assertSame( 500, $GLOBALS['_mock_json_response']['status'] );
+    }
 
-        $admin->handle_generate_taxonomy_batch_ajax();
+    /** @see test_start_job_rejects_an_invalid_nonce() for why this asserts the consequence, not the mechanism. */
+    public function test_job_status_rejects_an_invalid_nonce(): void {
+        $GLOBALS['_mock_verify_nonce'] = false;
+        $_POST                         = [ 'nonce' => 'bad' ];
+
+        $admin = $this->admin_with_job();
+
+        try {
+            $admin->handle_job_status_ajax();
+            $this->fail( 'Expected the invalid nonce to short-circuit the handler.' );
+        } catch ( \RuntimeException $e ) {
+            // Expected: the mock's check_ajax_referer() die path.
+        }
+
+        $this->assertFalse( isset( $GLOBALS['_mock_json_response'] ) );
     }
 
     // -----------------------------------------------------------------------
@@ -425,6 +378,17 @@ class AdminAjaxTest extends TestCase {
         $this->assertSame( 'markdownForAgentsBulkGenerate', $localised['object'] );
         $this->assertArrayHasKey( 'nonce', $localised['data'] );
         $this->assertArrayHasKey( 'ajaxurl', $localised['data'] );
+    }
+
+    public function test_enqueue_localises_the_new_nonce_action(): void {
+        $GLOBALS['_mock_nonces'] = [];
+
+        $this->admin_with_job()->enqueue_scripts( 'settings_page_markdown-for-agents' );
+
+        $localised = $GLOBALS['_mock_localized_scripts']['mfa-bulk-generate']['data'];
+
+        $this->assertSame( 'test_nonce_mfa_generation_job', $localised['nonce'] );
+        $this->assertArrayHasKey( 'ajaxurl', $localised );
     }
 
     public function test_enqueue_scripts_skips_other_pages(): void {

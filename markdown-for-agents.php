@@ -4,7 +4,7 @@
  * Plugin Name:       Markdown for Agents and Statistics
  * Plugin URI:        https://labs.chancerylaneproject.org/project/wordpress-markdown-for-agents/
  * Description:       Serve pre-generated Markdown files to AI agents via HTTP content negotiation, with access statistics.
- * Version:           1.6.2
+ * Version:           1.7.0
  * Requires at least: 6.3
  * Requires PHP:      8.1
  * Author:            The Chancery Lane Project
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'MARKDOWN_FOR_AGENTS_VERSION', '1.6.2' );
+define( 'MARKDOWN_FOR_AGENTS_VERSION', '1.7.0' );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );

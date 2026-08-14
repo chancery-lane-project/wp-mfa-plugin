@@ -23,7 +23,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Content negotiation** - serves Markdown on `Accept: text/markdown`, `?output_format=md`, or known AI User-Agent strings
 - **Taxonomy archive support** - category, tag, and custom taxonomy archives served as Markdown post listings
 - **Auto-generation** - files regenerated on post save; taxonomy archives regenerated when any post in the term changes
-- **Bulk generation** - generate all files via the admin settings page (AJAX with live progress counter) or WP-CLI
+- **Bulk generation** - generate all files from the admin settings page as a background WP-Cron job (start it and close the tab; the page polls for progress) or synchronously via WP-CLI
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
 - **ACF support** - dot-notation for nested group fields (e.g. `group.subfield`); relationship fields normalised to post titles
 - **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
@@ -76,6 +76,12 @@ Navigate to **Settings → Markdown for Agents**.
 | User-Agent detection | Force Markdown serving for specific AI User-Agent strings |
 | Field configuration | Per-post-type frontmatter and content field mappings |
 | Build downloadable bundle | Maintains a `.zip` of the export tree with relative internal links, generates `manifest.json`, and displays an ARD discovery catalog panel (`ai-catalog.json`, for manual deployment to `/.well-known/`) (off by default; no other toggle required) |
+
+Bulk generation (the "Generate everything" / per-post-type / taxonomy buttons) runs in the background via WP-Cron, so it needs WP-Cron working on the site. If `DISABLE_WP_CRON` is set and a system cron calls `wp-cron.php` instead, that cron must run as the same user as the web server, or the files it writes will fail permission checks.
+
+If WP-Cron is not working, a run sits at `running` with little or no progress rather than failing outright, since there is no page load to trigger the next batch. Check whether `DISABLE_WP_CRON` is set with no system cron behind it, and whether a firewall or HTTP auth blocks the loopback request WordPress makes to its own `wp-cron.php`.
+
+There is no cancel button, but deactivating the plugin stops a run in progress: it clears the job record and unschedules its background events. Reactivating leaves already-generated files untouched. This is blunt — it also stops Markdown serving while deactivated.
 
 ---
 
@@ -167,7 +173,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 - **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json`.
 - **Links:** internal links inside bundled `.md` files are rewritten from absolute upload URLs to paths relative to each linking file (OKF §5.2, e.g. `](../post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain. Relative form is used rather than root-absolute (`](/post/…)`) because many consumers treat a leading `/` as an external link and drop it.
 - **Location and stability:** the archive is built at a temporary path and atomically renamed into place, so the public URL is always stable and a concurrent download never sees a partial file.
-- **Rebuild policy:** the bundle is rebuilt synchronously at the end of bulk generation (the admin "Generate everything" button or `wp markdown-agents generate` / `generate-taxonomies`). A single post save instead marks the bundle stale and schedules a debounced WP-Cron event five minutes out, collapsing a burst of edits into one rebuild. That delay assumes the default WP-Cron behaviour of firing on the next page load; on sites with `DISABLE_WP_CRON` set, the rebuild instead fires on the next system-cron hit to `wp-cron.php`. You can also force a rebuild with `wp markdown-agents bundle`.
+- **Rebuild policy:** the bundle is rebuilt as the final background stage of a bulk generation job (the admin "Generate everything" button), or synchronously at the end of `wp markdown-agents generate` / `generate-taxonomies` on the command line. A single post save instead marks the bundle stale and schedules a debounced WP-Cron event five minutes out, collapsing a burst of edits into one rebuild. That delay assumes the default WP-Cron behaviour of firing on the next page load; on sites with `DISABLE_WP_CRON` set, the rebuild instead fires on the next system-cron hit to `wp-cron.php`. You can also force a rebuild with `wp markdown-agents bundle`.
 - **Statistics caveat:** bundle downloads are served directly by the web server as a static file and never touch PHP, so they do not appear in the plugin's access statistics.
 
 ### ARD discovery (/.well-known/ai-catalog.json)
@@ -247,6 +253,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
 | `markdown_for_agents_converter_options` | `(array $options)` | Override the HTML→Markdown converter options |
 | `markdown_for_agents_agent_categories` | `(array $map)` | Modify the intent-category → UA-substring map used to classify agents in stats |
+| `markdown_for_agents_tick_budget` | `(int $seconds, string $context)` | Wall-clock seconds one bulk-generation background tick may spend; checked only between batches, never mid-batch, so a single very slow item can still overrun it. `$context` is `cron` for a normal scheduled tick or `nudge` for the short inline catch-up run triggered from an admin request. Defaults to 30s (or 60% of `max_execution_time` when that is lower) for `cron`, 5s for `nudge` |
 
 ---
 

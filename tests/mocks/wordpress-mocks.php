@@ -33,6 +33,14 @@ if (!defined('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME')) {
     define('MARKDOWN_FOR_AGENTS_PLUGIN_BASENAME', 'markdown-for-agents-and-statistics/markdown-for-agents.php');
 }
 
+if (!defined('MINUTE_IN_SECONDS')) {
+    define('MINUTE_IN_SECONDS', 60);
+}
+
+if (!defined('HOUR_IN_SECONDS')) {
+    define('HOUR_IN_SECONDS', 3600);
+}
+
 // ---------------------------------------------------------------------------
 // Hook tracking
 // ---------------------------------------------------------------------------
@@ -88,6 +96,24 @@ if (!function_exists('add_filter')) {
     }
 }
 
+if (!function_exists('remove_filter')) {
+    function remove_filter(string $hook, callable|array $callback, int $priority = 10): bool {
+        $found = false;
+        $kept  = [];
+
+        foreach ($GLOBALS['_mock_filters'][$hook] ?? [] as $registered) {
+            if ($registered['callback'] === $callback && $registered['priority'] === $priority) {
+                $found = true;
+                continue;
+            }
+            $kept[] = $registered;
+        }
+
+        $GLOBALS['_mock_filters'][$hook] = $kept;
+        return $found;
+    }
+}
+
 if (!function_exists('apply_filters')) {
     function apply_filters(string $hook, mixed $value, mixed ...$args): mixed {
         // Per-test override: $GLOBALS['_mock_apply_filters']['hook'] = fn($val, ...$args) => $modified
@@ -112,7 +138,16 @@ if (!function_exists('do_action')) {
 
 if (!function_exists('get_option')) {
     function get_option(string $option, mixed $default = false): mixed {
-        return $GLOBALS['_mock_options'][$option] ?? $default;
+        $value = $GLOBALS['_mock_options'][$option] ?? $default;
+
+        // Test seam: lets a test simulate a rival process changing the option
+        // between two reads within a single caller (e.g. TickMutex::acquire()'s
+        // staleness read and its later re-read before stealing).
+        if (isset($GLOBALS['_mock_get_option_side_effect']) && is_callable($GLOBALS['_mock_get_option_side_effect'])) {
+            ($GLOBALS['_mock_get_option_side_effect'])($option, $value);
+        }
+
+        return $value;
     }
 }
 
@@ -124,9 +159,17 @@ if (!function_exists('update_option')) {
 }
 
 if (!function_exists('add_option')) {
-    function add_option(string $option, mixed $value): bool {
+    function add_option(string $option, mixed $value, string $deprecated = '', bool|string $autoload = true): bool {
         if (!isset($GLOBALS['_mock_options'][$option])) {
-            $GLOBALS['_mock_options'][$option] = $value;
+            $GLOBALS['_mock_options'][$option]         = $value;
+            $GLOBALS['_mock_option_autoload'][$option] = is_string($autoload) ? ('yes' === $autoload) : $autoload;
+
+            // Test seam: lets a test simulate another process writing between
+            // our insert and our confirming read.
+            if (isset($GLOBALS['_mock_add_option_side_effect']) && is_callable($GLOBALS['_mock_add_option_side_effect'])) {
+                ($GLOBALS['_mock_add_option_side_effect'])($option, $value);
+            }
+
             return true;
         }
         return false;
@@ -150,21 +193,74 @@ function reset_mock_scheduled_events(): void {
     $GLOBALS['_mock_scheduled_events'] = [];
 }
 
+if (!function_exists('wp_next_scheduled')) {
+    /** Returns the soonest matching event's timestamp, mirroring real WordPress — not merely the first inserted. */
+    function wp_next_scheduled(string $hook, array $args = []) {
+        $timestamps = array_column(
+            array_filter(
+                $GLOBALS['_mock_scheduled_events'] ?? [],
+                static fn($e) => $e['hook'] === $hook && $e['args'] === $args
+            ),
+            'timestamp'
+        );
+
+        return $timestamps ? min($timestamps) : false;
+    }
+}
+
 if (!function_exists('wp_schedule_single_event')) {
+    /**
+     * Mirrors two real behaviours the queue depends on: a forced-failure hook
+     * for tests, and WordPress's suppression of a duplicate hook+args event
+     * scheduled within 10 minutes of the *next* matching event (inclusive),
+     * which returns false. Real WordPress compares against wp_next_scheduled(),
+     * not every matching event, so this does too.
+     */
     function wp_schedule_single_event(int $timestamp, string $hook, array $args = []): bool {
-        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args];
+        if (isset($GLOBALS['_mock_schedule_single_event_return']) && !$GLOBALS['_mock_schedule_single_event_return']) {
+            return false;
+        }
+
+        $next = wp_next_scheduled($hook, $args);
+
+        if (false !== $next && abs($next - $timestamp) <= 10 * MINUTE_IN_SECONDS) {
+            return false;
+        }
+
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => ''];
         return true;
     }
 }
 
-if (!function_exists('wp_next_scheduled')) {
-    function wp_next_scheduled(string $hook, array $args = []) {
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event(int $timestamp, string $recurrence, string $hook, array $args = []): bool {
+        $GLOBALS['_mock_scheduled_events'][] = ['timestamp' => $timestamp, 'hook' => $hook, 'args' => $args, 'recurrence' => $recurrence];
+        return true;
+    }
+}
+
+if (!function_exists('wp_unschedule_hook')) {
+    function wp_unschedule_hook(string $hook): int {
+        $kept    = [];
+        $removed = 0;
+
         foreach ($GLOBALS['_mock_scheduled_events'] ?? [] as $e) {
             if ($e['hook'] === $hook) {
-                return $e['timestamp'];
+                ++$removed;
+                continue;
             }
+            $kept[] = $e;
         }
-        return false;
+
+        $GLOBALS['_mock_scheduled_events'] = $kept;
+        return $removed;
+    }
+}
+
+if (!function_exists('wp_clear_scheduled_hook')) {
+    /** Older sibling of wp_unschedule_hook(): same effect for our purposes (args matching is not exercised by anything in this plugin). */
+    function wp_clear_scheduled_hook(string $hook, array $args = []): int|bool {
+        return wp_unschedule_hook($hook);
     }
 }
 
@@ -180,6 +276,15 @@ $GLOBALS['_mock_thumbnail']         = null;
 $GLOBALS['_mock_hierarchical_types'] = ['page'];
 $GLOBALS['_mock_post_parent']        = [];
 $GLOBALS['_mock_post_ancestors']     = [];
+$GLOBALS['_mock_post_counts']        = [];
+$GLOBALS['_mock_terms_by_id']        = [];
+$GLOBALS['_mock_password_counter']   = 0;
+
+function reset_mock_job_globals(): void {
+    $GLOBALS['_mock_post_counts']      = [];
+    $GLOBALS['_mock_terms_by_id']      = [];
+    $GLOBALS['_mock_password_counter'] = 0;
+}
 
 if (!function_exists('is_post_type_hierarchical')) {
     function is_post_type_hierarchical(string $post_type): bool {
@@ -875,6 +980,9 @@ if (!class_exists('wpdb')) {
     class wpdb {
         public string $prefix = 'wp_';
         public string $charset = 'utf8mb4';
+        public string $posts         = 'wp_posts';
+        public string $terms         = 'wp_terms';
+        public string $term_taxonomy = 'wp_term_taxonomy';
 
         /** @var list<array{query: string, args: list<mixed>}> */
         public array $queries = [];
@@ -884,6 +992,12 @@ if (!class_exists('wpdb')) {
         public $mock_get_results = [];
         /** @var mixed */
         public $mock_get_var = null;
+        /** @var list<mixed> Queued get_col() return values, consumed in order. */
+        public array $mock_get_col_queue = [];
+        /** @var mixed Fallback once the queue is empty. */
+        public $mock_get_col = [];
+        /** @var list<mixed> Queued get_results() return values, consumed in order. */
+        public array $mock_get_results_queue = [];
 
         public function prepare(string $query, mixed ...$args): string {
             $this->queries[] = ['query' => $query, 'args' => $args];
@@ -908,7 +1022,22 @@ if (!class_exists('wpdb')) {
 
         public function get_results(string|null $query = null, string $output = 'OBJECT'): array {
             $this->queries[] = ['query' => $query, 'args' => []];
+
+            if ($this->mock_get_results_queue) {
+                return (array) array_shift($this->mock_get_results_queue);
+            }
+
             return $this->mock_get_results;
+        }
+
+        public function get_col(string|null $query = null, int $column_offset = 0): array {
+            $this->queries[] = ['query' => $query, 'args' => []];
+
+            if ($this->mock_get_col_queue) {
+                return (array) array_shift($this->mock_get_col_queue);
+            }
+
+            return (array) $this->mock_get_col;
         }
 
         public function get_var(string|null $query = null): mixed {
@@ -1188,6 +1317,29 @@ if (!function_exists('get_term_link')) {
                 ?? 'https://example.com/' . $term->taxonomy . '/' . $term->slug . '/';
         }
         return 'https://example.com/term/' . (int) $term . '/';
+    }
+}
+
+if (!function_exists('wp_count_posts')) {
+    function wp_count_posts(string $type = 'post', string $perm = ''): object {
+        return (object) ($GLOBALS['_mock_post_counts'][$type] ?? ['publish' => 0]);
+    }
+}
+
+if (!function_exists('get_term')) {
+    function get_term(int|\WP_Term $term, string $taxonomy = ''): \WP_Term|\WP_Error|null {
+        if ($term instanceof \WP_Term) {
+            return $term;
+        }
+
+        return $GLOBALS['_mock_terms_by_id'][$term] ?? null;
+    }
+}
+
+if (!function_exists('wp_generate_password')) {
+    function wp_generate_password(int $length = 12, bool $special_chars = true, bool $extra_special_chars = false): string {
+        $GLOBALS['_mock_password_counter'] = ($GLOBALS['_mock_password_counter'] ?? 0) + 1;
+        return 'mocktoken' . $GLOBALS['_mock_password_counter'];
     }
 }
 

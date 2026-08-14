@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.6.2
+Stable tag: 1.7.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -33,7 +33,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * Content negotiation (`Accept: text/markdown`, `?output_format=md`, or known AI User-Agents)
 * **Taxonomy archive support** — category, tag, and custom taxonomy term pages served as Markdown post listings
 * Automatic Markdown generation on post save; taxonomy archives auto-update when any post in the term changes
-* AJAX bulk generation with live progress counter — no page timeouts on large sites
+* Background bulk generation — runs as a WP-Cron job with live progress, so it survives closing the tab and never times out a page request
 * Per-post-type field configuration — choose which meta/ACF fields go in frontmatter or body
 * ACF support with dot notation for nested group fields (e.g. `group.subfield`)
 * Content fields option — use ACF fields as the body content instead of post_content
@@ -75,6 +75,28 @@ WordPress when content negotiation is triggered.
 No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
+
+= Does bulk generation need anything special on my host? =
+
+Bulk generation (the "Generate everything" and per-post-type/taxonomy buttons)
+runs in the background via WP-Cron, so WP-Cron needs to be working on the site.
+If you have set `DISABLE_WP_CRON` and use a system cron to call `wp-cron.php`
+instead, that cron must run as the same user as your web server, or the files
+it writes will fail permission checks.
+
+If WP-Cron is not working, a run sits at "running" with little or no progress
+instead of failing outright — there is no page load to trigger the next batch.
+Two things to check: whether `DISABLE_WP_CRON` is set with no system cron
+actually running behind it, and whether a firewall or HTTP auth on the site is
+blocking the loopback request WordPress makes to its own `wp-cron.php`.
+
+= How do I stop a bulk generation run that's in progress? =
+
+There is no cancel button, but deactivating the plugin (Plugins screen, no CLI
+needed) stops a run immediately: it clears the job and unschedules its
+background events. Reactivating leaves already-generated files untouched, and
+you can start a new run from Settings. Note this is blunt — deactivating also
+stops the plugin serving Markdown to agents until you reactivate it.
 
 = AI agents are getting HTML instead of Markdown. Why? =
 
@@ -247,6 +269,15 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.7.0 =
+* Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it continues in the background provided WP-Cron is working on the site. If WP-Cron is not working, progress only advances while a wp-admin page is open (see the FAQ for what to check).
+* Fixed a bug where a run containing posts skipped for good reason (password-protected, draft, excluded from export) could run forever instead of finishing.
+* Bulk generation no longer slows down the further it progresses through a large site.
+* Generating taxonomy archives no longer loads every term of every public taxonomy into memory before starting, and the export bundle (`.zip`) is rebuilt in its own step rather than tacked onto whichever request happens to finish last.
+* A run that is interrupted (e.g. by a server restart) now resumes automatically, without needing to be started again by hand.
+* Progress now shows skipped counts separately from errors, and starting a second run while one is already in progress shows that run's live progress instead of an error.
+* Added the `markdown_for_agents_tick_budget` filter, for site owners who want to tune how many seconds each background tick may spend.
 
 = 1.6.2 =
 * Refresh the default AI User-Agent list from 13 strings to 70, sourced from the Cloudflare Radar bot directory. Radar verifies bot operators rather than accepting community reports, and its `AI_ASSISTANT`, `AI_SEARCH` and `AI_CRAWLER` categories map directly onto the plugin's existing On-demand, Search and Training intent categories. New entries include `MistralAI-User`, `Google-Agent`, `DuckAssistBot`, `meta-externalfetcher`, `Claude-SearchBot`, `Bravebot`, `Amzn-SearchBot`, `Cloudflare-AI-Search`, `KimiBot`, `PetalBot`, `GoogleOther`, `CloudVertexBot` and `ICC-Crawler`. Each entry in `Options::get_defaults()` is annotated with its source.

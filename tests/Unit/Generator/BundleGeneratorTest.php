@@ -384,4 +384,53 @@ class BundleGeneratorTest extends TestCase {
         $this->assertSame( [], $GLOBALS['_mock_scheduled_events'] );
     }
 
+    // HASH_OPTION is private, so staleness is asserted through is_stale()
+    // rather than the raw option.
+    public function test_marks_stale_but_does_not_schedule_while_a_job_is_running(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+        $generator->build();
+
+        $this->assertFalse( $generator->is_stale() );
+
+        update_option(
+            \Tclp\WpMarkdownForAgents\Jobs\GenerationJob::OPTION,
+            [ 'status' => 'running', 'last_tick_at' => time() ]
+        );
+        reset_mock_scheduled_events();
+
+        $generator->mark_stale_and_schedule();
+
+        $this->assertTrue( $generator->is_stale() );
+        $this->assertFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
+    public function test_marks_stale_and_schedules_when_no_job_is_running(): void {
+        $this->write_file( 'index.md', "# Content\n" );
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+        $generator->build();
+
+        delete_option( \Tclp\WpMarkdownForAgents\Jobs\GenerationJob::OPTION );
+        reset_mock_scheduled_events();
+
+        $generator->mark_stale_and_schedule();
+
+        $this->assertTrue( $generator->is_stale() );
+        $this->assertNotFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
+    public function test_a_stale_running_job_does_not_suppress_scheduling(): void {
+        $generator = $this->make_generator( [ 'bundle_enabled' => true ] );
+
+        update_option(
+            \Tclp\WpMarkdownForAgents\Jobs\GenerationJob::OPTION,
+            [ 'status' => 'running', 'last_tick_at' => time() - 100_000 ]
+        );
+        reset_mock_scheduled_events();
+
+        $generator->mark_stale_and_schedule();
+
+        $this->assertNotFalse( wp_next_scheduled( 'markdown_for_agents_rebuild_bundle' ) );
+    }
+
 }

@@ -174,79 +174,9 @@ class TaxonomyArchiveGenerator {
 		return $results;
 	}
 
-	/**
-	 * Generate a paginated batch of term archives across all public taxonomies.
-	 *
-	 * Mirrors Generator::generate_batch() — returns the same response shape so
-	 * the Admin AJAX handler and bulk-generate.js can treat them identically.
-	 *
-	 * @since  1.1.0
-	 * @param  int $offset Zero-based offset into the full term list.
-	 * @param  int $limit  Maximum terms to process in this batch.
-	 * @return array{total: int, processed: int, errors: list<array{term_id: int, message: string}>}
-	 */
-	public function generate_batch( int $offset, int $limit ): array {
-		if ( $limit <= 0 ) {
-			return array( 'total' => 0, 'processed' => 0, 'errors' => array() );
-		}
-
-		$all_terms = $this->get_all_public_terms();
-		$total     = count( $all_terms );
-		$batch     = array_slice( $all_terms, $offset, $limit );
-		$processed = 0;
-		$errors    = array();
-
-		foreach ( $batch as $term ) {
-			try {
-				if ( $this->generate_term( $term ) ) {
-					++$processed;
-				} else {
-					// generate_term() has no skip path, so a false return means
-					// the filesystem write failed.
-					$errors[] = array(
-						'term_id' => $term->term_id,
-						'message' => 'Failed to write Markdown archive to disk; check export directory permissions.',
-					);
-				}
-			} catch ( \Throwable $e ) {
-				$errors[] = array(
-					'term_id' => $term->term_id,
-					'message' => $e->getMessage(),
-				);
-			}
-		}
-
-		return array(
-			'total'     => $total,
-			'processed' => $processed,
-			'errors'    => $errors,
-		);
-	}
-
 	// -----------------------------------------------------------------------
 	// Private helpers
 	// -----------------------------------------------------------------------
-
-	/**
-	 * Collect all terms across every public taxonomy.
-	 *
-	 * @since  1.1.0
-	 * @return \WP_Term[]
-	 */
-	private function get_all_public_terms(): array {
-		$taxonomies = array_keys( get_taxonomies( array( 'public' => true ) ) );
-		$all_terms  = array();
-
-		foreach ( $taxonomies as $tax ) {
-			$terms = get_terms( array( 'taxonomy' => $tax, 'hide_empty' => false ) );
-
-			if ( is_array( $terms ) && ! is_wp_error( $terms ) ) {
-				$all_terms = array_merge( $all_terms, $terms );
-			}
-		}
-
-		return $all_terms;
-	}
 
 	/**
 	 * Fetch all published posts in a term, batched to avoid memory exhaustion.

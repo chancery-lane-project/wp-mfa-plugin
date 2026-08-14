@@ -297,11 +297,11 @@ class SettingsPageTest extends TestCase {
         $page->render_page();
         $output = ob_get_clean();
 
-        $this->assertStringContainsString( 'data-generate-all="1"', $output );
+        $this->assertStringContainsString( 'data-mfa-scope="all"', $output );
         $this->assertStringContainsString( 'Generate everything', $output );
         // Per-type and taxonomy buttons remain alongside it.
-        $this->assertStringContainsString( 'data-post-type="post"', $output );
-        $this->assertStringContainsString( 'data-action="mfa_generate_taxonomy_batch"', $output );
+        $this->assertStringContainsString( 'data-mfa-scope="post_type:post"', $output );
+        $this->assertStringContainsString( 'data-mfa-scope="taxonomy"', $output );
     }
 
     public function test_field_bundle_enabled_renders_ard_panel_when_bundle_enabled(): void {

@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
-use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Jobs\Clock;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
+use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
+use Tclp\WpMarkdownForAgents\Jobs\SystemClock;
 
 /**
  * Admin coordinator — wires SettingsPage and MetaBox and handles POST actions.
@@ -19,24 +23,30 @@ class Admin {
 
 	private SettingsPage $settings_page;
 	private MetaBox $meta_box;
+	private NeedsRegenTracker $needs_regen;
 
 	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed>  $options          Current plugin options.
 	 * @param  Generator             $generator        Generator instance; also used to write manifests before a bundle rebuild.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Taxonomy archive generator.
-	 * @param  BundleGenerator|null  $bundle_generator Optional bundle generator, rebuilt after a final AJAX batch.
 	 * @param  ArdCatalog|null       $ard_catalog      Optional ARD catalog builder for the settings page discovery panel.
+	 * @param  GenerationJob|null    $generation_job   Optional job repository; absent means the AJAX job endpoints 500.
+	 * @param  StageFactory|null     $stage_factory    Optional stage-list builder; absent means the AJAX job endpoints 500.
+	 * @param  Clock                 $clock            Time source for public_job_record()'s seconds_since_tick.
 	 */
 	public function __construct(
 		private readonly array $options,
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
-		private readonly ?BundleGenerator $bundle_generator = null,
 		?ArdCatalog $ard_catalog = null,
+		private readonly ?GenerationJob $generation_job = null,
+		private readonly ?StageFactory $stage_factory = null,
+		private readonly Clock $clock = new SystemClock(),
 	) {
 		$this->settings_page = new SettingsPage( $options, $ard_catalog );
 		$this->meta_box      = new MetaBox( $options, $generator );
+		$this->needs_regen   = new NeedsRegenTracker();
 	}
 
 	/**
@@ -158,137 +168,116 @@ class Admin {
 	}
 
 	/**
-	 * Handle the AJAX batch-generate request.
+	 * Start a bulk generation job.
 	 *
-	 * Processes one paginated slice (offset + limit) for a post type and
-	 * returns JSON with total found, processed count, and any per-post errors.
+	 * Hooked to `wp_ajax_mfa_start_generation_job`. Returns immediately — all
+	 * work happens in the WP-Cron tick chain, so closing the tab is harmless
+	 * provided WP-Cron is actually running on the site; if it is not, progress
+	 * only advances while a wp-admin page (including this one, via the
+	 * admin_init nudge) is open.
 	 *
-	 * Hooked to `wp_ajax_mfa_generate_batch`.
-	 *
-	 * @since  1.1.0
+	 * @since  1.7.0
 	 */
-	public function handle_generate_batch_ajax(): void {
+	public function handle_start_generation_job_ajax(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
 			return;
 		}
 
-		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+		check_ajax_referer( 'mfa_generation_job', 'nonce' );
 
-		$post_type = sanitize_key( (string) ( $_POST['post_type'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$offset    = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$limit     = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-
-		if ( '' === $post_type ) {
-			wp_send_json_error( array( 'message' => 'post_type is required.' ), 400 );
+		if ( null === $this->generation_job || null === $this->stage_factory ) {
+			wp_send_json_error( array( 'message' => 'Generation queue unavailable.' ), 500 );
 			return;
 		}
 
-		$result = $this->generator->generate_batch( $post_type, $offset, $limit );
+		$scope  = sanitize_text_field( wp_unslash( (string) ( $_POST['scope'] ?? '' ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$stages = $this->stage_factory->build_stage_list( $scope );
 
-		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( sprintf( 'WP Markdown for Agents: generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
+		if ( empty( $stages ) ) {
+			wp_send_json_error( array( 'message' => 'Nothing to generate for that scope.' ), 400 );
+			return;
 		}
 
-		// Final batch for this post type — drop it from the pending-regen list.
-		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
-			$this->mark_post_type_regenerated( $post_type );
-			$this->maybe_rebuild_bundle();
+		$result = $this->generation_job->start( $stages );
+
+		if ( ! $result['ok'] ) {
+			// 409: a job is already live. The UI switches to that job's progress
+			// rather than showing an error.
+			wp_send_json_error(
+				array(
+					'message' => $result['message'],
+					'job'     => $this->public_job_record(),
+				),
+				409
+			);
+			return;
 		}
 
-		wp_send_json_success( $result );
-		return;
+		wp_send_json_success( $this->public_job_record() );
 	}
 
 	/**
-	 * Remove a post type from the pending-regeneration transient, deleting
-	 * the transient entirely once every flagged type has been regenerated.
+	 * Return the current job record for polling.
 	 *
-	 * @since  1.2.0
-	 * @param  string $post_type Slug just regenerated to completion.
+	 * Hooked to `wp_ajax_mfa_job_status`. Read-only.
+	 *
+	 * @since  1.7.0
 	 */
-	private function mark_post_type_regenerated( string $post_type ): void {
-		$pending = get_transient( 'markdown_for_agents_needs_regen' );
-
-		if ( ! is_array( $pending ) || empty( $pending ) ) {
-			return;
-		}
-
-		$remaining = array_values( array_diff( $pending, array( $post_type ) ) );
-
-		if ( empty( $remaining ) ) {
-			delete_transient( 'markdown_for_agents_needs_regen' );
-			return;
-		}
-
-		if ( $remaining !== $pending ) {
-			set_transient( 'markdown_for_agents_needs_regen', $remaining, 0 );
-		}
-	}
-
-	/**
-	 * Handle the AJAX taxonomy-batch-generate request.
-	 *
-	 * Hooked to `wp_ajax_mfa_generate_taxonomy_batch`.
-	 *
-	 * @since  1.1.0
-	 */
-	public function handle_generate_taxonomy_batch_ajax(): void {
+	public function handle_job_status_ajax(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => 'Unauthorised' ), 403 );
 			return;
 		}
 
-		check_ajax_referer( 'mfa_generate_batch', 'nonce' );
+		check_ajax_referer( 'mfa_generation_job', 'nonce' );
 
-		$offset = absint( $_POST['offset'] ?? 0 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$limit  = min( absint( $_POST['limit'] ?? 10 ), 50 ); // phpcs:ignore WordPress.Security.NonceVerification.Missing
-
-		$result = $this->taxonomy_generator->generate_batch( $offset, $limit );
-
-		if ( ! empty( $result['errors'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( sprintf( 'WP Markdown for Agents: taxonomy generate_batch returned %d error(s); first: %s', count( $result['errors'] ), $result['errors'][0]['message'] ?? '' ) );
-		}
-
-		// Final batch — rebuild the bundle, mirroring handle_generate_batch_ajax().
-		if ( ( $offset + $limit ) >= (int) $result['total'] ) {
-			$this->maybe_rebuild_bundle();
-		}
-
-		wp_send_json_success( $result );
-		return;
-	}
-
-	/**
-	 * Rebuild the OKF `.zip` bundle when enabled and a generator is wired
-	 * up. Called from the final batch of both AJAX bulk-generation handlers —
-	 * synchronous is acceptable here because the user is already waiting on
-	 * the final batch's response. Passed only_if_stale so that clicking
-	 * "Generate" repeatedly with no content changes in between doesn't
-	 * re-zip the whole export tree each time; any real change already
-	 * triggers the staleness hooks (`mark_stale_and_schedule()`), so a fresh
-	 * bundle here means there is genuinely nothing new to package.
-	 *
-	 * @since  1.6.0
-	 */
-	private function maybe_rebuild_bundle(): void {
-		if ( null === $this->bundle_generator ) {
+		if ( null === $this->generation_job ) {
+			wp_send_json_error( array( 'message' => 'Generation queue unavailable.' ), 500 );
 			return;
 		}
 
-		$result = $this->generator->rebuild_bundle( $this->bundle_generator, true );
+		wp_send_json_success( $this->public_job_record() );
+	}
 
-		if ( ! $result['manifests_ok'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( 'WP Markdown for Agents: manifest write failed during bundle rebuild; bundle may be stale.' );
+	/**
+	 * Fields of the job record exposed to the browser.
+	 *
+	 * An allowlist rather than a denylist: internal bookkeeping such as
+	 * `lock_token`, `cursor`, and `schedule_failures` stays server-side by
+	 * default, so a field added later to GenerationJob's record shape does
+	 * not leak until someone deliberately adds it here. This is the public
+	 * contract polled by assets/js/bulk-generate.js — keep the two in sync.
+	 *
+	 * @since  1.7.0
+	 */
+	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message' );
+
+	/**
+	 * The job record, reduced to the fields the browser is allowed to see.
+	 *
+	 * Adds a computed `seconds_since_tick` for a running (or just-finished)
+	 * job — how the browser tells "working, be patient" apart from "cron is
+	 * dead and nothing will ever advance this", which otherwise both render
+	 * as `running` with no progress. `last_tick_at` itself stays out of the
+	 * allowlist deliberately: sending a raw timestamp for the browser to
+	 * subtract its own clock from would misfire on any machine with a
+	 * skewed clock, so the subtraction happens here, server-side, against
+	 * this same request's clock.
+	 *
+	 * @since  1.7.0
+	 * @return array<string, mixed>
+	 */
+	private function public_job_record(): array {
+		$record = null !== $this->generation_job ? $this->generation_job->get() : array();
+
+		$public = array_intersect_key( $record, array_flip( self::PUBLIC_JOB_FIELDS ) );
+
+		if ( isset( $record['status'] ) && 'idle' !== $record['status'] ) {
+			$public['seconds_since_tick'] = max( 0, $this->clock->now() - (int) ( $record['last_tick_at'] ?? 0 ) );
 		}
 
-		if ( Generator::BUNDLE_FAILED === $result['status'] && defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
-			error_log( 'WP Markdown for Agents: bundle rebuild failed after bulk generation.' );
-		}
+		return $public;
 	}
 
 	/**
@@ -349,7 +338,7 @@ class Admin {
 				'mfa-bulk-generate',
 				'markdownForAgentsBulkGenerate',
 				array(
-					'nonce'   => wp_create_nonce( 'mfa_generate_batch' ),
+					'nonce'   => wp_create_nonce( 'mfa_generation_job' ),
 					'ajaxurl' => admin_url( 'admin-ajax.php' ),
 				)
 			);
@@ -417,7 +406,7 @@ class Admin {
 	 * @since  1.2.0
 	 */
 	private function display_regen_notice(): void {
-		$pending = get_transient( 'markdown_for_agents_needs_regen' );
+		$pending = get_transient( NeedsRegenTracker::TRANSIENT );
 
 		if ( ! is_array( $pending ) || empty( $pending ) ) {
 			return;
