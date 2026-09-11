@@ -57,8 +57,10 @@ class FrontmatterBuilder {
 		$type_config = $this->options['post_type_configs'][ $post->post_type ] ?? array();
 		$fm_fields   = (array) ( $type_config['frontmatter_fields'] ?? array() );
 
+		$field_keys = $this->field_keys( $fm_fields, array_keys( $frontmatter ) );
+
 		foreach ( $fm_fields as $field_path ) {
-			$key   = $this->field_key( $field_path );
+			$key   = $field_keys[ $field_path ];
 			$value = $this->field_resolver->resolve( $post->ID, $field_path );
 			if ( null !== $value && '' !== $value ) {
 				$frontmatter[ $key ] = self::normalize_value( $value );
@@ -179,6 +181,49 @@ class FrontmatterBuilder {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Choose stable keys before resolving values, so empty fields cannot rename others.
+	 *
+	 * Keep legacy short keys unless dotted paths collide with another configured
+	 * leaf or an automatic frontmatter key. Plain keys retain their explicit names.
+	 *
+	 * @param string[] $fields Configured paths.
+	 * @param string[] $existing Keys already in frontmatter.
+	 * @return array<string, string>
+	 */
+	private function field_keys( array $fields, array $existing ): array {
+		$fields = array_values( array_unique( $fields ) );
+		$counts = array_count_values( array_map( array( $this, 'field_key' ), $fields ) );
+		$reserved = array_fill_keys(
+			array_merge( $existing, array( 'featured_image', 'featured_image_alt', 'parent', 'ancestors', 'children', 'author', 'timestamp', 'tags' ) ),
+			true
+		);
+		$keys = array();
+
+		// Reserve explicit plain keys and all full paths before choosing fallbacks.
+		$used = $reserved;
+		foreach ( $fields as $path ) {
+			$used[ $path ] = true;
+		}
+
+		foreach ( $fields as $path ) {
+			$leaf = $this->field_key( $path );
+			$key  = $leaf;
+			if ( str_contains( $path, '.' ) && ( $counts[ $leaf ] > 1 || isset( $reserved[ $leaf ] ) ) ) {
+				$key = $path;
+				if ( isset( $reserved[ $key ] ) ) {
+					do {
+						$key = 'custom.' . $key;
+					} while ( isset( $used[ $key ] ) );
+				}
+			}
+			$keys[ $path ] = $key;
+			$used[ $key ]  = true;
+		}
+
+		return $keys;
 	}
 
 	/**

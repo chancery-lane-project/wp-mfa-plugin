@@ -326,4 +326,33 @@ class FrontmatterBuilderTest extends TestCase {
 
         $this->assertContains( 'extra', $result['tags'] );
     }
+
+    /** @dataProvider collision_cases */
+    public function test_preserves_colliding_paths_and_core_metadata(array $values, array $expected): void {
+        foreach ([$values, array_reverse($values, true)] as $ordered) {
+            $resolver = $this->createMock(FieldResolver::class);
+            $resolver->method('resolve')->willReturnCallback(static fn($id, $path) => $ordered[$path]);
+            $builder = new FrontmatterBuilder($resolver, new TaxonomyCollector(), [
+                'post_type_configs' => ['post' => ['frontmatter_fields' => array_keys($ordered)]],
+            ]);
+            $result = $builder->build($this->make_post());
+            foreach ($expected as $key => $value) {
+                $this->assertArrayHasKey($key, $result);
+                $this->assertSame($value, $result[$key]);
+            }
+            $this->assertSame('My Post Title', $result['title']);
+        }
+    }
+
+    public static function collision_cases(): array {
+        return [
+            'two levels' => [['one.label'=>'First', 'two.label'=>'Second'], ['one.label'=>'First', 'two.label'=>'Second']],
+            'three levels and core title' => [['sessions.one.title'=>'First', 'sessions.two.title'=>'Second'], ['sessions.one.title'=>'First', 'sessions.two.title'=>'Second']],
+            'one path collides with core' => [['group.title'=>'Custom'], ['group.title'=>'Custom']],
+            'later automatic key' => [['group.tags'=>['Custom']], ['group.tags'=>['Custom'], 'tags'=>[]]],
+            'plain key plus dotted key' => [['label'=>'Plain', 'group.label'=>'Nested'], ['label'=>'Plain', 'group.label'=>'Nested']],
+            'empty sibling keeps stable name' => [['one.label'=>null, 'two.label'=>'Second'], ['two.label'=>'Second']],
+            'distinct leaves retain legacy keys' => [['group.summary'=>'Summary', 'group.nested.description'=>'Description'], ['summary'=>'Summary', 'description'=>'Description']],
+        ];
+    }
 }
