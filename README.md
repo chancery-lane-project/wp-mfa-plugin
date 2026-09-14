@@ -85,6 +85,48 @@ There is no cancel button, but deactivating the plugin stops a run in progress: 
 
 ---
 
+## Caching
+
+Markdown is served on the same URL as the HTML page, chosen by content negotiation. That only works if the page cache in front of WordPress either lets agent-shaped requests through or keys its cache on them. The plugin sends the right signals on both sides:
+
+- **Markdown responses** carry `Cache-Control: private, no-store`, `X-LiteSpeed-Cache-Control: no-cache` and `Vary: Accept, User-Agent`, so a shared cache cannot replay Markdown to a human browser.
+- **HTML responses** with a Markdown alternate carry `Vary: Accept` and a `Link: <…?output_format=md>; rel="alternate"; type="text/markdown"` header.
+
+What the plugin cannot control is a cache that answers before WordPress runs. Most full-page caches do not key on the `Accept` header, so a warm HTML entry is served to `Accept: text/markdown` requests as if they were browsers. The `?output_format=md` query parameter is a distinct URL and always reaches the plugin, which is why it is advertised as the alternate. If you want the `Accept` header route to work as well, configure the cache layer. See the FAQ in `readme.txt` for the general rules; the LiteSpeed configuration below is a worked example.
+
+Both sets of headers are filterable (`markdown_for_agents_cache_headers`, `markdown_for_agents_html_headers`) for hosts whose cache honours `Vary` correctly and where you would rather trade the safety margin for cache hits.
+
+### LiteSpeed Cache
+
+LiteSpeed Cache does not vary its cache on `Accept` and, by default, does not treat `output_format` as a cache-busting query string. Without configuration it can serve a cached HTML page to an agent negotiating for Markdown, or cache the static `.md` files and keep serving them after a post has been regenerated. Configuration reported by a user running the plugin behind LiteSpeed (see [issue #22](https://github.com/chancery-lane-project/wp-mfa-plugin/issues/22)):
+
+**LiteSpeed Cache → Cache → Excludes**
+
+| Setting | Value |
+|---|---|
+| Do Not Cache URIs | `/wp-content/uploads/wp-mfa-exports/` (use your configured export directory) |
+| Do Not Cache Query Strings | `output_format` |
+
+**`.htaccess`**, to cover the `Accept` header route, which the two settings above do not reach:
+
+```apache
+<IfModule LiteSpeed>
+RewriteEngine On
+
+# Don't cache Markdown negotiated via the Accept header
+RewriteCond %{HTTP_ACCEPT} text/markdown [NC]
+RewriteRule .* - [E=Cache-Control:no-cache]
+
+# Don't cache Markdown requested via the query parameter
+RewriteCond %{QUERY_STRING} (^|&)output_format=md(&|$) [NC]
+RewriteRule .* - [E=Cache-Control:no-cache]
+</IfModule>
+```
+
+Ordinary browsers never send `text/markdown` in `Accept`, so these rules exclude only agent requests and leave HTML caching for visitors untouched. Do not add `User-Agent` to the cache key as a way of separating agents; that fragments the cache for every visitor.
+
+---
+
 ## File structure
 
 ```

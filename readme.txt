@@ -125,6 +125,11 @@ This is host/CDN configuration, not a plugin setting. Two changes help:
   `text/markdown`, whose query string contains `output_format=md`, or whose
   User-Agent is a known AI bot. Do **not** add User-Agent to the cache *key*; that
   fragments the cache for every visitor. Exclude from caching, do not key on it.
+* **LiteSpeed Cache:** under Cache → Excludes, add your export directory
+  (default `/wp-content/uploads/wp-mfa-exports/`) to "Do Not Cache URIs" and
+  `output_format` to "Do Not Cache Query Strings". The `Accept` header route
+  also needs a rewrite rule in `.htaccess`; the Caching section of the README
+  on GitHub has the full configuration.
 * **Firewall / bot rules (Cloudflare):** add a skip/allow rule for the AI
   User-Agents you want to serve (for example GPTBot, ClaudeBot, PerplexityBot,
   Google-Extended). Otherwise they receive a 403/429 and get nothing.
