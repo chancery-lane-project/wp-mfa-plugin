@@ -115,4 +115,17 @@ class YamlFormatterTest extends TestCase {
         $this->assertLessThan($wpid_pos, $title_pos);
         $this->assertLessThan($tags_pos, $wpid_pos);
     }
+
+    public function test_objects_and_booleans_are_safe_in_lists_and_maps(): void {
+        $term = new \WP_Term(['name' => 'Alice: Example']);
+        $post = new \WP_Post(['post_title' => 'Related post']);
+        $output = $this->formatter->format([
+            'single' => $term,
+            'speakers' => [$term, $post, new \stdClass(), true, false],
+            'nested' => [['speakers' => [$term]]],
+        ]);
+        $this->assertStringContainsString('single: "Alice: Example"', $output);
+        $this->assertStringContainsString("  - \"Alice: Example\"\n  - Related post\n  - stdClass\n  - true\n  - false\n", $output);
+        $this->assertStringContainsString("    speakers:\n      - \"Alice: Example\"", $output);
+    }
 }
