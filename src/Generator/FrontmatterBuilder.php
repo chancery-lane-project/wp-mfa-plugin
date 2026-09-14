@@ -163,7 +163,7 @@ class FrontmatterBuilder {
 	 * Normalize a field value for safe YAML serialisation.
 	 *
 	 * Converts WP_Post objects (e.g. from ACF relationship fields) to their
-	 * titles. Recursively normalizes arrays.
+	 * titles and WP_Term objects to their names. Recursively normalizes arrays.
 	 *
 	 * @since  1.1.0
 	 * @param  mixed $value The raw field value.
@@ -172,6 +172,10 @@ class FrontmatterBuilder {
 	private static function normalize_value( mixed $value ): mixed {
 		if ( $value instanceof \WP_Post ) {
 			return $value->post_title;
+		}
+
+		if ( $value instanceof \WP_Term ) {
+			return $value->name;
 		}
 
 		if ( is_array( $value ) ) {

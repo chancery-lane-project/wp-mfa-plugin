@@ -326,4 +326,15 @@ class FrontmatterBuilderTest extends TestCase {
 
         $this->assertContains( 'extra', $result['tags'] );
     }
+
+    public function test_normalises_taxonomy_objects_recursively(): void {
+        $term = new \WP_Term(['name' => 'Alice Example']);
+        $resolver = $this->createMock(FieldResolver::class);
+        $resolver->method('resolve')->willReturn([$term, ['speaker' => $term, 'related' => new \WP_Post(['post_title' => 'Related clause'])]]);
+        $builder = new FrontmatterBuilder($resolver, new TaxonomyCollector(), [
+            'post_type_configs' => ['post' => ['frontmatter_fields' => ['speakers']]],
+        ]);
+        $result = $builder->build($this->make_post());
+        $this->assertSame(['Alice Example', ['speaker' => 'Alice Example', 'related' => 'Related clause']], $result['speakers']);
+    }
 }

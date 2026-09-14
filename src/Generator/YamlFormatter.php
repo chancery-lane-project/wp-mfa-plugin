@@ -65,7 +65,7 @@ class YamlFormatter {
 							$yaml .= $this->format_field( (string) $sub_key, $sub_value, $indent_level + 2 );
 						}
 					} else {
-						$formatted = is_string( $item ) ? $this->escape_value( $item ) : $item;
+						$formatted = $this->format_scalar( $item );
 						$yaml     .= "{$indent}  - {$formatted}\n";
 					}
 				}
@@ -80,25 +80,33 @@ class YamlFormatter {
 			return $yaml;
 		}
 
-		// Safety net: convert objects to a string representation.
-		if ( is_object( $value ) ) {
-			if ( $value instanceof \WP_Post ) {
-				$value = $value->post_title;
-			} else {
-				$value = (string) get_class( $value );
-			}
+		return "{$indent}{$key}: " . $this->format_scalar( $value ) . "\n";
+	}
+
+	/**
+	 * Format scalar values consistently in maps and lists.
+	 *
+	 * @param mixed $value Value to serialise.
+	 * @return string
+	 */
+	private function format_scalar( mixed $value ): string {
+		if ( $value instanceof \WP_Post ) {
+			$value = $value->post_title;
+		} elseif ( $value instanceof \WP_Term ) {
+			$value = $value->name;
+		} elseif ( is_object( $value ) ) {
+			$value = get_class( $value );
 		}
 
 		if ( is_bool( $value ) ) {
-			return "{$indent}{$key}: " . ( $value ? 'true' : 'false' ) . "\n";
+			return $value ? 'true' : 'false';
 		}
 
 		if ( is_int( $value ) || is_float( $value ) ) {
-			return "{$indent}{$key}: {$value}\n";
+			return (string) $value;
 		}
 
-		$formatted = $this->escape_value( (string) $value );
-		return "{$indent}{$key}: {$formatted}\n";
+		return $this->escape_value( (string) $value );
 	}
 
 	/**
