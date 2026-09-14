@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.0
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -274,6 +274,11 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= 1.7.1 =
+* Fix: frontmatter keys for nested (dot notation) fields are no longer dropped or renamed when two configured fields share the same leaf name, or when a leaf name clashes with an automatic key such as `author` or `tags`. Colliding fields now keep their full dotted path as the key. Non-colliding fields keep their existing short key, so output for existing sites is unchanged.
+* Fix: taxonomy terms and posts used as frontmatter values are now serialised as their term name or post title instead of a class name, in list items as well as single values.
+* Docs: new Caching section covering the cache headers the plugin sends, why a full-page cache can answer `Accept`-negotiated requests before WordPress runs, and the LiteSpeed Cache exclusions and `.htaccess` rules to configure.
 
 = 1.7.0 =
 * Bulk generation now runs as a background WP-Cron job: starting a run returns immediately, and it continues in the background provided WP-Cron is working on the site. If WP-Cron is not working, progress only advances while a wp-admin page is open (see the FAQ for what to check).

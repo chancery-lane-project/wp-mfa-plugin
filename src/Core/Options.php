@@ -150,7 +150,7 @@ class Options {
 				'SemrushBot-OCOB',
 				'SemrushBot-SWA/',
 				'WARDBot',
-				'ygs-scraper-bot'
+				'ygs-scraper-bot',
 			),
 		);
 	}
