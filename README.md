@@ -284,3 +284,18 @@ Tests use PHPUnit 9.6 with namespace-scoped function mocks (no extensions requir
 ## Licence
 
 GPL-3.0-or-later. See [LICENSE](LICENSE) for details.
+
+### Custom frontmatter key collisions
+
+Dotted frontmatter paths normally use their final segment as the YAML key:
+`clause_fields.clause_summary` becomes `clause_summary`. If configured paths
+share a final segment, each dotted path uses its full path instead, for example
+`group1.label` and `group2.label`. Dotted paths that conflict with automatic
+metadata such as `title` or `tags` also retain their full paths. These are literal
+YAML keys containing dots, not nested YAML objects. This applies at any depth.
+Keys are chosen from the configuration, including fields empty on a given post,
+so posts with the same configuration use the same keys. Distinct, non-conflicting
+short keys and explicit plain field names retain their existing behaviour.
+If a full path itself matches an automatic key, it is prefixed with `custom.`
+until unused. Regenerate exports after upgrading; consumers of previously
+colliding keys should use the full-path keys.
