@@ -45,12 +45,14 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_sent_headers']   = [];
         $GLOBALS['_mock_post_meta']      = [];
         $_SERVER['HTTP_ACCEPT']          = '';
+        $_SERVER['REQUEST_METHOD']       = 'GET';
     }
 
     protected function tearDown(): void {
         $this->remove_dir( $this->tmp_dir );
         unset( $_SERVER['HTTP_ACCEPT'] );
         unset( $_SERVER['HTTP_USER_AGENT'] );
+        unset( $_SERVER['REQUEST_METHOD'] );
         unset( $_GET['output_format'] );
         unset( $GLOBALS['_mock_is_tax'] );
     }
@@ -416,6 +418,47 @@ class NegotiatorTest extends TestCase {
     // -----------------------------------------------------------------------
     // maybe_serve_markdown — access_method and agent label
     // -----------------------------------------------------------------------
+
+    /** @dataProvider request_methods_and_triggers */
+    public function test_only_get_selections_increment_stats( string $method, string $trigger ): void {
+        $md_file = $this->tmp_dir . '/method-check.md';
+        file_put_contents( $md_file, '# Method check' );
+        $GLOBALS['_mock_is_singular'] = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['REQUEST_METHOD'] = $method;
+        $_SERVER['HTTP_USER_AGENT'] = 'GPTBot/1.4';
+        $_SERVER['HTTP_ACCEPT'] = 'accept-header' === $trigger ? 'text/markdown' : 'text/html';
+        if ( 'query-param' === $trigger ) {
+            $_GET['output_format'] = 'md';
+        }
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( 'GET' === $method ? $this->once() : $this->never() )
+            ->method( 'log_access' )->with( 1, 'GPTBot', $trigger );
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try {
+            $neg->maybe_serve_markdown();
+            $this->fail( 'Expected the file-delivery test stub to stop serving.' );
+        } catch ( \RuntimeException $e ) {
+            $this->assertStringStartsWith( 'readfile_mock:', $e->getMessage() );
+        }
+        // HEAD still selects Markdown and emits the same response headers.
+        $this->assertContains( 'Content-Type: text/markdown; charset=utf-8', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'Cache-Control: private, no-store, max-age=0', $GLOBALS['_mock_sent_headers'] );
+        $this->assertContains( 'Vary: Accept, User-Agent', $GLOBALS['_mock_sent_headers'] );
+    }
+
+    public static function request_methods_and_triggers(): array {
+        $cases = [];
+        foreach ( [ 'GET', 'HEAD', 'POST' ] as $method ) {
+            foreach ( [ 'query-param', 'accept-header', 'ua' ] as $trigger ) {
+                $cases[ $method . ' ' . $trigger ] = [ $method, $trigger ];
+            }
+        }
+        return $cases;
+    }
 
     public function test_log_access_called_with_ua_method_when_ua_only(): void {
         $md_file = $this->tmp_dir . '/test-post.md';

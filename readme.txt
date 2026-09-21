@@ -67,8 +67,9 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 
 Inside `wp-content/uploads/{export_dir}/` (configurable in Settings). Post files
 live under `{export_dir}/{post-type}/{slug}.md`. Taxonomy archive files live under
-`{export_dir}/taxonomy/{taxonomy}/{term-slug}.md`. The directory is served by
-WordPress when content negotiation is triggered.
+`{export_dir}/taxonomy/{taxonomy}/{term-slug}.md`. Negotiated page requests are
+served through WordPress. Direct uploads URLs are normally served by the web
+server and bypass the plugin headers and counters.
 
 = Will this slow down my site? =
 
@@ -100,64 +101,92 @@ stops the plugin serving Markdown to agents until you reactivate it.
 
 = AI agents are getting HTML instead of Markdown. Why? =
 
-Almost always this is a CDN, firewall, or page cache sitting in front of
-WordPress — not the plugin. On many hosts (for example Cloudflare in front of WP
-Engine) the edge answers a request before it ever reaches the plugin: a full-page
-cache can return the cached HTML, or a bot/WAF rule can block a known AI crawler
-with a 403/429.
+First confirm the post is public, eligible, and has a current export. Missing
+files or excluded posts legitimately fall back to HTML. Otherwise inspect each
+CDN, firewall and page cache: it may answer before WordPress runs, return cached
+HTML or block the request. A UA-only request can receive warm cached HTML even
+when the HTML response varies on Accept.
 
-The reliable route is the query parameter: append `?output_format=md` to any post
-or archive URL. Because that is a distinct URL, caches store it separately and
-firewalls treat it as an ordinary request, so it reaches the plugin even on a
-hardened stack. The plugin advertises this URL automatically via a
-`<link rel="alternate" type="text/markdown">` tag in each page's `<head>`, so
-agents that read the page can discover and follow it.
-
-The `Accept: text/markdown` header and User-Agent routes also work, but only if
-your CDN/cache is configured to let them through (see the next question).
+The advertised `?output_format=md` alternate is the preferred route when every
+cache preserves that query parameter or explicitly bypasses it. It is not a
+firewall bypass, and caches configured to ignore query strings can still answer
+with the HTML entry. Direct upload URLs have separate static-cache behaviour.
 
 = How do I let my CDN or cache serve Markdown to agents? =
 
-This is host/CDN configuration, not a plugin setting. Two changes help:
+Configure every cache layer, including any hosting-provider cache behind a CDN.
+Bypass requests containing a Markdown Accept header, the `output_format` query
+parameter, or a configured AI User-Agent where that layer supports the match.
+Do not add User-Agent to the cache key: that fragments caching for every visitor.
+Keep origin cache-control respected, and permit intended agents through security
+controls separately from cache rules.
 
-* **Page cache (WP Engine, LiteSpeed, Varnish, nginx):** exclude agent-shaped
-  requests from the full-page cache — any request whose `Accept` header contains
-  `text/markdown`, whose query string contains `output_format=md`, or whose
-  User-Agent is a known AI bot. Do **not** add User-Agent to the cache *key*; that
-  fragments the cache for every visitor. Exclude from caching, do not key on it.
-* **LiteSpeed Cache:** under Cache → Excludes, add your export directory
-  (default `/wp-content/uploads/wp-mfa-exports/`) to "Do Not Cache URIs" and
-  `output_format` to "Do Not Cache Query Strings". The `Accept` header route
-  also needs a rewrite rule in `.htaccess`; the Caching section of the README
-  on GitHub has the full configuration.
-* **Firewall / bot rules (Cloudflare):** add a skip/allow rule for the AI
-  User-Agents you want to serve (for example GPTBot, ClaudeBot, PerplexityBot,
-  Google-Extended). Otherwise they receive a 403/429 and get nothing.
+For LiteSpeed Cache, under Cache → Excludes, add the export directory (default
+`/wp-content/uploads/wp-mfa-exports/`) to Do Not Cache URIs, `output_format` to
+Do Not Cache Query Strings, and all configured agent substrings to Do Not Cache
+User Agents, one per line. The Accept route additionally needs the README's
+rewrite rule. Regenerate UA exclusions whenever the configured list changes.
 
-If you skip this, nothing breaks — agents simply use the `?output_format=md` URL
-via discovery instead. The plugin already protects against the reverse problem:
-Markdown responses are sent with `Cache-Control: private, no-store` and
-`Vary: Accept, User-Agent`, so a shared cache cannot replay the Markdown to a
-human browser on the same URL.
+The [CDN and cache guide](https://github.com/chancery-lane-project/wp-mfa-plugin/blob/main/docs/cdn-caching.md)
+includes the worked configuration, other cache vendors, static-export caveats
+and both-order verification. Negotiated Markdown's private/no-store headers
+prevent storage only when the cache honours them; a forced TTL can defeat them.
+
+= What is different about Cloudflare? =
+
+If using cache-everything, choose an Edge TTL that respects origin cache-control.
+Put a Bypass cache rule for the Markdown query or configured UA **after** it:
+for conflicting cache settings the last matching rule wins. Generate the UA
+expression from this installation's saved options, not a stale copied list.
+Review bot/security policies and which layer manages robots.txt independently.
+
+A controlled free-plan test on 21 September 2026 rejected an Accept-header Cache
+Rule. Listed UA and query bypass worked; an unlisted client asking only through
+Accept still received warm cached HTML. This was a related Wagtail deployment,
+not verification of your WordPress host. Check current plan capabilities and
+use the guide's procedure against your actual stack.
 
 = How can I check what an agent actually receives? =
 
-Request a page the way an agent would and inspect the response headers:
+Use GET requests from an external network against a public post with an export:
 
 ```
-# Query-param route (the reliable one)
-curl -sI 'https://example.com/your-post/?output_format=md'
-
-# Accept-header route
-curl -sI -H 'Accept: text/markdown' 'https://example.com/your-post/'
+H=https://example.com/your-post/
+# Browser twice, to observe whether HTML really becomes cached.
+curl -sS -D - -o /dev/null -A 'Mozilla/5.0' -H 'Accept: text/html' "$H"
+curl -sS -D - -o /dev/null -A 'Mozilla/5.0' -H 'Accept: text/html' "$H"
+# Listed UA-only must receive Markdown even after cached HTML.
+curl -sS -D - -o /dev/null -A 'GPTBot/1.4' -H 'Accept: text/html' "$H"
+curl -sS -D - -o /dev/null "$H?output_format=md"
+# Unlisted Accept-only can receive HTML on Cloudflare free.
+curl -sS -D - -o /dev/null -A 'MarkdownVerification/1.0' -H 'Accept: text/markdown' "$H"
+# Browser after agents must still receive HTML.
+curl -sS -D - -o /dev/null -A 'Mozilla/5.0' -H 'Accept: text/html' "$H"
 ```
 
-A genuine Markdown response from the plugin has `Content-Type: text/markdown` and
-an `X-Markdown-Source: markdown-for-agents` header. If you instead see
-`Content-Type: text/html`, the request was answered by a cache or firewall before
-reaching the plugin (see the previous questions). Note that running these from
-your own server may bypass your CDN; testing from an external network shows what
-real agents experience.
+Check status, Content-Type, cache headers and cache-hit indicators. Negotiated
+plugin responses carry `X-Markdown-Source: markdown-for-agents`; direct static
+exports need not. HTML alone does not prove a cache fault: check eligibility and
+origin evidence too. Stop testing if a browser receives Markdown.
+
+Also test agent first, then browser, using a confirmed uncached public URL or a
+specifically agreed purge. Repeat for each trigger; ordering alone does not prove
+cold cache state. The guide covers direct exports, HEAD checks and correlation.
+
+= What do the access statistics count? =
+
+The plugin counts singular-post Markdown GET selections made by WordPress, not
+all agent traffic or confirmed body delivery. HEAD and other methods, taxonomy
+archives, HTML fallback, direct static exports and bundles do not increment
+these counters. Neither do cache hits or requests blocked before WordPress.
+Versions up to 1.7.1 also counted negotiated singular HEAD requests; the GET-only
+correction is listed under Unreleased below.
+
+Complete discovery and probes before a baseline snapshot because GET probes can
+increment counters. For reconciliation, verify both correlation IDs in actual
+origin records and compare UTC counter buckets after traffic has finished.
+Document background traffic and CDN/static bypasses separately. Sending custom
+headers does not make them appear in the usual combined access log.
 
 = Should I publish an llms.txt file? =
 
@@ -230,11 +259,11 @@ Yes. Several filters are available:
 
 By default the Markdown response is sent with `Cache-Control: private, no-store, max-age=0` (plus `X-LiteSpeed-Cache-Control`, `X-Accel-Expires` and `Vary: Accept, User-Agent`). This is deliberate: the Markdown is negotiated on the *same URL* as the HTML page, so a shared cache that ignores or normalises `Vary` could otherwise store the Markdown variant and replay it to ordinary browsers expecting HTML.
 
-The safe way to relax this is per access method, which the `markdown_for_agents_cache_headers` filter receives as its third argument (since 1.6.1). Requests via `?output_format=md` are on their own URL — and therefore their own cache key — so they can be cached publicly with no risk of variant confusion. Requests negotiated via the `Accept` header or detected by User-Agent share the page URL with the HTML and should stay private unless you are certain every cache layer in front of the site keys on `Accept`. Map any header to an empty string to omit it entirely:
+The safe way to relax this is per access method, which the `markdown_for_agents_cache_headers` filter receives as its third argument (since 1.6.1). Requests via `?output_format=md` can be cached publicly only when every cache preserves that query parameter in its key. Accept negotiation requires every cache to distinguish the negotiated variants. UA-only responses should remain private and bypass caches: keying on Accept alone does not separate them from browsers with the same Accept header. Map any header to an empty string to omit it entirely:
 
 ```
-add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath, string $access_method ) {
-	// Safe: ?output_format=md is a distinct URL with its own cache key.
+add_filter( 'markdown_for_agents_cache_headers', function ( array $headers, string $filepath = '', string $access_method = '' ) {
+	// Only after verifying every cache key preserves output_format.
 	if ( 'query-param' === $access_method ) {
 		$headers['Cache-Control']             = 'public, max-age=300';
 		$headers['X-LiteSpeed-Cache-Control'] = '';
@@ -274,6 +303,10 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= Unreleased =
+* Fix: count only singular Markdown GET selections. HEAD probes and other HTTP methods no longer inflate page-access statistics; negotiated response headers remain available.
+* Docs: add Cloudflare rule ordering and free-plan limitations, a bypass-expression generator from saved agent options, complete LiteSpeed UA exclusions, both-order GET verification and CDN/static statistics caveats. Correct unconditional cache guarantees.
 
 = 1.7.1 =
 * Fix: frontmatter keys for nested (dot notation) fields are no longer dropped or renamed when two configured fields share the same leaf name, or when a leaf name clashes with an automatic key such as `author` or `tags`. Colliding fields now keep their full dotted path as the key. Non-colliding fields keep their existing short key, so output for existing sites is unchanged.

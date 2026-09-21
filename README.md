@@ -89,12 +89,14 @@ There is no cancel button, but deactivating the plugin stops a run in progress: 
 
 Markdown is served on the same URL as the HTML page, chosen by content negotiation. That only works if the page cache in front of WordPress either lets agent-shaped requests through or keys its cache on them. The plugin sends the right signals on both sides:
 
-- **Markdown responses** carry `Cache-Control: private, no-store`, `X-LiteSpeed-Cache-Control: no-cache` and `Vary: Accept, User-Agent`, so a shared cache cannot replay Markdown to a human browser.
+- **Markdown responses** carry `Cache-Control: private, no-store`, `X-LiteSpeed-Cache-Control: no-cache` and `Vary: Accept, User-Agent`, so caches that respect these headers do not store the negotiated Markdown variant. An overriding cache rule can defeat them.
 - **HTML responses** with a Markdown alternate carry `Vary: Accept` and a `Link: <…?output_format=md>; rel="alternate"; type="text/markdown"` header.
 
-What the plugin cannot control is a cache that answers before WordPress runs. Most full-page caches do not key on the `Accept` header, so a warm HTML entry is served to `Accept: text/markdown` requests as if they were browsers. The `?output_format=md` query parameter is a distinct URL and always reaches the plugin, which is why it is advertised as the alternate. If you want the `Accept` header route to work as well, configure the cache layer. See the FAQ in `readme.txt` for the general rules; the LiteSpeed configuration below is a worked example.
+What the plugin cannot control is a cache that answers before WordPress runs. Most full-page caches do not key on the `Accept` header, so a warm HTML entry is served to `Accept: text/markdown` requests as if they were browsers. The advertised `?output_format=md` alternate is the preferred route when every cache preserves that query parameter or bypasses it. It does not bypass firewall or bot blocking. UA-only requests also need bypass on a warm HTML URL; HTML varying on Accept alone does not separate them from browsers.
 
-Both sets of headers are filterable (`markdown_for_agents_cache_headers`, `markdown_for_agents_html_headers`) for hosts whose cache honours `Vary` correctly and where you would rather trade the safety margin for cache hits.
+See the [CDN and cache guide](docs/cdn-caching.md) for the Cloudflare checklist, a bypass-expression generator using the installed agent list, nginx/Varnish/managed-host guidance, and verification in both request orders. Cloudflare bypass must follow cache-everything; the measured free-plan limitation for unlisted Accept-only clients remains explicit. The LiteSpeed configuration below is a worked example.
+
+Both sets of headers are filterable (`markdown_for_agents_cache_headers`, `markdown_for_agents_html_headers`). Relax caching only per access method after checking every cache key; keying on Accept alone does not make UA-only Markdown safe to cache. Direct uploads are a separate static path: they bypass these PHP headers and the plugin counters. See the [static-export and statistics limits](docs/cdn-caching.md#direct-uploads-are-a-separate-path).
 
 ### LiteSpeed Cache
 
@@ -106,8 +108,17 @@ LiteSpeed Cache does not vary its cache on `Accept` and, by default, does not tr
 |---|---|
 | Do Not Cache URIs | `/wp-content/uploads/wp-mfa-exports/` (use your configured export directory) |
 | Do Not Cache Query Strings | `output_format` |
+| Do Not Cache User Agents | Every configured agent substring, one per line (not just GPTBot/ClaudeBot) |
 
-**`.htaccess`**, to cover the `Accept` header route, which the two settings above do not reach:
+LiteSpeed supports [partial UA matches, one per line](https://docs.litespeedtech.com/lscache/lscwp/cache/#do-not-cache-user-agents). Copy the complete list from the plugin settings, or print the saved list with WP-CLI:
+
+```bash
+wp eval '$o = \Tclp\WpMarkdownForAgents\Core\Options::get(); echo implode("\n", $o["ua_agent_strings"]) . "\n";'
+```
+
+Regenerate the exclusions when that list changes. The UA setting handles UA-only requests after HTML has been cached. On multisite, check Network Admin for the setting.
+
+**`.htaccess`**, to cover the `Accept` header route, which those settings do not reach:
 
 ```apache
 <IfModule LiteSpeed>
@@ -118,12 +129,12 @@ RewriteCond %{HTTP_ACCEPT} text/markdown [NC]
 RewriteRule .* - [E=Cache-Control:no-cache]
 
 # Don't cache Markdown requested via the query parameter
-RewriteCond %{QUERY_STRING} (^|&)output_format=md(&|$) [NC]
+RewriteCond %{QUERY_STRING} (^|&)output_format=(md|markdown)(&|$) [NC]
 RewriteRule .* - [E=Cache-Control:no-cache]
 </IfModule>
 ```
 
-Ordinary browsers never send `text/markdown` in `Accept`, so these rules exclude only agent requests and leave HTML caching for visitors untouched. Do not add `User-Agent` to the cache key as a way of separating agents; that fragments the cache for every visitor.
+These rules bypass requests with Markdown triggers while ordinary browser requests can remain cached. A matching UA is a serving hint, not authenticated bot identity. Do not add `User-Agent` to the cache key as a way of separating agents; that fragments the cache for every visitor.
 
 ---
 

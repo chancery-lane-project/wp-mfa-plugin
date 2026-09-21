@@ -46,6 +46,7 @@ class Negotiator {
 	public function maybe_serve_markdown(): void {
 		$accept    = sanitize_text_field( wp_unslash( $_SERVER['HTTP_ACCEPT'] ?? '' ) );
 		$ua        = sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
+		$method    = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) );
 		// Public content-negotiation parameter on anonymous frontend requests — nonces are not applicable here.
 		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
@@ -98,7 +99,10 @@ class Negotiator {
 			// record the caller's product name even when no known-agent pattern matches.
 			$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
 
-			$this->access_logger->log_access( $post->ID, $agent, $access_method );
+			// Count page GET selections, not HEAD probes or other HTTP methods.
+			if ( 'GET' === $method ) {
+				$this->access_logger->log_access( $post->ID, $agent, $access_method );
+			}
 			$this->send_markdown_file( $filepath, $access_method );
 			return;
 		}
@@ -331,14 +335,14 @@ class Negotiator {
 		/**
 		 * Filter the cache-related headers sent with the Markdown response.
 		 *
-		 * The defaults prevent shared/full-page caches from storing the
-		 * Markdown variant under the URL key and replaying it to HTML clients.
+		 * Caches that respect these defaults do not store the negotiated
+		 * Markdown variant. An overriding cache rule can defeat the headers.
 		 * Override with caution — but note the risk differs by access method:
 		 * 'accept-header' and 'ua' responses share the page URL with the HTML
 		 * representation, so allowing them to be cached risks a cache layer
 		 * that ignores `Vary` serving Markdown to browsers. 'query-param'
-		 * responses live on their own URL (`?output_format=md`) and therefore
-		 * their own cache key, so they may safely be made cacheable. Map a
+		 * responses have their own key only when every cache preserves
+		 * output_format; verify that before making them cacheable. Map a
 		 * header to an empty string to omit it entirely.
 		 *
 		 * @since 1.5.1
