@@ -243,8 +243,11 @@ class StatsPage {
 				.mfa-legend i { display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; }
 				.mfa-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0 20px; }
 				.mfa-stats .postbox { margin-bottom: 0; }
-				.mfa-stat.headline { border-left: 4px solid #D7288B; }
+				.mfa-stat.headline { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['on-demand'] ); ?>; }
 				.mfa-stat.total { border-left: 4px solid #1C2B58; }
+				.mfa-stat.search { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['search'] ); ?>; }
+				.mfa-stat.training { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['training'] ); ?>; }
+				.mfa-stat.unknown { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['unknown'] ); ?>; }
 				.mfa-stat .lab { font-size: 13px; color: #50575e; }
 				.mfa-stat .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
@@ -303,7 +306,7 @@ class StatsPage {
 						</div>
 					</div>
 				</div>
-				<div class="postbox mfa-stat">
+				<div class="postbox mfa-stat search">
 					<div class="inside">
 						<div class="lab">🔎 <?php esc_html_e( 'Search', 'markdown-for-agents-and-statistics' ); ?></div>
 						<div class="num">
@@ -312,7 +315,7 @@ class StatsPage {
 						</div>
 					</div>
 				</div>
-				<div class="postbox mfa-stat">
+				<div class="postbox mfa-stat training">
 					<div class="inside">
 						<div class="lab">🤖 <?php esc_html_e( 'Training crawls', 'markdown-for-agents-and-statistics' ); ?></div>
 						<div class="num">
@@ -321,7 +324,7 @@ class StatsPage {
 						</div>
 					</div>
 				</div>
-				<div class="postbox mfa-stat">
+				<div class="postbox mfa-stat unknown">
 					<div class="inside">
 						<div class="lab">❔ <?php esc_html_e( 'Unknown', 'markdown-for-agents-and-statistics' ); ?></div>
 						<div class="num">
