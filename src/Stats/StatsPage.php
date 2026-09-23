@@ -45,9 +45,12 @@ class StatsPage {
 	/**
 	 * Intent categories shown as series/cards, with brand display colour.
 	 *
-	 * Stacked bottom→top (training, search, on-demand), so volume-heavy
-	 * background crawling forms the base in a muted navy tint while the headline
-	 * human-intent reads pop in brand magenta on top of each daily bar.
+	 * Stacked bottom→top (training, search, on-demand, unknown), so volume-heavy
+	 * background crawling forms the base in a muted navy tint, the headline
+	 * human-intent reads pop in brand magenta, and unknown caps each bar as a
+	 * muted remainder. Unknown sits on top rather than the base because its grey
+	 * is too close to the training tint to separate when adjacent; every
+	 * category is plotted so each bar's height equals the summary total.
 	 */
 	private const CATEGORY_COLORS = array(
 		'training'  => '#B3B8C8', // Navy tint (muted, back layer).
@@ -746,7 +749,7 @@ class StatsPage {
 
 		$series = array();
 		$legend = array();
-		foreach ( array( 'training', 'search', 'on-demand' ) as $cat ) {
+		foreach ( array( 'training', 'search', 'on-demand', 'unknown' ) as $cat ) {
 			$series[]       = array(
 				'name'  => $cat,
 				'color' => self::CATEGORY_COLORS[ $cat ],

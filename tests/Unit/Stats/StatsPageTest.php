@@ -533,6 +533,26 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'Requests by purpose', $output );
     }
 
+    public function test_chart_plots_unknown_so_bars_sum_to_summary_total(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 6 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 4 ],
+        ] );
+
+        $output = $this->render();
+
+        // Legend lists all four categories, Unknown last (top of the stack).
+        $this->assertMatchesRegularExpression( '/mfa-legend.*?Training.*?Search.*?On-demand.*?Unknown/s', $output );
+
+        // Today's bar stacks GPTBot (training, 6) and curl (unknown, 4): segment
+        // heights must add up to the full bar for the 10-request summary total.
+        preg_match_all( '/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="([^"]*)" fill="(#B3B8C8|#D9DCE3)"\/>/', $output, $m );
+        $heights = array_combine( $m[2], array_map( 'floatval', $m[1] ) );
+        $this->assertEqualsWithDelta( 6 / 4, $heights['#B3B8C8'] / $heights['#D9DCE3'], 0.01 );
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">10</s', $output );
+    }
+
     public function test_purpose_section_defines_every_category(): void {
         $this->stub_empty_repository();
 
