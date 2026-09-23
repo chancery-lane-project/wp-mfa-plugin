@@ -544,6 +544,8 @@ class StatsPageTest extends TestCase {
         foreach ( [ 'On-demand', 'Search', 'Training', 'Unknown' ] as $label ) {
             $this->assertStringContainsString( '<strong>' . $label . '</strong>: ', $output );
         }
+        $this->assertStringContainsString( "<strong>Unknown</strong>: agents whose purpose we can&#039;t identify.", $output );
+        $this->assertStringContainsString( "<strong>Unattributed</strong>: agents whose operator we haven&#039;t identified.", $output );
         // The section sits between the operator cards and the chart.
         $this->assertLessThan( strpos( $output, '<div class="postbox mfa-chart-card">' ), strpos( $output, '>Purpose</h2>' ) );
         $this->assertGreaterThan( strpos( $output, '>Operators</h2>' ), strpos( $output, '>Purpose</h2>' ) );

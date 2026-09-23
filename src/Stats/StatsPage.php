@@ -426,7 +426,15 @@ class StatsPage {
 					?>
 					<a href="<?php echo esc_url( $this->operator_url( $filter_operator, $filter_operator, $filter_agent ) ); ?>"><?php esc_html_e( 'Clear operator filter', 'markdown-for-agents-and-statistics' ); ?></a>
 				<?php else : ?>
-					<?php esc_html_e( 'Select an operator to filter the whole report. Unattributed covers agents without reviewed operator details.', 'markdown-for-agents-and-statistics' ); ?>
+					<?php esc_html_e( 'Select an operator to filter the whole report.', 'markdown-for-agents-and-statistics' ); ?>
+					<?php
+					// Worded in parallel with the Purpose "Unknown" definition: different question, same shape.
+					printf(
+						'<strong>%1$s</strong>: %2$s',
+						esc_html( $this->operator_name( DashboardSummary::UNATTRIBUTED ) ),
+						esc_html__( "agents whose operator we haven't identified.", 'markdown-for-agents-and-statistics' )
+					);
+					?>
 				<?php endif; ?>
 			</p>
 
@@ -480,7 +488,7 @@ class StatsPage {
 					'on-demand' => __( 'fetched because a person asked an AI assistant, so it is the best estimate of human reads.', 'markdown-for-agents-and-statistics' ),
 					'search'    => __( 'indexing for AI search answers and citations.', 'markdown-for-agents-and-statistics' ),
 					'training'  => __( 'collecting content to train models.', 'markdown-for-agents-and-statistics' ),
-					'unknown'   => __( 'agents that cannot be classified.', 'markdown-for-agents-and-statistics' ),
+					'unknown'   => __( "agents whose purpose we can't identify.", 'markdown-for-agents-and-statistics' ),
 				);
 				foreach ( $purposes as $cat => $definition ) {
 					printf( '<strong>%1$s</strong>: %2$s ', esc_html( $this->category_label( $cat ) ), esc_html( $definition ) );
