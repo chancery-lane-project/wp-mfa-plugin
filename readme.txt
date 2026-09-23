@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1
-Stable tag: 1.7.1
+Stable tag: 1.7.2
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -179,7 +179,7 @@ The plugin counts singular-post Markdown GET selections made by WordPress, not
 all agent traffic or confirmed body delivery. HEAD and other methods, taxonomy
 archives, HTML fallback, direct static exports and bundles do not increment
 these counters. Neither do cache hits or requests blocked before WordPress.
-Versions up to 1.7.1 also counted negotiated singular HEAD requests; the GET-only
+Versions up to 1.7.2 also counted negotiated singular HEAD requests; the GET-only
 correction is listed under Unreleased below.
 
 Complete discovery and probes before a baseline snapshot because GET probes can
@@ -304,7 +304,7 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= Unreleased =
+= 1.7.2 =
 * Feature: the statistics page opens on the last 7 days by default. Last 30 days, This month, All time and custom dates are unchanged.
 * Feature: statistics dashboard summary showing recorded Markdown requests, most requested page, leading agent and leading operator for the selected filters and date range. Ties are shown as ties, and deleted posts are labelled by ID.
 * Feature: operator cards (OpenAI, Anthropic, Google, …) with per-agent totals. Selecting a card filters the summary, chart and tables while keeping other filters. Agents without reviewed operator details are counted under Unattributed, so the cards always add up to the total. New `markdown_for_agents_agent_operators` filter.
