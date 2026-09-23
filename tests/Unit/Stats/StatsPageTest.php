@@ -530,7 +530,23 @@ class StatsPageTest extends TestCase {
 
         $this->assertStringContainsString( 'mfa-chart-card', $output );
         $this->assertStringContainsString( '<svg', $output );
-        $this->assertStringContainsString( 'AI access by intent', $output );
+        $this->assertStringContainsString( 'Requests by purpose', $output );
+    }
+
+    public function test_purpose_section_defines_every_category(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '<h2 class="mfa-section-title">Purpose</h2>', $output );
+        foreach ( [ 'On-demand', 'Search', 'Training', 'Unknown' ] as $label ) {
+            $this->assertStringContainsString( '<strong>' . $label . '</strong>: ', $output );
+        }
+        // The section sits between the operator cards and the chart.
+        $this->assertLessThan( strpos( $output, '<div class="postbox mfa-chart-card">' ), strpos( $output, '>Purpose</h2>' ) );
+        $this->assertGreaterThan( strpos( $output, '>Operators</h2>' ), strpos( $output, '>Purpose</h2>' ) );
     }
 
     public function test_render_page_shows_on_demand_headline_as_estimate(): void {

@@ -324,7 +324,7 @@ class StatsPage {
 
 			<style>
 				/* Chrome (border, shadow, header, padding) is inherited from core .postbox/.inside. */
-				.mfa-chart-card { margin-block-start: 20px; }
+				.mfa-chart-card { margin-block-start: 12px; }
 				.mfa-chart svg { display: block; width: 100%; height: auto; --grid: #dcdcde; --muted: #646970; }
 				.mfa-legend { display: flex; gap: 16px; font-size: 13px; font-weight: 400; color: #50575e; padding-right: 12px; }
 				.mfa-legend i { display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; }
@@ -472,9 +472,25 @@ class StatsPage {
 				</ul>
 			<?php endif; ?>
 
+			<h2 class="mfa-section-title"><?php esc_html_e( 'Purpose', 'markdown-for-agents-and-statistics' ); ?></h2>
+			<p class="description">
+				<?php
+				// One string per category so translators can reorder freely; names are bold for scanning.
+				$purposes = array(
+					'on-demand' => __( 'fetched because a person asked an AI assistant, so it is the best estimate of human reads.', 'markdown-for-agents-and-statistics' ),
+					'search'    => __( 'indexing for AI search answers and citations.', 'markdown-for-agents-and-statistics' ),
+					'training'  => __( 'collecting content to train models.', 'markdown-for-agents-and-statistics' ),
+					'unknown'   => __( 'agents that cannot be classified.', 'markdown-for-agents-and-statistics' ),
+				);
+				foreach ( $purposes as $cat => $definition ) {
+					printf( '<strong>%1$s</strong>: %2$s ', esc_html( $this->category_label( $cat ) ), esc_html( $definition ) );
+				}
+				?>
+			</p>
+
 			<div class="postbox mfa-chart-card">
 				<div class="postbox-header">
-					<h2 class="hndle"><?php esc_html_e( 'AI access by intent', 'markdown-for-agents-and-statistics' ); ?></h2>
+					<h3 class="hndle"><?php esc_html_e( 'Requests by purpose', 'markdown-for-agents-and-statistics' ); ?></h3>
 					<div class="mfa-legend">
 						<?php foreach ( $chart['legend'] as $cat => $color ) : ?>
 							<span><i style="background:<?php echo esc_attr( $color ); ?>"></i><?php echo esc_html( $this->category_label( $cat ) ); ?></span>
