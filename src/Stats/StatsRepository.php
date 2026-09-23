@@ -323,19 +323,23 @@ class StatsRepository {
 	/**
 	 * Return post IDs and titles for posts that have at least one stat row.
 	 *
+	 * Titles come from the same query (raw post_title, unfiltered) so the page
+	 * list costs one round trip however many posts have stats. A deleted post
+	 * maps to ''.
+	 *
 	 * @since  1.1.0
 	 * @return array<int, string> Map of post_id => title.
 	 */
 	public function get_posts_with_stats(): array {
 		$table = self::get_table_name( $this->wpdb );
+		$posts = $this->wpdb->posts;
 		$rows  = $this->wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			"SELECT DISTINCT post_id FROM {$table} ORDER BY post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			"SELECT s.post_id, p.post_title FROM (SELECT DISTINCT post_id FROM {$table}) s LEFT JOIN {$posts} p ON p.ID = s.post_id ORDER BY s.post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 
 		$result = array();
 		foreach ( $rows as $row ) {
-			$id            = (int) $row->post_id;
-			$result[ $id ] = get_the_title( $id );
+			$result[ (int) $row->post_id ] = (string) ( $row->post_title ?? '' );
 		}
 
 		return $result;

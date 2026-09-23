@@ -101,6 +101,22 @@ class StatsPage {
 		$filter_operator      = isset( $_GET['operator'] ) ? sanitize_key( (string) $_GET['operator'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
 
+		// Page filter: the search box submits post_search (a datalist label), which
+		// wins over post_id; summary links set post_id and drop post_search.
+		$posts          = $this->repository->get_posts_with_stats();
+		$post_options   = $this->post_options( $posts );
+		$post_search    = isset( $_GET['post_search'] ) ? trim( sanitize_text_field( wp_unslash( (string) $_GET['post_search'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
+		$post_unmatched = '';
+		if ( null !== $post_search ) {
+			$filter_post_id = $this->resolve_post_search( $post_search, $post_options );
+			if ( 0 === $filter_post_id && '' !== $post_search ) {
+				$post_unmatched = $post_search;
+			}
+		}
+		$post_search_value = '' !== $post_unmatched
+			? $post_unmatched
+			: ( $post_options[ $filter_post_id ] ?? ( $filter_post_id > 0 ? $this->post_label( $filter_post_id ) : '' ) );
+
 		if ( '' !== $filter_operator && DashboardSummary::UNATTRIBUTED !== $filter_operator && ! array_key_exists( $filter_operator, $this->agent_detector->get_agent_operators() ) ) {
 			$filter_operator = '';
 		}
@@ -208,7 +224,6 @@ class StatsPage {
 
 		$rows        = $this->repository->get_stats( $filters );
 		$total       = $this->repository->get_total_count( $count_filters );
-		$posts       = $this->repository->get_posts_with_stats();
 		$total_pages = (int) ceil( $total / self::PER_PAGE );
 
 		// One per-day, per-agent fetch feeds the summary, operator cards and chart,
@@ -233,7 +248,7 @@ class StatsPage {
 				$dashboard['top_page'],
 				'page',
 				fn( $id ) => $this->post_label( (int) $id ),
-				fn( $id ) => $this->filter_url( array( 'post_id' => (int) $id ) )
+				fn( $id ) => $this->filter_url( array( 'post_id' => (int) $id ), array( 'post_search' ) )
 			),
 			'agent'    => $this->leader_html(
 				$dashboard['top_agent'],
@@ -283,14 +298,15 @@ class StatsPage {
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
 					<div class="alignleft actions">
-						<select name="post_id" aria-label="<?php esc_attr_e( 'Filter by post', 'markdown-for-agents-and-statistics' ); ?>">
-							<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents-and-statistics' ); ?></option>
-							<?php foreach ( $posts as $id => $title ) : ?>
-								<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
-									<?php echo esc_html( '' !== $title ? $title : $this->post_label( (int) $id ) ); ?>
-								</option>
+						<input type="search" name="post_search" list="mfa-post-options" autocomplete="off"
+							value="<?php echo esc_attr( $post_search_value ); ?>"
+							placeholder="<?php esc_attr_e( 'All pages', 'markdown-for-agents-and-statistics' ); ?>"
+							aria-label="<?php esc_attr_e( 'Filter by page: type to search', 'markdown-for-agents-and-statistics' ); ?>">
+						<datalist id="mfa-post-options">
+							<?php foreach ( $post_options as $label ) : ?>
+								<option value="<?php echo esc_attr( $label ); ?>"></option>
 							<?php endforeach; ?>
-						</select>
+						</datalist>
 						<select name="operator" aria-label="<?php esc_attr_e( 'Filter by operator', 'markdown-for-agents-and-statistics' ); ?>">
 							<option value=""><?php esc_html_e( 'All operators', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( $operator_options as $key => $name ) : ?>
@@ -323,6 +339,14 @@ class StatsPage {
 					</div>
 					<br class="clear">
 				</div>
+				<?php if ( '' !== $post_unmatched ) : ?>
+					<p class="description" role="status">
+						<?php
+						/* translators: %s: the page search text the user entered. */
+						echo esc_html( sprintf( __( 'No recorded page matches “%s”. Showing all pages.', 'markdown-for-agents-and-statistics' ), $post_unmatched ) );
+						?>
+					</p>
+				<?php endif; ?>
 			</form>
 
 			<style>
@@ -984,6 +1008,69 @@ class StatsPage {
 	 */
 	private function agent_label( string $agent ): string {
 		return '' !== $agent ? $agent : __( '(unknown)', 'markdown-for-agents-and-statistics' );
+	}
+
+	/**
+	 * Datalist labels for the page search, sorted by label.
+	 *
+	 * Untitled and deleted posts fall back to post_label(); duplicate labels get
+	 * a "(#id)" suffix so every label resolves to exactly one post.
+	 *
+	 * @since  1.7.2
+	 * @param  array<int, string> $posts Map of post_id => title from get_posts_with_stats().
+	 * @return array<int, string>        Map of post_id => unique label.
+	 */
+	private function post_options( array $posts ): array {
+		$labels = array();
+		foreach ( $posts as $id => $title ) {
+			$labels[ (int) $id ] = '' !== $title ? $title : $this->post_label( (int) $id );
+		}
+
+		$counts = array_count_values( array_map( 'mb_strtolower', $labels ) );
+		foreach ( $labels as $id => $label ) {
+			if ( $counts[ mb_strtolower( $label ) ] > 1 ) {
+				$labels[ $id ] = sprintf( '%s (#%d)', $label, $id );
+			}
+		}
+
+		asort( $labels, SORT_NATURAL | SORT_FLAG_CASE );
+
+		return $labels;
+	}
+
+	/**
+	 * Resolve page search text to a post ID.
+	 *
+	 * Tries an exact label, then a case-insensitive one, then a trailing "#123"
+	 * for a post with stats. Returns 0 for empty or unmatched text.
+	 *
+	 * @since  1.7.2
+	 * @param  string             $search  Text from the search box.
+	 * @param  array<int, string> $options Map of post_id => label from post_options().
+	 * @return int
+	 */
+	private function resolve_post_search( string $search, array $options ): int {
+		if ( '' === $search ) {
+			return 0;
+		}
+
+		$id = array_search( $search, $options, true );
+		if ( false !== $id ) {
+			return (int) $id;
+		}
+
+		$needle = mb_strtolower( $search );
+		foreach ( $options as $id => $label ) {
+			if ( mb_strtolower( $label ) === $needle ) {
+				return (int) $id;
+			}
+		}
+
+		if ( preg_match( '/#(\d+)\)?$/', $search, $m ) && isset( $options[ (int) $m[1] ] ) ) {
+			return (int) $m[1];
+		}
+
+		return 0;
 	}
 
 	/**

@@ -130,14 +130,22 @@ class StatsRepositoryTest extends TestCase {
     }
 
     public function test_get_posts_with_stats_returns_id_title_pairs(): void {
-        $GLOBALS['_mock_post_titles'] = [ 1 => 'Hello World', 2 => 'Another Post' ];
         $this->wpdb->mock_get_results = [
-            (object) [ 'post_id' => 1 ],
-            (object) [ 'post_id' => 2 ],
+            (object) [ 'post_id' => 1, 'post_title' => 'Hello World' ],
+            (object) [ 'post_id' => 2, 'post_title' => 'Another Post' ],
+            (object) [ 'post_id' => 3, 'post_title' => null ],
         ];
 
         $posts = $this->repo->get_posts_with_stats();
-        $this->assertSame( [ 1 => 'Hello World', 2 => 'Another Post' ], $posts );
+        $this->assertSame( [ 1 => 'Hello World', 2 => 'Another Post', 3 => '' ], $posts );
+    }
+
+    public function test_get_posts_with_stats_joins_titles_in_one_query(): void {
+        $this->wpdb->mock_get_results = [];
+        $this->repo->get_posts_with_stats();
+
+        $this->assertCount( 1, $this->wpdb->queries );
+        $this->assertStringContainsString( 'LEFT JOIN wp_posts', $this->wpdb->queries[0]['query'] );
     }
 
     public function test_get_stats_with_post_id_and_agent_filters(): void {

@@ -850,6 +850,100 @@ class StatsPageTest extends TestCase {
     // Dashboard summary and operator cards (1.7.2)
     // ---------------------------------------------------------------------
 
+    /**
+     * Stub a repository with recorded pages and capture the count filters.
+     */
+    private function stub_post_search_repository( array $posts, ?array &$captured = null ): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( $posts );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturnCallback(
+            function ( array $filters ) use ( &$captured ): int {
+                $captured = $filters;
+                return 0;
+            }
+        );
+    }
+
+    public function test_page_filter_is_a_searchable_datalist(): void {
+        $GLOBALS['_mock_post_objects'] = [];
+        $GLOBALS['_mock_post_titles']  = [ 4 => '' ];
+        $this->stub_post_search_repository( [ 3 => 'glossary', 1 => 'Clause library', 5 => 'Model clauses', 9 => 'Model clauses', 4 => '' ] );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringContainsString( '<input type="search" name="post_search" list="mfa-post-options"', $output );
+        $this->assertStringNotContainsString( '<select name="post_id"', $output );
+        // Sorted by label, case-insensitively; duplicates disambiguated; deleted posts labelled.
+        $this->assertMatchesRegularExpression(
+            '/value="\(deleted post #4\)".*value="Clause library".*value="glossary".*value="Model clauses \(#5\)".*value="Model clauses \(#9\)"/s',
+            $output
+        );
+    }
+
+    public function test_page_search_resolves_label_to_post_filter(): void {
+        $_GET['post_search'] = 'model clauses (#9)';
+        $captured = null;
+        $this->stub_post_search_repository( [ 5 => 'Model clauses', 9 => 'Model clauses', 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertSame( 9, $captured['post_id'] );
+        $this->assertStringContainsString( 'value="Model clauses (#9)"', $output );
+        $this->assertStringNotContainsString( 'No recorded page matches', $output );
+    }
+
+    public function test_page_search_overrides_post_id_and_empty_clears_it(): void {
+        $_GET['post_id']     = '1';
+        $_GET['post_search'] = '';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $this->render();
+
+        $this->assertArrayNotHasKey( 'post_id', $captured );
+    }
+
+    public function test_post_id_link_prefills_search_box(): void {
+        $_GET['post_id'] = '1';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertSame( 1, $captured['post_id'] );
+        $this->assertMatchesRegularExpression( '/name="post_search"[^>]*value="Clause library"/s', $output );
+    }
+
+    public function test_unmatched_page_search_shows_notice_and_all_pages(): void {
+        $_GET['post_search'] = 'Nope';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertArrayNotHasKey( 'post_id', $captured );
+        $this->assertStringContainsString( 'No recorded page matches “Nope”. Showing all pages.', $output );
+        $this->assertMatchesRegularExpression( '/name="post_search"[^>]*value="Nope"/s', $output );
+    }
+
+    public function test_most_requested_page_link_drops_page_search(): void {
+        $_GET['post_search'] = 'Clause library';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Glossary' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ],
+            [ (object) [ 'post_id' => 7, 'total' => 5 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertMatchesRegularExpression( '/Most requested page.*?href="[^"]*post_id=7[^"]*"/s', $output );
+        $this->assertDoesNotMatchRegularExpression( '/Most requested page.*?href="[^"]*post_search[^"]*post_id=7/s', $output );
+    }
+
     private function render(): string {
         ob_start();
         $this->page->render_page();
@@ -1044,7 +1138,7 @@ class StatsPageTest extends TestCase {
 
         $output = $this->render();
 
-        foreach ( [ 'Filter by post', 'Filter by operator', 'Filter by agent', 'Filter by access method' ] as $label ) {
+        foreach ( [ 'Filter by page: type to search', 'Filter by operator', 'Filter by agent', 'Filter by access method' ] as $label ) {
             $this->assertStringContainsString( 'aria-label="' . $label . '"', $output );
         }
     }
