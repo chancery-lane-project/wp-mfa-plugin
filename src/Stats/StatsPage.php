@@ -420,69 +420,6 @@ class StatsPage {
 				</div>
 			</div>
 
-			<h2 class="mfa-section-title"><?php esc_html_e( 'Operators', 'markdown-for-agents-and-statistics' ); ?></h2>
-			<p class="description">
-				<?php if ( '' !== $filter_operator ) : ?>
-					<?php
-					/* translators: %s: operator name, e.g. "OpenAI". */
-					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->operator_name( $filter_operator ) ) );
-					?>
-					<a href="<?php echo esc_url( $this->operator_url( $filter_operator, $filter_operator, $filter_agent ) ); ?>"><?php esc_html_e( 'Clear operator filter', 'markdown-for-agents-and-statistics' ); ?></a>
-				<?php else : ?>
-					<?php esc_html_e( 'Select an operator to filter the whole report.', 'markdown-for-agents-and-statistics' ); ?>
-					<?php
-					// Worded in parallel with the Purpose "Unknown" definition: different question, same shape.
-					printf(
-						'<strong>%1$s</strong>: %2$s',
-						esc_html( $this->operator_name( DashboardSummary::UNATTRIBUTED ) ),
-						esc_html__( "agents whose operator we haven't identified.", 'markdown-for-agents-and-statistics' )
-					);
-					?>
-				<?php endif; ?>
-			</p>
-
-			<?php if ( empty( $dashboard['operators'] ) ) : ?>
-				<p><?php esc_html_e( 'No requests recorded for these filters.', 'markdown-for-agents-and-statistics' ); ?></p>
-			<?php else : ?>
-				<ul class="mfa-operators">
-					<?php foreach ( $dashboard['operators'] as $operator ) : ?>
-						<?php
-						$is_active = $operator['key'] === $filter_operator;
-						$name      = $this->operator_name( $operator['key'] );
-						?>
-						<li class="postbox mfa-operator<?php echo $is_active ? ' is-active' : ''; ?>">
-							<div class="inside">
-								<h3>
-									<a href="<?php echo esc_url( $this->operator_url( $operator['key'], $filter_operator, $filter_agent ) ); ?>"
-										<?php echo $is_active ? 'aria-current="true"' : ''; ?>
-										aria-label="<?php echo esc_attr( $is_active ? sprintf( /* translators: %s: operator name. */ __( '%s, filtered: remove operator filter', 'markdown-for-agents-and-statistics' ), $name ) : sprintf( /* translators: %s: operator name. */ __( '%s: filter report by this operator', 'markdown-for-agents-and-statistics' ), $name ) ); ?>"><?php echo esc_html( $name ); ?></a>
-									<?php if ( $is_active ) : ?>
-										<span class="mfa-badge" aria-hidden="true"><?php esc_html_e( 'Filtered', 'markdown-for-agents-and-statistics' ); ?></span>
-									<?php endif; ?>
-								</h3>
-								<div class="num">
-									<?php echo esc_html( number_format_i18n( $operator['total'] ) ); ?>
-									<small><?php echo esc_html( _n( 'request', 'requests', $operator['total'], 'markdown-for-agents-and-statistics' ) ); ?></small>
-								</div>
-								<ul>
-									<?php foreach ( $operator['agents'] as $agent_row ) : ?>
-										<li><span><?php echo esc_html( $this->agent_label( $agent_row['label'] ) ); ?></span><span><?php echo esc_html( number_format_i18n( $agent_row['total'] ) ); ?></span></li>
-									<?php endforeach; ?>
-									<?php if ( $operator['more'] > 0 ) : ?>
-										<li class="more">
-											<?php
-											/* translators: %s: number of further agents not listed on the card. */
-											echo esc_html( sprintf( _n( '+%s more agent', '+%s more agents', $operator['more'], 'markdown-for-agents-and-statistics' ), number_format_i18n( $operator['more'] ) ) );
-											?>
-										</li>
-									<?php endif; ?>
-								</ul>
-							</div>
-						</li>
-					<?php endforeach; ?>
-				</ul>
-			<?php endif; ?>
-
 			<h2 class="mfa-section-title"><?php esc_html_e( 'Purpose', 'markdown-for-agents-and-statistics' ); ?></h2>
 			<p class="description">
 				<?php
@@ -567,6 +504,69 @@ class StatsPage {
 					</div>
 				</div>
 			</div>
+
+			<h2 class="mfa-section-title"><?php esc_html_e( 'Operators', 'markdown-for-agents-and-statistics' ); ?></h2>
+			<p class="description">
+				<?php if ( '' !== $filter_operator ) : ?>
+					<?php
+					/* translators: %s: operator name, e.g. "OpenAI". */
+					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->operator_name( $filter_operator ) ) );
+					?>
+					<a href="<?php echo esc_url( $this->operator_url( $filter_operator, $filter_operator, $filter_agent ) ); ?>"><?php esc_html_e( 'Clear operator filter', 'markdown-for-agents-and-statistics' ); ?></a>
+				<?php else : ?>
+					<?php esc_html_e( 'Select an operator to filter the whole report.', 'markdown-for-agents-and-statistics' ); ?>
+					<?php
+					// Worded in parallel with the Purpose "Unknown" definition: different question, same shape.
+					printf(
+						'<strong>%1$s</strong>: %2$s',
+						esc_html( $this->operator_name( DashboardSummary::UNATTRIBUTED ) ),
+						esc_html__( "agents whose operator we haven't identified.", 'markdown-for-agents-and-statistics' )
+					);
+					?>
+				<?php endif; ?>
+			</p>
+
+			<?php if ( empty( $dashboard['operators'] ) ) : ?>
+				<p><?php esc_html_e( 'No requests recorded for these filters.', 'markdown-for-agents-and-statistics' ); ?></p>
+			<?php else : ?>
+				<ul class="mfa-operators">
+					<?php foreach ( $dashboard['operators'] as $operator ) : ?>
+						<?php
+						$is_active = $operator['key'] === $filter_operator;
+						$name      = $this->operator_name( $operator['key'] );
+						?>
+						<li class="postbox mfa-operator<?php echo $is_active ? ' is-active' : ''; ?>">
+							<div class="inside">
+								<h3>
+									<a href="<?php echo esc_url( $this->operator_url( $operator['key'], $filter_operator, $filter_agent ) ); ?>"
+										<?php echo $is_active ? 'aria-current="true"' : ''; ?>
+										aria-label="<?php echo esc_attr( $is_active ? sprintf( /* translators: %s: operator name. */ __( '%s, filtered: remove operator filter', 'markdown-for-agents-and-statistics' ), $name ) : sprintf( /* translators: %s: operator name. */ __( '%s: filter report by this operator', 'markdown-for-agents-and-statistics' ), $name ) ); ?>"><?php echo esc_html( $name ); ?></a>
+									<?php if ( $is_active ) : ?>
+										<span class="mfa-badge" aria-hidden="true"><?php esc_html_e( 'Filtered', 'markdown-for-agents-and-statistics' ); ?></span>
+									<?php endif; ?>
+								</h3>
+								<div class="num">
+									<?php echo esc_html( number_format_i18n( $operator['total'] ) ); ?>
+									<small><?php echo esc_html( _n( 'request', 'requests', $operator['total'], 'markdown-for-agents-and-statistics' ) ); ?></small>
+								</div>
+								<ul>
+									<?php foreach ( $operator['agents'] as $agent_row ) : ?>
+										<li><span><?php echo esc_html( $this->agent_label( $agent_row['label'] ) ); ?></span><span><?php echo esc_html( number_format_i18n( $agent_row['total'] ) ); ?></span></li>
+									<?php endforeach; ?>
+									<?php if ( $operator['more'] > 0 ) : ?>
+										<li class="more">
+											<?php
+											/* translators: %s: number of further agents not listed on the card. */
+											echo esc_html( sprintf( _n( '+%s more agent', '+%s more agents', $operator['more'], 'markdown-for-agents-and-statistics' ), number_format_i18n( $operator['more'] ) ) );
+											?>
+										</li>
+									<?php endif; ?>
+								</ul>
+							</div>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>

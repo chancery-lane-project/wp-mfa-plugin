@@ -566,9 +566,16 @@ class StatsPageTest extends TestCase {
         }
         $this->assertStringContainsString( "<strong>Unknown</strong>: agents whose purpose we can&#039;t identify.", $output );
         $this->assertStringContainsString( "<strong>Unattributed</strong>: agents whose operator we haven&#039;t identified.", $output );
-        // The section sits between the operator cards and the chart.
-        $this->assertLessThan( strpos( $output, '<div class="postbox mfa-chart-card">' ), strpos( $output, '>Purpose</h2>' ) );
-        $this->assertGreaterThan( strpos( $output, '>Operators</h2>' ), strpos( $output, '>Purpose</h2>' ) );
+        // Section order: Summary, Purpose (heading then chart), Operators, daily records.
+        $summary   = strpos( $output, 'Summary · ' );
+        $purpose   = strpos( $output, '>Purpose</h2>' );
+        $chart     = strpos( $output, '<div class="postbox mfa-chart-card">' );
+        $operators = strpos( $output, '>Operators</h2>' );
+        $records   = strpos( $output, 'column-post' );
+        $this->assertLessThan( $purpose, $summary );
+        $this->assertLessThan( $chart, $purpose );
+        $this->assertLessThan( $operators, $chart );
+        $this->assertLessThan( $records, $operators );
     }
 
     public function test_render_page_shows_on_demand_headline_as_estimate(): void {
