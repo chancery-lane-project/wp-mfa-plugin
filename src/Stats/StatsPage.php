@@ -20,8 +20,8 @@ class StatsPage {
 	private const PAGE_SLUG = 'markdown-for-agents-stats';
 	private const PER_PAGE  = 50;
 
-	/** Chart window when no explicit date range is set (days, inclusive). */
-	private const CHART_DEFAULT_DAYS = 30;
+	/** Report window when no explicit date range is set (days, inclusive, ending today UTC). */
+	private const DEFAULT_RANGE_DAYS = 7;
 
 	/** Above this span (days) the chart switches from daily to monthly bars. */
 	private const CHART_DAY_SPAN_MAX = 92;
@@ -95,13 +95,13 @@ class StatsPage {
 
 		// Window anchors (UTC).
 		$today       = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
-		$seven_ago   = ( clone $today )->modify( '-6 days' );
+		$seven_ago   = ( clone $today )->modify( '-' . ( self::DEFAULT_RANGE_DAYS - 1 ) . ' days' );
 		$thirty_ago  = ( clone $today )->modify( '-29 days' );
 		$month_start = ( clone $today )->modify( 'first day of this month' );
 		$today_str   = $today->format( 'Y-m-d' );
 
 		// "All time" is an explicit choice via ?range=all; otherwise the page
-		// defaults to the last 30 days so the chart and table always agree.
+		// defaults to the last 7 days so the chart and table always agree.
 		$is_all_time = isset( $_GET['range'] ) && 'all' === sanitize_key( (string) $_GET['range'] ); // phpcs:ignore WordPress.Security.NonceVerification
 
 		$date_from = '';
@@ -126,8 +126,8 @@ class StatsPage {
 			$date_from = '';
 			$date_to   = '';
 		} elseif ( '' === $date_from && '' === $date_to ) {
-			// Default view: last 30 days.
-			$date_from = $thirty_ago->format( 'Y-m-d' );
+			// Default view: last 7 days (the "Last 7 days" preset).
+			$date_from = $seven_ago->format( 'Y-m-d' );
 			$date_to   = $today_str;
 		}
 
@@ -574,7 +574,7 @@ class StatsPage {
 	 * Resolve the chart window to a [start, end] DateTime pair.
 	 *
 	 * Uses explicit bounds when given; for all-time (null bounds) derives the
-	 * span from the data; falls back to the last 30 days when there is no data.
+	 * span from the data; falls back to the default range when there is no data.
 	 *
 	 * @since  1.5.0
 	 * @param  string|null         $from
@@ -604,7 +604,7 @@ class StatsPage {
 
 		if ( false === $start || false === $end || ! ( $start instanceof \DateTime ) || ! ( $end instanceof \DateTime ) || $end < $start ) {
 			$end   = new \DateTime( 'now', $tz );
-			$start = ( clone $end )->modify( '-' . ( self::CHART_DEFAULT_DAYS - 1 ) . ' days' );
+			$start = ( clone $end )->modify( '-' . ( self::DEFAULT_RANGE_DAYS - 1 ) . ' days' );
 		}
 
 		$start->setTime( 0, 0 );

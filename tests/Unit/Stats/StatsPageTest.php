@@ -691,8 +691,45 @@ class StatsPageTest extends TestCase {
         $this->assertMatchesRegularExpression( '/Training crawls.*?>\s*40\s*</s', $output );
     }
 
-    public function test_render_page_defaults_to_last_30_days(): void {
-        // No $_GET → "Last 30 days" is the active preset, not "All time".
+    public function test_render_page_defaults_to_last_7_days(): void {
+        // No $_GET → "Last 7 days" is the active preset, not "All time" or "Last 30 days".
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="current">Last 7 days', $output );
+        $this->assertStringNotContainsString( 'class="current">Last 30 days', $output );
+        $this->assertStringNotContainsString( 'class="current">All time', $output );
+        // Default chart grain is daily.
+        $this->assertStringContainsString( 'daily', $output );
+    }
+
+    public function test_default_range_queries_last_7_days_inclusive_of_today(): void {
+        $today     = gmdate( 'Y-m-d' );
+        $seven_ago = gmdate( 'Y-m-d', strtotime( '-6 days' ) );
+
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_total_count' )
+            ->with( [ 'date_from' => $seven_ago, 'date_to' => $today ] )
+            ->willReturn( 0 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // Date inputs echo the default window so the form matches the report.
+        $this->assertStringContainsString( 'value="' . $seven_ago . '"', $output );
+        $this->assertStringContainsString( 'value="' . $today . '"', $output );
+    }
+
+    public function test_explicit_30_day_preset_still_active(): void {
+        $_GET['date_from'] = gmdate( 'Y-m-d', strtotime( '-29 days' ) );
+        $_GET['date_to']   = gmdate( 'Y-m-d' );
         $this->stub_empty_repository();
 
         ob_start();
@@ -700,9 +737,7 @@ class StatsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringContainsString( 'class="current">Last 30 days', $output );
-        $this->assertStringNotContainsString( 'class="current">All time', $output );
-        // Default chart grain is daily.
-        $this->assertStringContainsString( 'daily', $output );
+        $this->assertStringNotContainsString( 'class="current">Last 7 days', $output );
     }
 
     public function test_render_page_all_time_uses_range_param(): void {
