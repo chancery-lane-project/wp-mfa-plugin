@@ -269,4 +269,53 @@ class StatsRepositoryTest extends TestCase {
         $this->expectException( \InvalidArgumentException::class );
         $repo->delete_before_date( 0 );
     }
+
+    // ---------------------------------------------------------------------
+    // Operator filters and post totals (1.8.0)
+    // ---------------------------------------------------------------------
+
+    public function test_agents_in_filter_builds_in_clause(): void {
+        $this->repo->get_total_count( [ 'agents_in' => [ 'GPTBot', 'ChatGPT-User' ] ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( "agent IN ('GPTBot', 'ChatGPT-User')", $last['query'] );
+    }
+
+    public function test_empty_agents_in_filter_matches_nothing(): void {
+        $this->repo->get_daily_agent_totals( [ 'agents_in' => [] ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'WHERE 1 = 0', $last['query'] );
+    }
+
+    public function test_agents_not_in_filter_builds_not_in_clause(): void {
+        $this->repo->get_stats( [ 'agents_not_in' => [ 'GPTBot' ], 'date_from' => '2026-09-17' ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( "agent NOT IN ('GPTBot')", $last['query'] );
+        $this->assertStringContainsString( "access_date >= '2026-09-17'", $last['query'] );
+    }
+
+    public function test_empty_agents_not_in_filter_is_ignored(): void {
+        $this->repo->get_daily_agent_totals( [ 'agents_not_in' => [] ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringNotContainsString( 'NOT IN', $last['query'] );
+    }
+
+    public function test_get_post_totals_builds_bounded_grouped_query(): void {
+        $this->repo->get_post_totals( [ 'date_from' => '2026-09-17', 'agents_in' => [ 'GPTBot' ] ], 50 );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'GROUP BY post_id', $last['query'] );
+        $this->assertStringContainsString( 'ORDER BY total DESC, post_id ASC', $last['query'] );
+        $this->assertStringContainsString( "agent IN ('GPTBot')", $last['query'] );
+        $this->assertStringContainsString( 'LIMIT 50', $last['query'] );
+    }
+
+    public function test_get_post_totals_returns_mock_results(): void {
+        $this->wpdb->mock_get_results = [ (object) [ 'post_id' => 7, 'total' => 30 ] ];
+
+        $this->assertSame( 7, $this->repo->get_post_totals()[0]->post_id );
+    }
 }

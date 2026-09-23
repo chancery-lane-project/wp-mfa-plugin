@@ -800,4 +800,207 @@ class StatsPageTest extends TestCase {
         $this->repository->method( 'get_stats' )->willReturn( [] );
         $this->repository->method( 'get_total_count' )->willReturn( 0 );
     }
+
+    // ---------------------------------------------------------------------
+    // Dashboard summary and operator cards (1.8.0)
+    // ---------------------------------------------------------------------
+
+    private function render(): string {
+        ob_start();
+        $this->page->render_page();
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Stub a repository whose distinct labels span two operators plus an
+     * unattributed one, and capture the count filters the page applies.
+     */
+    private function stub_dashboard_repository( array $daily = [], array $posts = [], ?array &$captured = null ): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [ 'ChatGPT-User', 'ClaudeBot', 'GPTBot', 'curl' ] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturnCallback(
+            function ( array $filters ) use ( &$captured ): int {
+                $captured = $filters;
+                return 0;
+            }
+        );
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( $daily );
+        $this->repository->method( 'get_post_totals' )->willReturn( $posts );
+    }
+
+    public function test_summary_shows_range_and_headline_values(): void {
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library' ];
+        $this->stub_dashboard_repository(
+            [
+                (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 40 ],
+                (object) [ 'access_date' => $today, 'agent' => 'ClaudeBot', 'total' => 12 ],
+                (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 3 ],
+            ],
+            [ (object) [ 'post_id' => 7, 'total' => 30 ], (object) [ 'post_id' => 3, 'total' => 25 ] ]
+        );
+
+        $output = $this->render();
+
+        $range = gmdate( 'j M Y', strtotime( '-6 days' ) ) . ' – ' . gmdate( 'j M Y' );
+        $this->assertStringContainsString( 'Summary · ' . $range, $output );
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">55</s', $output );
+        $this->assertMatchesRegularExpression( '/Most requested page.*?post_id=7.*?>Clause library<.*?30 requests/s', $output );
+        $this->assertMatchesRegularExpression( '/Leading agent.*?agent=GPTBot.*?>GPTBot<.*?40 requests/s', $output );
+        $this->assertMatchesRegularExpression( '/Leading operator.*?operator=openai.*?>OpenAI<.*?40 requests/s', $output );
+        $this->assertStringContainsString( 'CDN or static cache', $output );
+        $GLOBALS['_mock_post_titles'] = [];
+    }
+
+    public function test_summary_total_matches_intent_total_card(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 4 ],
+        ] );
+
+        $output = $this->render();
+
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">11</s', $output );
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?>\s*11\s/s', $output );
+    }
+
+    public function test_summary_shows_ties_and_deleted_posts(): void {
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 4 => '', 9 => 'Glossary' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 8 ] ],
+            [ (object) [ 'post_id' => 4, 'total' => 4 ], (object) [ 'post_id' => 9, 'total' => 4 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringContainsString( 'Tied: 2 pages', $output );
+        $this->assertStringContainsString( '4 requests each', $output );
+        $this->assertStringContainsString( '(deleted post #4), Glossary', $output );
+    }
+
+    public function test_summary_empty_state(): void {
+        $this->stub_dashboard_repository();
+
+        $output = $this->render();
+
+        $this->assertStringContainsString( 'No pages requested in this range', $output );
+        $this->assertStringContainsString( 'No identified agents in this range', $output );
+        $this->assertStringContainsString( 'No attributed operators in this range', $output );
+        $this->assertStringContainsString( 'No requests recorded for these filters.', $output );
+    }
+
+    public function test_operator_cards_list_agents_and_link_to_filter(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 40 ],
+            (object) [ 'access_date' => $today, 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 3 ],
+        ] );
+
+        $output = $this->render();
+
+        $this->assertMatchesRegularExpression( '/operator=openai[^>]*aria-label="OpenAI: filter report by this operator">OpenAI<\/a>.*?47.*?GPTBot.*?40.*?ChatGPT-User.*?7/s', $output );
+        $this->assertMatchesRegularExpression( '/operator=unattributed[^>]*>Unattributed<\/a>.*?3.*?curl/s', $output );
+        // Unattributed card comes after the reviewed operators.
+        $this->assertLessThan( strpos( $output, '>Unattributed</a>' ), strpos( $output, '>OpenAI</a>' ) );
+        $this->assertStringNotContainsString( 'Clear operator filter', $output );
+    }
+
+    public function test_operator_filter_restricts_every_query_to_its_agents(): void {
+        $_GET['operator'] = 'openai';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_daily_agent_totals' )
+            ->with( $this->callback( fn( array $f ) => [ 'ChatGPT-User', 'GPTBot' ] === $f['agents_in'] ) );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_post_totals' )
+            ->with( $this->callback( fn( array $f ) => [ 'ChatGPT-User', 'GPTBot' ] === $f['agents_in'] ) );
+
+        $output = $this->render();
+
+        $this->assertSame( [ 'ChatGPT-User', 'GPTBot' ], $captured['agents_in'] );
+        $this->assertArrayNotHasKey( 'agents_not_in', $captured );
+        $this->assertStringContainsString( 'Showing OpenAI only.', $output );
+        $this->assertStringContainsString( 'Clear operator filter', $output );
+        // Agent dropdown narrows to the operator's agents.
+        $this->assertStringContainsString( '<option value="GPTBot"', $output );
+        $this->assertStringNotContainsString( '<option value="ClaudeBot"', $output );
+    }
+
+    public function test_unattributed_filter_excludes_attributed_agents(): void {
+        $_GET['operator'] = 'unattributed';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertSame( [ 'ChatGPT-User', 'ClaudeBot', 'GPTBot' ], $captured['agents_not_in'] );
+        $this->assertArrayNotHasKey( 'agents_in', $captured );
+    }
+
+    public function test_operator_filter_drops_agent_from_another_operator(): void {
+        $_GET['operator'] = 'openai';
+        $_GET['agent']    = 'ClaudeBot';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertArrayNotHasKey( 'agent', $captured );
+        $this->assertSame( [ 'ChatGPT-User', 'GPTBot' ], $captured['agents_in'] );
+    }
+
+    public function test_operator_filter_keeps_agent_it_runs(): void {
+        $_GET['operator']      = 'openai';
+        $_GET['agent']         = 'GPTBot';
+        $_GET['access_method'] = 'ua';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertSame( 'GPTBot', $captured['agent'] );
+        $this->assertSame( 'ua', $captured['access_method'] );
+    }
+
+    public function test_unknown_operator_param_is_ignored(): void {
+        $_GET['operator'] = 'not-a-real-operator';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $output = $this->render();
+
+        $this->assertArrayNotHasKey( 'agents_in', $captured );
+        $this->assertArrayNotHasKey( 'agents_not_in', $captured );
+        $this->assertStringNotContainsString( 'Clear operator filter', $output );
+    }
+
+    public function test_active_operator_card_is_marked_and_toggles_off(): void {
+        $_GET['operator'] = 'openai';
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ] );
+
+        $output = $this->render();
+
+        $this->assertStringContainsString( 'mfa-operator is-active', $output );
+        $this->assertStringContainsString( 'aria-current="true"', $output );
+        $this->assertStringContainsString( 'OpenAI, filtered: remove operator filter', $output );
+        $this->assertStringContainsString( '>Filtered<', $output );
+        $this->assertMatchesRegularExpression( '/<option value="openai"\s+selected/', $output );
+    }
+
+    public function test_filter_selects_have_accessible_labels(): void {
+        $this->stub_dashboard_repository();
+
+        $output = $this->render();
+
+        foreach ( [ 'Filter by post', 'Filter by operator', 'Filter by agent', 'Filter by access method' ] as $label ) {
+            $this->assertStringContainsString( 'aria-label="' . $label . '"', $output );
+        }
+    }
 }

@@ -9,8 +9,9 @@ use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 /**
  * Admin page for displaying agent access statistics.
  *
- * Registered as a top-level menu item. Shows an intent-aware daily chart and
- * stat cards above a filterable, paginated table of daily access counts.
+ * Registered as a top-level menu item. Shows a headline summary and operator
+ * cards, then an intent-aware daily chart and stat cards, above a filterable,
+ * paginated table of daily access counts. Every section reads the same filters.
  *
  * @since  1.1.0
  * @package Tclp\WpMarkdownForAgents\Stats
@@ -37,6 +38,9 @@ class StatsPage {
 
 	/** Hard cap on yearly bars (backstop for absurdly long histories). */
 	private const CHART_MAX_YEARS = 120;
+
+	/** Rows scanned for the most-requested page; a tie filling them all reads "50+". */
+	private const TOP_POSTS_SCAN = 50;
 
 	/**
 	 * Intent categories shown as series/cards, with brand display colour.
@@ -91,7 +95,32 @@ class StatsPage {
 		$filter_post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;    // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_agent         = isset( $_GET['agent'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['agent'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_access_method = isset( $_GET['access_method'] ) ? sanitize_key( (string) $_GET['access_method'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
+		$filter_operator      = isset( $_GET['operator'] ) ? sanitize_key( (string) $_GET['operator'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
+
+		if ( '' !== $filter_operator && DashboardSummary::UNATTRIBUTED !== $filter_operator && ! array_key_exists( $filter_operator, $this->agent_detector->get_agent_operators() ) ) {
+			$filter_operator = '';
+		}
+
+		// Operator of every recorded label. One distinct-labels query serves the
+		// operator filter, the agent dropdown and the card links.
+		$agents          = array_map( 'strval', $this->repository->get_distinct_agents() );
+		$agent_operators = array();
+		foreach ( $agents as $agent ) {
+			$agent_operators[ $agent ] = $this->operator_of( $agent );
+		}
+
+		$agent_options = $agents;
+		if ( '' !== $filter_operator ) {
+			$agent_options = array_values(
+				array_filter( $agents, fn( string $agent ) => $agent_operators[ $agent ] === $filter_operator )
+			);
+			// An agent run by a different operator can never match; the operator wins
+			// so the report is never silently empty.
+			if ( '' !== $filter_agent && $this->operator_of( $filter_agent ) !== $filter_operator ) {
+				$filter_agent = '';
+			}
+		}
 
 		// Window anchors (UTC).
 		$today       = new \DateTime( 'now', new \DateTimeZone( 'UTC' ) );
@@ -138,6 +167,16 @@ class StatsPage {
 		if ( '' !== $filter_agent ) {
 			$count_filters['agent'] = $filter_agent;
 		}
+		if ( DashboardSummary::UNATTRIBUTED === $filter_operator ) {
+			$attributed = array_values(
+				array_filter( $agents, fn( string $agent ) => DashboardSummary::UNATTRIBUTED !== $agent_operators[ $agent ] )
+			);
+			if ( ! empty( $attributed ) ) {
+				$count_filters['agents_not_in'] = $attributed;
+			}
+		} elseif ( '' !== $filter_operator ) {
+			$count_filters['agents_in'] = $agent_options;
+		}
 		if ( '' !== $filter_access_method ) {
 			$count_filters['access_method'] = $filter_access_method;
 		}
@@ -166,17 +205,57 @@ class StatsPage {
 
 		$rows        = $this->repository->get_stats( $filters );
 		$total       = $this->repository->get_total_count( $count_filters );
-		$agents      = $this->repository->get_distinct_agents();
 		$posts       = $this->repository->get_posts_with_stats();
 		$total_pages = (int) ceil( $total / self::PER_PAGE );
+
+		// One per-day, per-agent fetch feeds the summary, operator cards and chart,
+		// so they reconcile by construction; totals ignore table pagination.
+		$daily_rows = (array) $this->repository->get_daily_agent_totals( $count_filters );
+		$post_rows  = (array) $this->repository->get_post_totals( $count_filters, self::TOP_POSTS_SCAN );
+		$dashboard  = ( new DashboardSummary( $this->agent_detector ) )->build( $daily_rows, $post_rows, self::TOP_POSTS_SCAN );
 
 		// Intent-aware chart. Aligns with the table window; all-time spans the full
 		// history. Grain (daily vs monthly) adapts to the span inside build_chart_data().
 		$chart = $this->build_chart_data(
-			$count_filters,
+			$daily_rows,
 			$is_all_time ? null : $date_from,
 			$is_all_time ? null : $date_to
 		);
+
+		$range_label = $this->range_label( $date_from, $date_to );
+
+		// Summary tile bodies; leader_html() escapes everything it returns.
+		$leader_tiles = array(
+			'page'     => $this->leader_html(
+				$dashboard['top_page'],
+				'page',
+				fn( $id ) => $this->post_label( (int) $id ),
+				fn( $id ) => $this->filter_url( array( 'post_id' => (int) $id ) )
+			),
+			'agent'    => $this->leader_html(
+				$dashboard['top_agent'],
+				'agent',
+				fn( $label ) => $this->agent_label( (string) $label ),
+				fn( $label ) => $this->filter_url( array( 'agent' => (string) $label ) )
+			),
+			'operator' => $this->leader_html(
+				$dashboard['top_operator'],
+				'operator',
+				fn( $key ) => $this->operator_name( (string) $key ),
+				fn( $key ) => $this->operator_url( (string) $key, $filter_operator, $filter_agent )
+			),
+		);
+
+		// Operators offered in the filter form: any seen in recorded labels, plus
+		// the unattributed bucket and whichever is currently selected.
+		$operator_options = array();
+		foreach ( array_unique( array_merge( array_values( $agent_operators ), array( $filter_operator ) ) ) as $key ) {
+			if ( '' !== $key && DashboardSummary::UNATTRIBUTED !== $key ) {
+				$operator_options[ $key ] = $this->operator_name( $key );
+			}
+		}
+		asort( $operator_options, SORT_FLAG_CASE | SORT_STRING );
+		$operator_options[ DashboardSummary::UNATTRIBUTED ] = $this->operator_name( DashboardSummary::UNATTRIBUTED );
 
 		?>
 		<div class="wrap">
@@ -201,23 +280,31 @@ class StatsPage {
 				<input type="hidden" name="page" value="<?php echo esc_attr( self::PAGE_SLUG ); ?>">
 				<div class="tablenav top">
 					<div class="alignleft actions">
-						<select name="post_id">
+						<select name="post_id" aria-label="<?php esc_attr_e( 'Filter by post', 'markdown-for-agents-and-statistics' ); ?>">
 							<option value=""><?php esc_html_e( 'All posts', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( $posts as $id => $title ) : ?>
 								<option value="<?php echo esc_attr( (string) $id ); ?>" <?php selected( $filter_post_id, $id ); ?>>
-									<?php echo esc_html( $title ); ?>
+									<?php echo esc_html( '' !== $title ? $title : $this->post_label( (int) $id ) ); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
-						<select name="agent">
+						<select name="operator" aria-label="<?php esc_attr_e( 'Filter by operator', 'markdown-for-agents-and-statistics' ); ?>">
+							<option value=""><?php esc_html_e( 'All operators', 'markdown-for-agents-and-statistics' ); ?></option>
+							<?php foreach ( $operator_options as $key => $name ) : ?>
+								<option value="<?php echo esc_attr( (string) $key ); ?>" <?php selected( $filter_operator, (string) $key ); ?>>
+									<?php echo esc_html( $name ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<select name="agent" aria-label="<?php esc_attr_e( 'Filter by agent', 'markdown-for-agents-and-statistics' ); ?>">
 							<option value=""><?php esc_html_e( 'All agents', 'markdown-for-agents-and-statistics' ); ?></option>
-							<?php foreach ( $agents as $agent ) : ?>
+							<?php foreach ( $agent_options as $agent ) : ?>
 								<option value="<?php echo esc_attr( $agent ); ?>" <?php selected( $filter_agent, $agent ); ?>>
 									<?php echo esc_html( $agent ); ?>
 								</option>
 							<?php endforeach; ?>
 						</select>
-						<select name="access_method">
+						<select name="access_method" aria-label="<?php esc_attr_e( 'Filter by access method', 'markdown-for-agents-and-statistics' ); ?>">
 							<option value=""><?php esc_html_e( 'All methods', 'markdown-for-agents-and-statistics' ); ?></option>
 							<?php foreach ( array( 'ua', 'accept-header', 'query-param' ) as $method ) : ?>
 								<option value="<?php echo esc_attr( $method ); ?>" <?php selected( $filter_access_method, $method ); ?>>
@@ -242,14 +329,15 @@ class StatsPage {
 				.mfa-legend { display: flex; gap: 16px; font-size: 13px; font-weight: 400; color: #50575e; padding-right: 12px; }
 				.mfa-legend i { display: inline-block; width: 11px; height: 11px; margin-right: 6px; vertical-align: -1px; }
 				.mfa-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 16px 0 20px; }
-				.mfa-stats .postbox { margin-bottom: 0; }
+				/* Core .postbox has min-width: 255px, which overflows the grids on phones. */
+				.mfa-stats .postbox, .mfa-summary .postbox, .mfa-operators .postbox { margin-bottom: 0; min-width: 0; }
 				.mfa-stat.headline { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['on-demand'] ); ?>; }
 				.mfa-stat.total { border-left: 4px solid #1C2B58; }
 				.mfa-stat.search { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['search'] ); ?>; }
 				.mfa-stat.training { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['training'] ); ?>; }
 				.mfa-stat.unknown { border-left: 4px solid <?php echo esc_attr( self::CATEGORY_COLORS['unknown'] ); ?>; }
-				.mfa-stat .lab { font-size: 13px; color: #50575e; }
-				.mfa-stat .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
+				.mfa-stat .lab, .mfa-tile .lab { font-size: 13px; color: #50575e; }
+				.mfa-stat .num, .mfa-tile .num, .mfa-operator .num { font-size: 26px; font-weight: 600; margin-top: 6px; }
 				.mfa-stat .est { display: block; font-size: 11px; color: #646970; margin-top: 4px; font-weight: 400; }
 				/* Direction arrow is a CSS border-triangle (currentColor), not a glyph, so
 					it can't be re-flowed by WP's emoji replacement and stays aligned. */
@@ -263,8 +351,126 @@ class StatsPage {
 				.mfa-caption { margin: 2px 0 10px; }
 				.postbox-header { padding-inline: 10px; }
 				.wp-list-table { margin-bottom: 20px; }
-				@media (max-width: 782px) { .mfa-stats { grid-template-columns: repeat(2, 1fr); } }
+				.mfa-section-title { margin: 20px 0 4px; }
+				.mfa-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0 8px; }
+				.mfa-tile .val { font-size: 15px; font-weight: 600; margin-top: 8px; overflow-wrap: anywhere; }
+				.mfa-tile .sub { font-size: 12px; color: #646970; margin-top: 4px; overflow-wrap: anywhere; }
+				.mfa-operators { list-style: none; margin: 12px 0 20px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+				.mfa-operators > li { margin: 0; }
+				/* The heading link covers the card so the whole card is one keyboard stop. */
+				.mfa-operator { position: relative; }
+				.mfa-operator h3 { margin: 0; font-size: 14px; }
+				.mfa-operator h3 a { text-decoration: none; }
+				.mfa-operator h3 a::after { content: ""; position: absolute; inset: 0; }
+				.mfa-operator h3 a:focus { box-shadow: none; outline: none; }
+				.mfa-operator:focus-within { box-shadow: 0 0 0 2px #2271b1; }
+				.mfa-operator:hover { border-color: #8c8f94; }
+				.mfa-operator.is-active { border-color: #2271b1; box-shadow: inset 4px 0 0 #2271b1; }
+				.mfa-operator.is-active:focus-within { box-shadow: inset 4px 0 0 #2271b1, 0 0 0 2px #2271b1; }
+				.mfa-operator .num { font-size: 22px; }
+				.mfa-operator .num small { font-size: 12px; font-weight: 400; color: #646970; }
+				.mfa-operator ul { margin: 8px 0 0; }
+				.mfa-operator li { display: flex; justify-content: space-between; gap: 8px; margin: 0; padding: 2px 0; font-size: 12px; border-top: 1px solid #f0f0f1; }
+				.mfa-operator li span:first-child { overflow-wrap: anywhere; }
+				.mfa-operator li.more { color: #646970; }
+				.mfa-badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 2px; background: #2271b1; color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; vertical-align: 1px; }
+				@media (max-width: 1100px) { .mfa-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+				@media (max-width: 782px) { .mfa-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+				@media (max-width: 600px) { .mfa-summary { grid-template-columns: minmax(0, 1fr); } }
 			</style>
+
+			<h2 class="mfa-section-title">
+				<?php
+				/* translators: %s: the selected date range, e.g. "17 Sep 2026 – 23 Sep 2026" or "All time". */
+				echo esc_html( sprintf( __( 'Summary · %s', 'markdown-for-agents-and-statistics' ), $range_label ) );
+				?>
+			</h2>
+			<p class="description">
+				<?php esc_html_e( 'Counts are singular-post Markdown GET selections recorded by WordPress, not all crawler traffic or proof of delivery. Requests answered by a CDN or static cache, or blocked before WordPress runs, are not counted.', 'markdown-for-agents-and-statistics' ); ?>
+			</p>
+
+			<div class="mfa-summary">
+				<div class="postbox mfa-tile">
+					<div class="inside">
+						<div class="lab"><?php esc_html_e( 'Recorded Markdown requests', 'markdown-for-agents-and-statistics' ); ?></div>
+						<div class="num"><?php echo esc_html( number_format_i18n( $dashboard['total'] ) ); ?></div>
+						<div class="sub"><?php echo esc_html( $range_label ); ?></div>
+					</div>
+				</div>
+				<div class="postbox mfa-tile">
+					<div class="inside">
+						<div class="lab"><?php esc_html_e( 'Most requested page', 'markdown-for-agents-and-statistics' ); ?></div>
+						<?php echo $leader_tiles['page']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside leader_html(). ?>
+					</div>
+				</div>
+				<div class="postbox mfa-tile">
+					<div class="inside">
+						<div class="lab"><?php esc_html_e( 'Leading agent', 'markdown-for-agents-and-statistics' ); ?></div>
+						<?php echo $leader_tiles['agent']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside leader_html(). ?>
+					</div>
+				</div>
+				<div class="postbox mfa-tile">
+					<div class="inside">
+						<div class="lab"><?php esc_html_e( 'Leading operator', 'markdown-for-agents-and-statistics' ); ?></div>
+						<?php echo $leader_tiles['operator']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside leader_html(). ?>
+					</div>
+				</div>
+			</div>
+
+			<h2 class="mfa-section-title"><?php esc_html_e( 'Operators', 'markdown-for-agents-and-statistics' ); ?></h2>
+			<p class="description">
+				<?php if ( '' !== $filter_operator ) : ?>
+					<?php
+					/* translators: %s: operator name, e.g. "OpenAI". */
+					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->operator_name( $filter_operator ) ) );
+					?>
+					<a href="<?php echo esc_url( $this->operator_url( $filter_operator, $filter_operator, $filter_agent ) ); ?>"><?php esc_html_e( 'Clear operator filter', 'markdown-for-agents-and-statistics' ); ?></a>
+				<?php else : ?>
+					<?php esc_html_e( 'Select an operator to filter the whole report. Unattributed covers agents without reviewed operator details.', 'markdown-for-agents-and-statistics' ); ?>
+				<?php endif; ?>
+			</p>
+
+			<?php if ( empty( $dashboard['operators'] ) ) : ?>
+				<p><?php esc_html_e( 'No requests recorded for these filters.', 'markdown-for-agents-and-statistics' ); ?></p>
+			<?php else : ?>
+				<ul class="mfa-operators">
+					<?php foreach ( $dashboard['operators'] as $operator ) : ?>
+						<?php
+						$is_active = $operator['key'] === $filter_operator;
+						$name      = $this->operator_name( $operator['key'] );
+						?>
+						<li class="postbox mfa-operator<?php echo $is_active ? ' is-active' : ''; ?>">
+							<div class="inside">
+								<h3>
+									<a href="<?php echo esc_url( $this->operator_url( $operator['key'], $filter_operator, $filter_agent ) ); ?>"
+										<?php echo $is_active ? 'aria-current="true"' : ''; ?>
+										aria-label="<?php echo esc_attr( $is_active ? sprintf( /* translators: %s: operator name. */ __( '%s, filtered: remove operator filter', 'markdown-for-agents-and-statistics' ), $name ) : sprintf( /* translators: %s: operator name. */ __( '%s: filter report by this operator', 'markdown-for-agents-and-statistics' ), $name ) ); ?>"><?php echo esc_html( $name ); ?></a>
+									<?php if ( $is_active ) : ?>
+										<span class="mfa-badge" aria-hidden="true"><?php esc_html_e( 'Filtered', 'markdown-for-agents-and-statistics' ); ?></span>
+									<?php endif; ?>
+								</h3>
+								<div class="num">
+									<?php echo esc_html( number_format_i18n( $operator['total'] ) ); ?>
+									<small><?php echo esc_html( _n( 'request', 'requests', $operator['total'], 'markdown-for-agents-and-statistics' ) ); ?></small>
+								</div>
+								<ul>
+									<?php foreach ( $operator['agents'] as $agent_row ) : ?>
+										<li><span><?php echo esc_html( $this->agent_label( $agent_row['label'] ) ); ?></span><span><?php echo esc_html( number_format_i18n( $agent_row['total'] ) ); ?></span></li>
+									<?php endforeach; ?>
+									<?php if ( $operator['more'] > 0 ) : ?>
+										<li class="more">
+											<?php
+											/* translators: %s: number of further agents not listed on the card. */
+											echo esc_html( sprintf( _n( '+%s more agent', '+%s more agents', $operator['more'], 'markdown-for-agents-and-statistics' ), number_format_i18n( $operator['more'] ) ) );
+											?>
+										</li>
+									<?php endif; ?>
+								</ul>
+							</div>
+						</li>
+					<?php endforeach; ?>
+				</ul>
+			<?php endif; ?>
 
 			<div class="postbox mfa-chart-card">
 				<div class="postbox-header">
@@ -337,7 +543,7 @@ class StatsPage {
 
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
-				<h2><?php esc_html_e( 'Summary', 'markdown-for-agents-and-statistics' ); ?></h2>
+				<h2><?php esc_html_e( 'Agents by access method', 'markdown-for-agents-and-statistics' ); ?></h2>
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
@@ -388,7 +594,7 @@ class StatsPage {
 					<?php else : ?>
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
-								<td><?php echo esc_html( get_the_title( (int) $row->post_id ) ); ?></td>
+								<td><?php echo esc_html( $this->post_label( (int) $row->post_id ) ); ?></td>
 								<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
 								<td><?php echo esc_html( $row->access_method ); ?></td>
 								<td><?php echo esc_html( $row->access_date ); ?></td>
@@ -439,30 +645,19 @@ class StatsPage {
 	/**
 	 * Build the intent-aware chart payload for a window.
 	 *
-	 * Fetches per-day, per-agent totals, classifies each agent into an intent
+	 * Takes per-day, per-agent totals, classifies each agent into an intent
 	 * category, and assembles one zero-filled series per category plus totals.
 	 * Grain adapts to the span: short windows render daily bars, longer windows
 	 * and all-time render monthly bars. Pass null bounds for all-time (the span
 	 * is then derived from the data).
 	 *
 	 * @since  1.5.0
-	 * @param  array<string, mixed> $base_filters Filters from the page (post/agent/method); date keys are overridden.
-	 * @param  string|null          $from         Window start (Y-m-d), or null for all-time.
-	 * @param  string|null          $to           Window end (Y-m-d), or null for all-time.
+	 * @param  array<int, object> $rows Rows from StatsRepository::get_daily_agent_totals() for the page filters.
+	 * @param  string|null        $from Window start (Y-m-d), or null for all-time.
+	 * @param  string|null        $to   Window end (Y-m-d), or null for all-time.
 	 * @return array{chart_args: array<string, mixed>, legend: array<string, string>, totals: array<string, int>, caption: string}
 	 */
-	private function build_chart_data( array $base_filters, ?string $from, ?string $to ): array {
-		$filters = $base_filters;
-		unset( $filters['limit'], $filters['offset'], $filters['date_from'], $filters['date_to'] );
-		if ( null !== $from ) {
-			$filters['date_from'] = $from;
-		}
-		if ( null !== $to ) {
-			$filters['date_to'] = $to;
-		}
-
-		$rows = (array) $this->repository->get_daily_agent_totals( $filters );
-
+	private function build_chart_data( array $rows, ?string $from, ?string $to ): array {
 		$tz = new \DateTimeZone( 'UTC' );
 		list( $start, $end ) = $this->resolve_window( $from, $to, $rows, $tz );
 
@@ -724,6 +919,192 @@ class StatsPage {
 			/* translators: 1: trend direction (rising/falling), 2: correlation coefficient. */
 			esc_attr( sprintf( __( 'Trend %1$s · Pearson r = %2$s', 'markdown-for-agents-and-statistics' ), $label, number_format( $r, 2 ) ) ),
 			esc_html( number_format( $r, 2 ) )
+		);
+	}
+
+	/**
+	 * Operator bucket for a stored agent label.
+	 *
+	 * @since  1.8.0
+	 * @param  string $agent Stored agent label.
+	 * @return string        Operator key, or DashboardSummary::UNATTRIBUTED.
+	 */
+	private function operator_of( string $agent ): string {
+		return $this->agent_detector->get_operator( $agent ) ?? DashboardSummary::UNATTRIBUTED;
+	}
+
+	/**
+	 * Display name for an operator key, including the unattributed bucket.
+	 *
+	 * @since  1.8.0
+	 * @param  string $key
+	 * @return string
+	 */
+	private function operator_name( string $key ): string {
+		if ( DashboardSummary::UNATTRIBUTED === $key ) {
+			return __( 'Unattributed', 'markdown-for-agents-and-statistics' );
+		}
+
+		return $this->agent_detector->get_operator_label( $key );
+	}
+
+	/**
+	 * Display label for a stored agent label.
+	 *
+	 * @since  1.8.0
+	 * @param  string $agent
+	 * @return string
+	 */
+	private function agent_label( string $agent ): string {
+		return '' !== $agent ? $agent : __( '(unknown)', 'markdown-for-agents-and-statistics' );
+	}
+
+	/**
+	 * Display label for a post, keeping deleted and untitled posts identifiable.
+	 *
+	 * @since  1.8.0
+	 * @param  int $post_id
+	 * @return string
+	 */
+	private function post_label( int $post_id ): string {
+		$title = get_the_title( $post_id );
+		if ( '' !== $title ) {
+			return $title;
+		}
+
+		return null === get_post( $post_id )
+			/* translators: %d: post ID. */
+			? sprintf( __( '(deleted post #%d)', 'markdown-for-agents-and-statistics' ), $post_id )
+			/* translators: %d: post ID. */
+			: sprintf( __( '(no title) #%d', 'markdown-for-agents-and-statistics' ), $post_id );
+	}
+
+	/**
+	 * Build a report URL that sets filters, keeps the others and resets paging.
+	 *
+	 * @since  1.8.0
+	 * @param  array<string, int|string> $set    Query args to set.
+	 * @param  string[]                  $remove Query args to drop.
+	 * @return string
+	 */
+	private function filter_url( array $set, array $remove = array() ): string {
+		return add_query_arg( array_merge( $set, array( 'paged' => 1 ) ), remove_query_arg( $remove ) );
+	}
+
+	/**
+	 * URL an operator card links to: select it, or remove it when already active.
+	 *
+	 * Selecting an operator keeps the other filters, but drops an agent filter
+	 * for an agent run by a different operator, since that pair can never match.
+	 *
+	 * @since  1.8.0
+	 * @param  string $key             Operator key the link targets.
+	 * @param  string $active_operator Currently filtered operator, or ''.
+	 * @param  string $active_agent    Currently filtered agent, or ''.
+	 * @return string
+	 */
+	private function operator_url( string $key, string $active_operator, string $active_agent ): string {
+		if ( $key === $active_operator ) {
+			return $this->filter_url( array(), array( 'operator' ) );
+		}
+
+		$remove = ( '' !== $active_agent && $this->operator_of( $active_agent ) !== $key ) ? array( 'agent' ) : array();
+
+		return $this->filter_url( array( 'operator' => $key ), $remove );
+	}
+
+	/**
+	 * Human-readable label for the selected date range.
+	 *
+	 * @since  1.8.0
+	 * @param  string $from Y-m-d, or '' when unbounded.
+	 * @param  string $to   Y-m-d, or '' when unbounded.
+	 * @return string
+	 */
+	private function range_label( string $from, string $to ): string {
+		$format = static fn( string $date ): string => (string) \DateTime::createFromFormat( '!Y-m-d', $date, new \DateTimeZone( 'UTC' ) )->format( 'j M Y' );
+
+		if ( '' !== $from && '' !== $to ) {
+			/* translators: 1: start date, 2: end date. */
+			return sprintf( __( '%1$s – %2$s', 'markdown-for-agents-and-statistics' ), $format( $from ), $format( $to ) );
+		}
+		if ( '' !== $from ) {
+			/* translators: %s: start date. */
+			return sprintf( __( 'From %s', 'markdown-for-agents-and-statistics' ), $format( $from ) );
+		}
+		if ( '' !== $to ) {
+			/* translators: %s: end date. */
+			return sprintf( __( 'Up to %s', 'markdown-for-agents-and-statistics' ), $format( $to ) );
+		}
+
+		return __( 'All time', 'markdown-for-agents-and-statistics' );
+	}
+
+	/**
+	 * Render a summary tile body for a leader from DashboardSummary.
+	 *
+	 * A single leader links to the matching filter. A tie is shown as a tie with
+	 * the first few names, so no item is crowned arbitrarily.
+	 *
+	 * @since  1.8.0
+	 * @param  array{total: int, items: list<int|string>, count: int, capped: bool}|null $leader
+	 * @param  string                                                                      $type One of 'page', 'agent', 'operator'.
+	 * @param  callable(int|string): string                                                $name Display name for an item.
+	 * @param  callable(int|string): string                                                $url  Filter URL for an item.
+	 * @return string Escaped HTML.
+	 */
+	private function leader_html( ?array $leader, string $type, callable $name, callable $url ): string {
+		if ( null === $leader ) {
+			$empty = array(
+				'page'     => __( 'No pages requested in this range', 'markdown-for-agents-and-statistics' ),
+				'agent'    => __( 'No identified agents in this range', 'markdown-for-agents-and-statistics' ),
+				'operator' => __( 'No attributed operators in this range', 'markdown-for-agents-and-statistics' ),
+			);
+
+			return sprintf(
+				'<div class="val" aria-hidden="true">—</div><div class="sub">%s</div>',
+				esc_html( $empty[ $type ] ?? '' )
+			);
+		}
+
+		/* translators: %s: number of requests. */
+		$requests = sprintf( _n( '%s request', '%s requests', $leader['total'], 'markdown-for-agents-and-statistics' ), number_format_i18n( $leader['total'] ) );
+
+		if ( 1 === $leader['count'] ) {
+			$item = $leader['items'][0];
+
+			return sprintf(
+				'<div class="val"><a href="%1$s">%2$s</a></div><div class="sub">%3$s</div>',
+				esc_url( $url( $item ) ),
+				esc_html( $name( $item ) ),
+				esc_html( $requests )
+			);
+		}
+
+		$count = number_format_i18n( $leader['count'] ) . ( $leader['capped'] ? '+' : '' );
+		// A tie always has two or more items, so no singular forms are needed.
+		$nouns = array(
+			/* translators: %s: number of tied pages, e.g. "3" or "50+". */
+			'page'     => __( 'Tied: %s pages', 'markdown-for-agents-and-statistics' ),
+			/* translators: %s: number of tied agents. */
+			'agent'    => __( 'Tied: %s agents', 'markdown-for-agents-and-statistics' ),
+			/* translators: %s: number of tied operators. */
+			'operator' => __( 'Tied: %s operators', 'markdown-for-agents-and-statistics' ),
+		);
+
+		$names = implode( ', ', array_map( $name, $leader['items'] ) );
+		$rest  = $leader['count'] - count( $leader['items'] );
+		if ( $rest > 0 ) {
+			/* translators: 1: comma-separated names, 2: number of further tied items (may end in "+"). */
+			$names = sprintf( __( '%1$s and %2$s more', 'markdown-for-agents-and-statistics' ), $names, number_format_i18n( $rest ) . ( $leader['capped'] ? '+' : '' ) );
+		}
+
+		return sprintf(
+			'<div class="val">%1$s</div><div class="sub">%2$s</div><div class="sub">%3$s</div>',
+			esc_html( sprintf( $nouns[ $type ] ?? '%s', $count ) ),
+			/* translators: %s: request count for each tied item, e.g. "14 requests". */
+			esc_html( sprintf( __( '%s each', 'markdown-for-agents-and-statistics' ), $requests ) ),
+			esc_html( $names )
 		);
 	}
 
