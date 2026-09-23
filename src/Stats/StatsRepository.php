@@ -272,7 +272,7 @@ class StatsRepository {
 	 * query stays bounded however many posts have stats. Callers wanting to detect
 	 * ties should request more than one row.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  array<string, mixed> $filters Supports the build_where() keys.
 	 * @param  int                  $limit   Maximum rows to return (>= 1).
 	 * @return array<int, object>            Each object has post_id (int) and total (int).

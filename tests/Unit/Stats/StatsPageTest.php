@@ -840,7 +840,7 @@ class StatsPageTest extends TestCase {
     }
 
     // ---------------------------------------------------------------------
-    // Dashboard summary and operator cards (1.8.0)
+    // Dashboard summary and operator cards (1.7.2)
     // ---------------------------------------------------------------------
 
     private function render(): string {

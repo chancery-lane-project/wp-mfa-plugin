@@ -14,7 +14,7 @@ use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
  * is the sum of the daily rows, and each request lands in exactly one operator
  * card (reviewed operator or the explicit unattributed bucket).
  *
- * @since  1.8.0
+ * @since  1.7.2
  * @package Tclp\WpMarkdownForAgents\Stats
  */
 class DashboardSummary {
@@ -35,7 +35,7 @@ class DashboardSummary {
 	private const NON_AGENT_LABELS = array( '', 'accept-header', 'query-param' );
 
 	/**
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  AgentDetector $agent_detector Resolves agent labels to operators.
 	 */
 	public function __construct( private readonly AgentDetector $agent_detector ) {}
@@ -47,7 +47,7 @@ class DashboardSummary {
 	 * items share the top total and lists the first few by name, rather than
 	 * picking one arbitrarily.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  array<int, object> $daily_rows      Rows from StatsRepository::get_daily_agent_totals()
 	 *                                             (agent, total) for the report filters.
 	 * @param  array<int, object> $post_rows       Rows from StatsRepository::get_post_totals()

@@ -271,7 +271,7 @@ class StatsRepositoryTest extends TestCase {
     }
 
     // ---------------------------------------------------------------------
-    // Operator filters and post totals (1.8.0)
+    // Operator filters and post totals (1.7.2)
     // ---------------------------------------------------------------------
 
     public function test_agents_in_filter_builds_in_clause(): void {

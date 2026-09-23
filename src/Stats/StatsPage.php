@@ -952,7 +952,7 @@ class StatsPage {
 	/**
 	 * Operator bucket for a stored agent label.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  string $agent Stored agent label.
 	 * @return string        Operator key, or DashboardSummary::UNATTRIBUTED.
 	 */
@@ -963,7 +963,7 @@ class StatsPage {
 	/**
 	 * Display name for an operator key, including the unattributed bucket.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  string $key
 	 * @return string
 	 */
@@ -978,7 +978,7 @@ class StatsPage {
 	/**
 	 * Display label for a stored agent label.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  string $agent
 	 * @return string
 	 */
@@ -989,7 +989,7 @@ class StatsPage {
 	/**
 	 * Display label for a post, keeping deleted and untitled posts identifiable.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  int $post_id
 	 * @return string
 	 */
@@ -1009,7 +1009,7 @@ class StatsPage {
 	/**
 	 * Build a report URL that sets filters, keeps the others and resets paging.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  array<string, int|string> $set    Query args to set.
 	 * @param  string[]                  $remove Query args to drop.
 	 * @return string
@@ -1024,7 +1024,7 @@ class StatsPage {
 	 * Selecting an operator keeps the other filters, but drops an agent filter
 	 * for an agent run by a different operator, since that pair can never match.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  string $key             Operator key the link targets.
 	 * @param  string $active_operator Currently filtered operator, or ''.
 	 * @param  string $active_agent    Currently filtered agent, or ''.
@@ -1043,7 +1043,7 @@ class StatsPage {
 	/**
 	 * Human-readable label for the selected date range.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  string $from Y-m-d, or '' when unbounded.
 	 * @param  string $to   Y-m-d, or '' when unbounded.
 	 * @return string
@@ -1073,7 +1073,7 @@ class StatsPage {
 	 * A single leader links to the matching filter. A tie is shown as a tie with
 	 * the first few names, so no item is crowned arbitrarily.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.2
 	 * @param  array{total: int, items: list<int|string>, count: int, capped: bool}|null $leader
 	 * @param  string                                                                      $type One of 'page', 'agent', 'operator'.
 	 * @param  callable(int|string): string                                                $name Display name for an item.
