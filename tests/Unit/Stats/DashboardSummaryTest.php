@@ -165,6 +165,36 @@ class DashboardSummaryTest extends TestCase {
         $this->assertNull( $result['top_page'] );
         $this->assertNull( $result['top_agent'] );
         $this->assertNull( $result['top_operator'] );
+        $this->assertSame( [], $result['top_pages'] );
+    }
+
+    public function test_top_pages_rank_ties_and_share_of_total(): void {
+        $result = $this->summary->build(
+            [ $this->row( 'GPTBot', 20 ) ],
+            [ $this->post( 7, 10 ), $this->post( 2, 5 ), $this->post( 9, 5 ), $this->post( 4, 0 ) ],
+            50
+        );
+
+        $this->assertSame(
+            [
+                [ 'rank' => 1, 'post_id' => 7, 'total' => 10, 'share' => 0.5 ],
+                [ 'rank' => 2, 'post_id' => 2, 'total' => 5, 'share' => 0.25 ],
+                [ 'rank' => 2, 'post_id' => 9, 'total' => 5, 'share' => 0.25 ],
+            ],
+            $result['top_pages']
+        );
+    }
+
+    public function test_top_pages_stops_at_ten(): void {
+        $posts = [];
+        for ( $i = 1; $i <= 12; $i++ ) {
+            $posts[] = $this->post( $i, 20 - $i );
+        }
+
+        $pages = $this->summary->build( [ $this->row( 'GPTBot', 200 ) ], $posts, 50 )['top_pages'];
+
+        $this->assertCount( 10, $pages );
+        $this->assertSame( 10, $pages[9]['post_id'] );
     }
 
     public function test_numeric_agent_labels_stay_strings(): void {

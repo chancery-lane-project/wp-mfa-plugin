@@ -566,16 +566,18 @@ class StatsPageTest extends TestCase {
         }
         $this->assertStringContainsString( "<strong>Unknown</strong>: agents whose purpose we can&#039;t identify.", $output );
         $this->assertStringContainsString( "<strong>Unattributed</strong>: agents whose operator we haven&#039;t identified.", $output );
-        // Section order: Summary, Purpose (heading then chart), Operators, daily records.
+        // Section order: Summary, Purpose (heading then chart), Operators, Top pages, Daily records.
         $summary   = strpos( $output, 'Summary · ' );
         $purpose   = strpos( $output, '>Purpose</h2>' );
         $chart     = strpos( $output, '<div class="postbox mfa-chart-card">' );
         $operators = strpos( $output, '>Operators</h2>' );
-        $records   = strpos( $output, 'column-post' );
+        $top_pages = strpos( $output, '>Top pages</h2>' );
+        $records   = strpos( $output, '>Daily records</h2>' );
         $this->assertLessThan( $purpose, $summary );
         $this->assertLessThan( $chart, $purpose );
         $this->assertLessThan( $operators, $chart );
-        $this->assertLessThan( $records, $operators );
+        $this->assertLessThan( $top_pages, $operators );
+        $this->assertLessThan( $records, $top_pages );
     }
 
     public function test_render_page_shows_on_demand_headline_as_estimate(): void {
@@ -1030,6 +1032,49 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( 'No identified agents in this range', $output );
         $this->assertStringContainsString( 'No attributed operators in this range', $output );
         $this->assertStringContainsString( 'No requests recorded for these filters.', $output );
+        $this->assertStringContainsString( 'No pages requested in this range.', $output );
+    }
+
+    public function test_top_pages_table_ranks_links_and_shares(): void {
+        $_GET['post_search'] = '';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library', 3 => 'Glossary', 5 => 'Guides' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 400 ] ],
+            [
+                (object) [ 'post_id' => 7, 'total' => 300 ],
+                (object) [ 'post_id' => 3, 'total' => 99 ],
+                (object) [ 'post_id' => 5, 'total' => 1 ],
+            ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertMatchesRegularExpression( '/<table class="[^"]*mfa-top-pages/', $output );
+        $table = substr( $output, strpos( $output, 'mfa-top-pages' ) );
+        $table = substr( $table, 0, strpos( $table, '</table>' ) );
+        $this->assertMatchesRegularExpression( '/>1<\/td>\s*<td><a href="[^"]*post_id=7[^"]*">Clause library<\/a><\/td>\s*<td class="num">300<\/td>\s*<td class="num">75%<\/td>/', $table );
+        $this->assertMatchesRegularExpression( '/>Glossary<.*?>25%</s', $table );
+        $this->assertStringContainsString( '&lt;1%', $table );
+        $this->assertStringNotContainsString( 'post_search', $table );
+    }
+
+    public function test_top_pages_collapses_to_clear_link_when_page_filtered(): void {
+        $_GET['post_id'] = '7';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ],
+            [ (object) [ 'post_id' => 7, 'total' => 5 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringNotContainsString( 'mfa-top-pages"', $output );
+        $this->assertStringContainsString( 'Showing Clause library only.', $output );
+        $this->assertMatchesRegularExpression( '/<a href="(?![^"]*post_id=)[^"]*">Clear page filter<\/a>/', $output );
     }
 
     public function test_operator_cards_list_agents_and_link_to_filter(): void {

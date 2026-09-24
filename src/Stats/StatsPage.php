@@ -379,6 +379,12 @@ class StatsPage {
 				.postbox-header { padding-inline: 10px; }
 				.wp-list-table { margin-bottom: 20px; }
 				.mfa-section-title { margin: 20px 0 4px; }
+				/* Compact rows: a ranked list, not a data grid. */
+				.mfa-top-pages { margin-top: 8px; }
+				.mfa-top-pages th, .mfa-top-pages td { padding-block: 4px; }
+				.mfa-top-pages .column-rank { width: 3em; }
+				.mfa-top-pages .column-total, .mfa-top-pages .column-share { width: 7em; }
+				.mfa-top-pages td { overflow-wrap: anywhere; }
 				.mfa-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0 8px; }
 				.mfa-tile .val { font-size: 15px; font-weight: 600; margin-top: 8px; overflow-wrap: anywhere; }
 				.mfa-tile .sub { font-size: 12px; color: #646970; margin-top: 4px; overflow-wrap: anywhere; }
@@ -592,16 +598,51 @@ class StatsPage {
 				</ul>
 			<?php endif; ?>
 
+			<h2 class="mfa-section-title"><?php esc_html_e( 'Top pages', 'markdown-for-agents-and-statistics' ); ?></h2>
+			<?php if ( $filter_post_id > 0 ) : ?>
+				<p class="description">
+					<?php
+					/* translators: %s: page title. */
+					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->post_label( $filter_post_id ) ) );
+					?>
+					<a href="<?php echo esc_url( $this->filter_url( array(), array( 'post_id', 'post_search' ) ) ); ?>"><?php esc_html_e( 'Clear page filter', 'markdown-for-agents-and-statistics' ); ?></a>
+				</p>
+			<?php elseif ( empty( $dashboard['top_pages'] ) ) : ?>
+				<p><?php esc_html_e( 'No pages requested in this range.', 'markdown-for-agents-and-statistics' ); ?></p>
+			<?php else : ?>
+				<p class="description"><?php esc_html_e( 'Select a page to filter the whole report.', 'markdown-for-agents-and-statistics' ); ?></p>
+				<table class="wp-list-table widefat fixed striped mfa-top-pages">
+					<thead>
+						<tr>
+							<th scope="col" class="manage-column column-rank num"><?php esc_html_e( '#', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Page', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-total num"><?php esc_html_e( 'Requests', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-share num"><?php esc_html_e( 'Share', 'markdown-for-agents-and-statistics' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $dashboard['top_pages'] as $page_row ) : ?>
+							<tr>
+								<td class="num"><?php echo esc_html( number_format_i18n( $page_row['rank'] ) ); ?></td>
+								<td><a href="<?php echo esc_url( $this->filter_url( array( 'post_id' => $page_row['post_id'] ), array( 'post_search' ) ) ); ?>"><?php echo esc_html( $this->post_label( $page_row['post_id'] ) ); ?></a></td>
+								<td class="num"><?php echo esc_html( number_format_i18n( $page_row['total'] ) ); ?></td>
+								<td class="num"><?php echo esc_html( $this->share_label( $page_row['share'] ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+
 			<?php if ( '' !== $date_from || '' !== $date_to ) : ?>
 				<?php $summary = $this->repository->get_agent_summary( $count_filters ); ?>
-				<h2><?php esc_html_e( 'Agents by access method', 'markdown-for-agents-and-statistics' ); ?></h2>
+				<h2 class="mfa-section-title"><?php esc_html_e( 'Agents by access method', 'markdown-for-agents-and-statistics' ); ?></h2>
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
 							<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents-and-statistics' ); ?></th>
 							<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents-and-statistics' ); ?></th>
 							<th scope="col" class="manage-column column-total num"><?php esc_html_e( 'Total accesses', 'markdown-for-agents-and-statistics' ); ?></th>
-							<th scope="col" class="manage-column column-unique num"><?php esc_html_e( 'Unique posts', 'markdown-for-agents-and-statistics' ); ?></th>
+							<th scope="col" class="manage-column column-unique num"><?php esc_html_e( 'Unique pages', 'markdown-for-agents-and-statistics' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -627,10 +668,12 @@ class StatsPage {
 				</table>
 			<?php endif; ?>
 
+			<h2 class="mfa-section-title"><?php esc_html_e( 'Daily records', 'markdown-for-agents-and-statistics' ); ?></h2>
+			<p class="description"><?php esc_html_e( 'One row per page, agent, access method and day.', 'markdown-for-agents-and-statistics' ); ?></p>
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
 					<tr>
-						<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Post', 'markdown-for-agents-and-statistics' ); ?></th>
+						<th scope="col" class="manage-column column-post"><?php esc_html_e( 'Page', 'markdown-for-agents-and-statistics' ); ?></th>
 						<th scope="col" class="manage-column column-agent"><?php esc_html_e( 'Agent', 'markdown-for-agents-and-statistics' ); ?></th>
 						<th scope="col" class="manage-column column-access-method"><?php esc_html_e( 'Access Method', 'markdown-for-agents-and-statistics' ); ?></th>
 						<th scope="col" class="manage-column column-date"><?php esc_html_e( 'Date', 'markdown-for-agents-and-statistics' ); ?></th>
@@ -1091,6 +1134,26 @@ class StatsPage {
 			? sprintf( __( '(deleted post #%d)', 'markdown-for-agents-and-statistics' ), $post_id )
 			/* translators: %d: post ID. */
 			: sprintf( __( '(no title) #%d', 'markdown-for-agents-and-statistics' ), $post_id );
+	}
+
+	/**
+	 * Format a fraction of the report total as a whole percentage.
+	 *
+	 * Non-zero shares that round to nothing read "<1%" rather than a misleading 0%.
+	 *
+	 * @since  1.7.2
+	 * @param  float $share Fraction between 0 and 1.
+	 * @return string
+	 */
+	private function share_label( float $share ): string {
+		$percent = (int) round( $share * 100 );
+		if ( 0 === $percent && $share > 0 ) {
+			/* translators: shown for a share of requests below one per cent. */
+			return __( '<1%', 'markdown-for-agents-and-statistics' );
+		}
+
+		/* translators: %s: whole-number percentage. */
+		return sprintf( __( '%s%%', 'markdown-for-agents-and-statistics' ), number_format_i18n( $percent ) );
 	}
 
 	/**

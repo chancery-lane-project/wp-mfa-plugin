@@ -7,7 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Stats;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 
 /**
- * Builds the statistics dashboard summary and operator cards.
+ * Builds the statistics dashboard summary, operator cards and top pages.
  *
  * Pure aggregation over rows the stats page has already fetched, so every
  * figure reconciles with the chart and table for the same filters: the total
@@ -27,6 +27,9 @@ class DashboardSummary {
 
 	/** Names listed for a tied leader before the rest are summarised. */
 	private const LEADER_NAMES = 3;
+
+	/** Rows in the top pages table. */
+	private const TOP_PAGES = 10;
 
 	/**
 	 * Stored labels that record the access method rather than an agent (pre-1.3.0
@@ -59,6 +62,7 @@ class DashboardSummary {
 	 *     top_page: array{total: int, items: list<int>, count: int, capped: bool}|null,
 	 *     top_agent: array{total: int, items: list<string>, count: int, capped: bool}|null,
 	 *     top_operator: array{total: int, items: list<string>, count: int, capped: bool}|null,
+	 *     top_pages: list<array{rank: int, post_id: int, total: int, share: float}>,
 	 *     operators: list<array{key: string, label: string, total: int, agents: list<array{label: string, total: int}>, more: int}>
 	 * }
 	 */
@@ -127,16 +131,53 @@ class DashboardSummary {
 			}
 		}
 
+		$total = (int) array_sum( $agent_totals );
+
 		return array(
-			'total'        => (int) array_sum( $agent_totals ),
+			'total'        => $total,
 			'top_page'     => $this->page_leader( $post_rows, $post_scan_limit ),
 			'top_agent'    => $this->leader( $leading_agents ),
 			'top_operator' => $this->leader(
 				$leading_operators,
 				fn( string $key ) => $this->agent_detector->get_operator_label( $key )
 			),
+			'top_pages'    => $this->top_pages( $post_rows, $total ),
 			'operators'    => $operators,
 		);
+	}
+
+	/**
+	 * Rank the most-requested pages from rows ordered by total descending.
+	 *
+	 * Tied pages share a rank (1, 1, 3). Share is the fraction of the report
+	 * total, which covers the same filters as the post rows.
+	 *
+	 * @param  array<int, object> $post_rows
+	 * @param  int                $total     Report total for the same filters.
+	 * @return list<array{rank: int, post_id: int, total: int, share: float}>
+	 */
+	private function top_pages( array $post_rows, int $total ): array {
+		$pages    = array();
+		$previous = null;
+		$rank     = 0;
+		foreach ( array_slice( $post_rows, 0, self::TOP_PAGES ) as $index => $row ) {
+			$value = (int) ( $row->total ?? 0 );
+			if ( $value <= 0 ) {
+				break;
+			}
+			if ( $value !== $previous ) {
+				$rank     = $index + 1;
+				$previous = $value;
+			}
+			$pages[] = array(
+				'rank'    => $rank,
+				'post_id' => (int) ( $row->post_id ?? 0 ),
+				'total'   => $value,
+				'share'   => $total > 0 ? $value / $total : 0.0,
+			);
+		}
+
+		return $pages;
 	}
 
 	/**
