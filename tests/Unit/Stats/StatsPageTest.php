@@ -530,7 +530,54 @@ class StatsPageTest extends TestCase {
 
         $this->assertStringContainsString( 'mfa-chart-card', $output );
         $this->assertStringContainsString( '<svg', $output );
-        $this->assertStringContainsString( 'AI access by intent', $output );
+        $this->assertStringContainsString( 'Requests by purpose', $output );
+    }
+
+    public function test_chart_plots_unknown_so_bars_sum_to_summary_total(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 6 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 4 ],
+        ] );
+
+        $output = $this->render();
+
+        // Legend lists all four categories, Unknown last (top of the stack).
+        $this->assertMatchesRegularExpression( '/mfa-legend.*?Training.*?Search.*?On-demand.*?Unknown/s', $output );
+
+        // Today's bar stacks GPTBot (training, 6) and curl (unknown, 4): segment
+        // heights must add up to the full bar for the 10-request summary total.
+        preg_match_all( '/<rect x="[^"]*" y="[^"]*" width="[^"]*" height="([^"]*)" fill="(#B3B8C8|#D9DCE3)"\/>/', $output, $m );
+        $heights = array_combine( $m[2], array_map( 'floatval', $m[1] ) );
+        $this->assertEqualsWithDelta( 6 / 4, $heights['#B3B8C8'] / $heights['#D9DCE3'], 0.01 );
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">10</s', $output );
+    }
+
+    public function test_purpose_section_defines_every_category(): void {
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '<h2 class="mfa-section-title">Purpose</h2>', $output );
+        foreach ( [ 'On-demand', 'Search', 'Training', 'Unknown' ] as $label ) {
+            $this->assertStringContainsString( '<strong>' . $label . '</strong>: ', $output );
+        }
+        $this->assertStringContainsString( "<strong>Unknown</strong>: agents whose purpose we can&#039;t identify.", $output );
+        $this->assertStringContainsString( "<strong>Unattributed</strong>: agents whose operator we haven&#039;t identified.", $output );
+        // Section order: Summary, Purpose (heading then chart), Operators, Top pages, Daily records.
+        $summary   = strpos( $output, 'Summary · ' );
+        $purpose   = strpos( $output, '>Purpose</h2>' );
+        $chart     = strpos( $output, '<div class="postbox mfa-chart-card">' );
+        $operators = strpos( $output, '>Operators</h2>' );
+        $top_pages = strpos( $output, '>Top pages</h2>' );
+        $records   = strpos( $output, '>Daily records</h2>' );
+        $this->assertLessThan( $purpose, $summary );
+        $this->assertLessThan( $chart, $purpose );
+        $this->assertLessThan( $operators, $chart );
+        $this->assertLessThan( $top_pages, $operators );
+        $this->assertLessThan( $records, $top_pages );
     }
 
     public function test_render_page_shows_on_demand_headline_as_estimate(): void {
@@ -691,8 +738,45 @@ class StatsPageTest extends TestCase {
         $this->assertMatchesRegularExpression( '/Training crawls.*?>\s*40\s*</s', $output );
     }
 
-    public function test_render_page_defaults_to_last_30_days(): void {
-        // No $_GET → "Last 30 days" is the active preset, not "All time".
+    public function test_render_page_defaults_to_last_7_days(): void {
+        // No $_GET → "Last 7 days" is the active preset, not "All time" or "Last 30 days".
+        $this->stub_empty_repository();
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'class="current">Last 7 days', $output );
+        $this->assertStringNotContainsString( 'class="current">Last 30 days', $output );
+        $this->assertStringNotContainsString( 'class="current">All time', $output );
+        // Default chart grain is daily.
+        $this->assertStringContainsString( 'daily', $output );
+    }
+
+    public function test_default_range_queries_last_7_days_inclusive_of_today(): void {
+        $today     = gmdate( 'Y-m-d' );
+        $seven_ago = gmdate( 'Y-m-d', strtotime( '-6 days' ) );
+
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_total_count' )
+            ->with( [ 'date_from' => $seven_ago, 'date_to' => $today ] )
+            ->willReturn( 0 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        // Date inputs echo the default window so the form matches the report.
+        $this->assertStringContainsString( 'value="' . $seven_ago . '"', $output );
+        $this->assertStringContainsString( 'value="' . $today . '"', $output );
+    }
+
+    public function test_explicit_30_day_preset_still_active(): void {
+        $_GET['date_from'] = gmdate( 'Y-m-d', strtotime( '-29 days' ) );
+        $_GET['date_to']   = gmdate( 'Y-m-d' );
         $this->stub_empty_repository();
 
         ob_start();
@@ -700,9 +784,7 @@ class StatsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringContainsString( 'class="current">Last 30 days', $output );
-        $this->assertStringNotContainsString( 'class="current">All time', $output );
-        // Default chart grain is daily.
-        $this->assertStringContainsString( 'daily', $output );
+        $this->assertStringNotContainsString( 'class="current">Last 7 days', $output );
     }
 
     public function test_render_page_all_time_uses_range_param(): void {
@@ -764,5 +846,345 @@ class StatsPageTest extends TestCase {
         $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
         $this->repository->method( 'get_stats' )->willReturn( [] );
         $this->repository->method( 'get_total_count' )->willReturn( 0 );
+    }
+
+    // ---------------------------------------------------------------------
+    // Dashboard summary and operator cards (1.7.2)
+    // ---------------------------------------------------------------------
+
+    /**
+     * Stub a repository with recorded pages and capture the count filters.
+     */
+    private function stub_post_search_repository( array $posts, ?array &$captured = null ): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( $posts );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturnCallback(
+            function ( array $filters ) use ( &$captured ): int {
+                $captured = $filters;
+                return 0;
+            }
+        );
+    }
+
+    public function test_page_filter_is_a_searchable_datalist(): void {
+        $GLOBALS['_mock_post_objects'] = [];
+        $GLOBALS['_mock_post_titles']  = [ 4 => '' ];
+        $this->stub_post_search_repository( [ 3 => 'glossary', 1 => 'Clause library', 5 => 'Model clauses', 9 => 'Model clauses', 4 => '' ] );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringContainsString( '<input type="search" name="post_search" list="mfa-post-options"', $output );
+        $this->assertStringNotContainsString( '<select name="post_id"', $output );
+        // Sorted by label, case-insensitively; duplicates disambiguated; deleted posts labelled.
+        $this->assertMatchesRegularExpression(
+            '/value="\(deleted post #4\)".*value="Clause library".*value="glossary".*value="Model clauses \(#5\)".*value="Model clauses \(#9\)"/s',
+            $output
+        );
+    }
+
+    public function test_page_search_resolves_label_to_post_filter(): void {
+        $_GET['post_search'] = 'model clauses (#9)';
+        $captured = null;
+        $this->stub_post_search_repository( [ 5 => 'Model clauses', 9 => 'Model clauses', 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertSame( 9, $captured['post_id'] );
+        $this->assertStringContainsString( 'value="Model clauses (#9)"', $output );
+        $this->assertStringNotContainsString( 'No recorded page matches', $output );
+    }
+
+    public function test_page_search_overrides_post_id_and_empty_clears_it(): void {
+        $_GET['post_id']     = '1';
+        $_GET['post_search'] = '';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $this->render();
+
+        $this->assertArrayNotHasKey( 'post_id', $captured );
+    }
+
+    public function test_post_id_link_prefills_search_box(): void {
+        $_GET['post_id'] = '1';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertSame( 1, $captured['post_id'] );
+        $this->assertMatchesRegularExpression( '/name="post_search"[^>]*value="Clause library"/s', $output );
+    }
+
+    public function test_unmatched_page_search_shows_notice_and_all_pages(): void {
+        $_GET['post_search'] = 'Nope';
+        $captured = null;
+        $this->stub_post_search_repository( [ 1 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+
+        $this->assertArrayNotHasKey( 'post_id', $captured );
+        $this->assertStringContainsString( 'No recorded page matches “Nope”. Showing all pages.', $output );
+        $this->assertMatchesRegularExpression( '/name="post_search"[^>]*value="Nope"/s', $output );
+    }
+
+    public function test_most_requested_page_link_drops_page_search(): void {
+        $_GET['post_search'] = 'Clause library';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Glossary' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ],
+            [ (object) [ 'post_id' => 7, 'total' => 5 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertMatchesRegularExpression( '/Most requested page.*?href="[^"]*post_id=7[^"]*"/s', $output );
+        $this->assertDoesNotMatchRegularExpression( '/Most requested page.*?href="[^"]*post_search[^"]*post_id=7/s', $output );
+    }
+
+    private function render(): string {
+        ob_start();
+        $this->page->render_page();
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Stub a repository whose distinct labels span two operators plus an
+     * unattributed one, and capture the count filters the page applies.
+     */
+    private function stub_dashboard_repository( array $daily = [], array $posts = [], ?array &$captured = null ): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [ 'ChatGPT-User', 'ClaudeBot', 'GPTBot', 'curl' ] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [] );
+        $this->repository->method( 'get_total_count' )->willReturnCallback(
+            function ( array $filters ) use ( &$captured ): int {
+                $captured = $filters;
+                return 0;
+            }
+        );
+        $this->repository->method( 'get_daily_agent_totals' )->willReturn( $daily );
+        $this->repository->method( 'get_post_totals' )->willReturn( $posts );
+    }
+
+    public function test_summary_shows_range_and_headline_values(): void {
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library' ];
+        $this->stub_dashboard_repository(
+            [
+                (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 40 ],
+                (object) [ 'access_date' => $today, 'agent' => 'ClaudeBot', 'total' => 12 ],
+                (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 3 ],
+            ],
+            [ (object) [ 'post_id' => 7, 'total' => 30 ], (object) [ 'post_id' => 3, 'total' => 25 ] ]
+        );
+
+        $output = $this->render();
+
+        $range = gmdate( 'j M Y', strtotime( '-6 days' ) ) . ' – ' . gmdate( 'j M Y' );
+        $this->assertStringContainsString( 'Summary · ' . $range, $output );
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">55</s', $output );
+        $this->assertMatchesRegularExpression( '/Most requested page.*?post_id=7.*?>Clause library<.*?30 requests/s', $output );
+        $this->assertMatchesRegularExpression( '/Leading agent.*?agent=GPTBot.*?>GPTBot<.*?40 requests/s', $output );
+        $this->assertMatchesRegularExpression( '/Leading operator.*?operator=openai.*?>OpenAI<.*?40 requests/s', $output );
+        $this->assertStringContainsString( 'CDN or static cache', $output );
+        $GLOBALS['_mock_post_titles'] = [];
+    }
+
+    public function test_summary_total_matches_intent_total_card(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 4 ],
+        ] );
+
+        $output = $this->render();
+
+        $this->assertMatchesRegularExpression( '/Recorded Markdown requests<\/div>\s*<div class="num">11</s', $output );
+        $this->assertMatchesRegularExpression( '/Total agent visits.*?>\s*11\s/s', $output );
+    }
+
+    public function test_summary_shows_ties_and_deleted_posts(): void {
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 4 => '', 9 => 'Glossary' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 8 ] ],
+            [ (object) [ 'post_id' => 4, 'total' => 4 ], (object) [ 'post_id' => 9, 'total' => 4 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringContainsString( 'Tied: 2 pages', $output );
+        $this->assertStringContainsString( '4 requests each', $output );
+        $this->assertStringContainsString( '(deleted post #4), Glossary', $output );
+    }
+
+    public function test_summary_empty_state(): void {
+        $this->stub_dashboard_repository();
+
+        $output = $this->render();
+
+        $this->assertStringContainsString( 'No pages requested in this range', $output );
+        $this->assertStringContainsString( 'No identified agents in this range', $output );
+        $this->assertStringContainsString( 'No attributed operators in this range', $output );
+        $this->assertStringContainsString( 'No requests recorded for these filters.', $output );
+        $this->assertStringContainsString( 'No pages requested in this range.', $output );
+    }
+
+    public function test_top_pages_table_ranks_links_and_shares(): void {
+        $_GET['post_search'] = '';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library', 3 => 'Glossary', 5 => 'Guides' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 400 ] ],
+            [
+                (object) [ 'post_id' => 7, 'total' => 300 ],
+                (object) [ 'post_id' => 3, 'total' => 99 ],
+                (object) [ 'post_id' => 5, 'total' => 1 ],
+            ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertMatchesRegularExpression( '/<table class="[^"]*mfa-top-pages/', $output );
+        $table = substr( $output, strpos( $output, 'mfa-top-pages' ) );
+        $table = substr( $table, 0, strpos( $table, '</table>' ) );
+        $this->assertMatchesRegularExpression( '/>1<\/td>\s*<td><a href="[^"]*post_id=7[^"]*">Clause library<\/a><\/td>\s*<td class="num">300<\/td>\s*<td class="num">75%<\/td>/', $table );
+        $this->assertMatchesRegularExpression( '/>Glossary<.*?>25%</s', $table );
+        $this->assertStringContainsString( '&lt;1%', $table );
+        $this->assertStringNotContainsString( 'post_search', $table );
+    }
+
+    public function test_top_pages_collapses_to_clear_link_when_page_filtered(): void {
+        $_GET['post_id'] = '7';
+        $today = gmdate( 'Y-m-d' );
+        $GLOBALS['_mock_post_titles'] = [ 7 => 'Clause library' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ],
+            [ (object) [ 'post_id' => 7, 'total' => 5 ] ]
+        );
+
+        $output = $this->render();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertStringNotContainsString( 'mfa-top-pages"', $output );
+        $this->assertStringContainsString( 'Showing Clause library only.', $output );
+        $this->assertMatchesRegularExpression( '/<a href="(?![^"]*post_id=)[^"]*">Clear page filter<\/a>/', $output );
+    }
+
+    public function test_operator_cards_list_agents_and_link_to_filter(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [
+            (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 40 ],
+            (object) [ 'access_date' => $today, 'agent' => 'ChatGPT-User', 'total' => 7 ],
+            (object) [ 'access_date' => $today, 'agent' => 'curl', 'total' => 3 ],
+        ] );
+
+        $output = $this->render();
+
+        $this->assertMatchesRegularExpression( '/operator=openai[^>]*aria-label="OpenAI: filter report by this operator">OpenAI<\/a>.*?47.*?GPTBot.*?40.*?ChatGPT-User.*?7/s', $output );
+        $this->assertMatchesRegularExpression( '/operator=unattributed[^>]*>Unattributed<\/a>.*?3.*?curl/s', $output );
+        // Unattributed card comes after the reviewed operators.
+        $this->assertLessThan( strpos( $output, '>Unattributed</a>' ), strpos( $output, '>OpenAI</a>' ) );
+        $this->assertStringNotContainsString( 'Clear operator filter', $output );
+    }
+
+    public function test_operator_filter_restricts_every_query_to_its_agents(): void {
+        $_GET['operator'] = 'openai';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_daily_agent_totals' )
+            ->with( $this->callback( fn( array $f ) => [ 'ChatGPT-User', 'GPTBot' ] === $f['agents_in'] ) );
+        $this->repository->expects( $this->once() )
+            ->method( 'get_post_totals' )
+            ->with( $this->callback( fn( array $f ) => [ 'ChatGPT-User', 'GPTBot' ] === $f['agents_in'] ) );
+
+        $output = $this->render();
+
+        $this->assertSame( [ 'ChatGPT-User', 'GPTBot' ], $captured['agents_in'] );
+        $this->assertArrayNotHasKey( 'agents_not_in', $captured );
+        $this->assertStringContainsString( 'Showing OpenAI only.', $output );
+        $this->assertStringContainsString( 'Clear operator filter', $output );
+        // Agent dropdown narrows to the operator's agents.
+        $this->assertStringContainsString( '<option value="GPTBot"', $output );
+        $this->assertStringNotContainsString( '<option value="ClaudeBot"', $output );
+    }
+
+    public function test_unattributed_filter_excludes_attributed_agents(): void {
+        $_GET['operator'] = 'unattributed';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertSame( [ 'ChatGPT-User', 'ClaudeBot', 'GPTBot' ], $captured['agents_not_in'] );
+        $this->assertArrayNotHasKey( 'agents_in', $captured );
+    }
+
+    public function test_operator_filter_drops_agent_from_another_operator(): void {
+        $_GET['operator'] = 'openai';
+        $_GET['agent']    = 'ClaudeBot';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertArrayNotHasKey( 'agent', $captured );
+        $this->assertSame( [ 'ChatGPT-User', 'GPTBot' ], $captured['agents_in'] );
+    }
+
+    public function test_operator_filter_keeps_agent_it_runs(): void {
+        $_GET['operator']      = 'openai';
+        $_GET['agent']         = 'GPTBot';
+        $_GET['access_method'] = 'ua';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $this->render();
+
+        $this->assertSame( 'GPTBot', $captured['agent'] );
+        $this->assertSame( 'ua', $captured['access_method'] );
+    }
+
+    public function test_unknown_operator_param_is_ignored(): void {
+        $_GET['operator'] = 'not-a-real-operator';
+        $captured = null;
+        $this->stub_dashboard_repository( [], [], $captured );
+
+        $output = $this->render();
+
+        $this->assertArrayNotHasKey( 'agents_in', $captured );
+        $this->assertArrayNotHasKey( 'agents_not_in', $captured );
+        $this->assertStringNotContainsString( 'Clear operator filter', $output );
+    }
+
+    public function test_active_operator_card_is_marked_and_toggles_off(): void {
+        $_GET['operator'] = 'openai';
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_dashboard_repository( [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 5 ] ] );
+
+        $output = $this->render();
+
+        $this->assertStringContainsString( 'mfa-operator is-active', $output );
+        $this->assertStringContainsString( 'aria-current="true"', $output );
+        $this->assertStringContainsString( 'OpenAI, filtered: remove operator filter', $output );
+        $this->assertStringContainsString( '>Filtered<', $output );
+        $this->assertMatchesRegularExpression( '/<option value="openai"\s+selected/', $output );
+    }
+
+    public function test_filter_selects_have_accessible_labels(): void {
+        $this->stub_dashboard_repository();
+
+        $output = $this->render();
+
+        foreach ( [ 'Filter by page: type to search', 'Filter by operator', 'Filter by agent', 'Filter by access method' ] as $label ) {
+            $this->assertStringContainsString( 'aria-label="' . $label . '"', $output );
+        }
     }
 }

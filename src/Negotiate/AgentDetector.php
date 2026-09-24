@@ -219,4 +219,145 @@ class AgentDetector {
 
 		return (array) apply_filters( 'markdown_for_agents_agent_categories', $defaults );
 	}
+
+	/**
+	 * Resolve the reviewed operator behind an agent label.
+	 *
+	 * Operators are the organisations that run an agent (OpenAI, Anthropic, …).
+	 * Like categorise_agent(), this is derived at read time from the stored label
+	 * with case-insensitive substring matching, first match wins. Labels with no
+	 * reviewed entry return null — an operator is never guessed from an arbitrary
+	 * User-Agent, so callers should report those as unattributed.
+	 *
+	 * @since  1.8.0
+	 * @param  string $agent The stored agent label (matched substring or product name).
+	 * @return string|null   Operator key (e.g. 'openai'), or null when unattributed.
+	 */
+	public function get_operator( string $agent ): ?string {
+		$agent = trim( $agent );
+		if ( '' === $agent ) {
+			return null;
+		}
+
+		foreach ( $this->get_agent_operators() as $key => $operator ) {
+			foreach ( (array) ( $operator['agents'] ?? array() ) as $substring ) {
+				if ( '' !== $substring && false !== stripos( $agent, (string) $substring ) ) {
+					return (string) $key;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Return the display name for an operator key.
+	 *
+	 * @since  1.8.0
+	 * @param  string $key Operator key from get_operator().
+	 * @return string      Display name, or the key itself when unknown.
+	 */
+	public function get_operator_label( string $key ): string {
+		$operators = $this->get_agent_operators();
+
+		return (string) ( $operators[ $key ]['label'] ?? $key );
+	}
+
+	/**
+	 * Return the operator key → {label, agents} map, filtered.
+	 *
+	 * Only agents whose operator has been reviewed are listed; the long tail stays
+	 * unattributed rather than guessed. Tokens added through the categories filter
+	 * or the agent-strings option have no operator until they are added here via
+	 * the `markdown_for_agents_agent_operators` filter.
+	 *
+	 * Treat this map as append-only, like the category map: operators are derived
+	 * from labels already in the stats table, so removing an entry retrospectively
+	 * moves that agent's history into the unattributed bucket.
+	 *
+	 * @since  1.8.0
+	 * @return array<string, array{label: string, agents: string[]}>
+	 */
+	public function get_agent_operators(): array {
+		$defaults = array(
+			'openai'       => array(
+				'label'  => 'OpenAI',
+				'agents' => array( 'ChatGPT-User', 'OAI-SearchBot', 'GPTBot' ),
+			),
+			'anthropic'    => array(
+				'label'  => 'Anthropic',
+				'agents' => array( 'Claude-User', 'Claude-Web', 'Claude-SearchBot', 'ClaudeBot', 'anthropic-ai' ),
+			),
+			'google'       => array(
+				'label'  => 'Google',
+				'agents' => array( 'Gemini-User', 'Google-Agent', 'Google-Extended', 'GoogleOther', 'CloudVertexBot' ),
+			),
+			'perplexity'   => array(
+				'label'  => 'Perplexity',
+				'agents' => array( 'Perplexity-User', 'PerplexityBot' ),
+			),
+			'meta'         => array(
+				'label'  => 'Meta',
+				'agents' => array( 'meta-externalfetcher', 'meta-externalagent' ),
+			),
+			'amazon'       => array(
+				'label'  => 'Amazon',
+				'agents' => array( 'Amzn-SearchBot', 'Amazonbot', 'amazon-kendra-' ),
+			),
+			'apple'        => array(
+				'label'  => 'Apple',
+				'agents' => array( 'Applebot-Extended' ),
+			),
+			'mistral'      => array(
+				'label'  => 'Mistral AI',
+				'agents' => array( 'MistralAI-User' ),
+			),
+			'bytedance'    => array(
+				'label'  => 'ByteDance',
+				'agents' => array( 'Bytespider' ),
+			),
+			'common-crawl' => array(
+				'label'  => 'Common Crawl',
+				'agents' => array( 'CCBot' ),
+			),
+			'cohere'       => array(
+				'label'  => 'Cohere',
+				'agents' => array( 'cohere-ai' ),
+			),
+			'duckduckgo'   => array(
+				'label'  => 'DuckDuckGo',
+				'agents' => array( 'DuckAssistBot' ),
+			),
+			'brave'        => array(
+				'label'  => 'Brave',
+				'agents' => array( 'Bravebot' ),
+			),
+			'cloudflare'   => array(
+				'label'  => 'Cloudflare',
+				'agents' => array( 'Cloudflare-AI-Search', 'CloudflareBrowserRenderingCrawler' ),
+			),
+			'moonshot'     => array(
+				'label'  => 'Moonshot AI',
+				'agents' => array( 'KimiBot' ),
+			),
+			'huawei'       => array(
+				'label'  => 'Huawei',
+				'agents' => array( 'PetalBot' ),
+			),
+			'cognition'    => array(
+				'label'  => 'Cognition',
+				'agents' => array( 'Devin' ),
+			),
+			'semrush'      => array(
+				'label'  => 'Semrush',
+				'agents' => array( 'SemrushBot-OCOB', 'SemrushBot-SWA' ),
+			),
+			'atlassian'    => array(
+				'label'  => 'Atlassian',
+				'agents' => array( 'atlassian-bot' ),
+			),
+		);
+
+		return (array) apply_filters( 'markdown_for_agents_agent_operators', $defaults );
+	}
 }
