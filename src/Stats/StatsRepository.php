@@ -135,7 +135,9 @@ class StatsRepository {
 	 * Build a WHERE clause and prepared values from a filters array.
 	 *
 	 * Supports 'post_id' (int), 'agent' (string), 'access_method' (string),
-	 * 'date_from' (string Y-m-d), and 'date_to' (string Y-m-d) keys.
+	 * 'date_from' (string Y-m-d), and 'date_to' (string Y-m-d) keys, plus
+	 * 'agents_in' / 'agents_not_in' (string[]) for operator filtering. An empty
+	 * 'agents_in' list matches nothing; an empty 'agents_not_in' list is ignored.
 	 *
 	 * @since  1.3.0
 	 * @param  array<string, mixed> $filters
@@ -153,6 +155,22 @@ class StatsRepository {
 		if ( ! empty( $filters['agent'] ) ) {
 			$where[]  = 'agent = %s';
 			$values[] = (string) $filters['agent'];
+		}
+
+		if ( isset( $filters['agents_in'] ) && is_array( $filters['agents_in'] ) ) {
+			$agents = array_values( array_map( 'strval', $filters['agents_in'] ) );
+			if ( empty( $agents ) ) {
+				$where[] = '1 = 0';
+			} else {
+				$where[] = 'agent IN (' . implode( ', ', array_fill( 0, count( $agents ), '%s' ) ) . ')';
+				array_push( $values, ...$agents );
+			}
+		}
+
+		if ( ! empty( $filters['agents_not_in'] ) && is_array( $filters['agents_not_in'] ) ) {
+			$agents   = array_values( array_map( 'strval', $filters['agents_not_in'] ) );
+			$where[]  = 'agent NOT IN (' . implode( ', ', array_fill( 0, count( $agents ), '%s' ) ) . ')';
+			array_push( $values, ...$agents );
 		}
 
 		if ( ! empty( $filters['access_method'] ) ) {
@@ -248,6 +266,35 @@ class StatsRepository {
 	}
 
 	/**
+	 * Return the most-requested posts for the given filters.
+	 *
+	 * Ordered by total descending, then post ID, and capped at $limit rows so the
+	 * query stays bounded however many posts have stats. Callers wanting to detect
+	 * ties should request more than one row.
+	 *
+	 * @since  1.7.2
+	 * @param  array<string, mixed> $filters Supports the build_where() keys.
+	 * @param  int                  $limit   Maximum rows to return (>= 1).
+	 * @return array<int, object>            Each object has post_id (int) and total (int).
+	 */
+	public function get_post_totals( array $filters = array(), int $limit = 10 ): array {
+		$table  = self::get_table_name( $this->wpdb );
+		$clause = $this->build_where( $filters );
+
+		$where_sql = $clause['sql'];
+		$values    = $clause['values'];
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $table is $wpdb->prefix only; $where_sql is built by build_where() with safe placeholders; spread arg count is dynamic but correct.
+		$sql = $this->wpdb->prepare(
+			"SELECT post_id, SUM(`count`) AS total FROM {$table} {$where_sql} GROUP BY post_id ORDER BY total DESC, post_id ASC LIMIT %d",
+			...array_merge( $values, array( max( 1, $limit ) ) )
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+
+		return $this->wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared -- prepared above.
+	}
+
+	/**
 	 * Delete access stats records older than the given number of days.
 	 *
 	 * @since  1.2.0
@@ -276,19 +323,23 @@ class StatsRepository {
 	/**
 	 * Return post IDs and titles for posts that have at least one stat row.
 	 *
+	 * Titles come from the same query (raw post_title, unfiltered) so the page
+	 * list costs one round trip however many posts have stats. A deleted post
+	 * maps to ''.
+	 *
 	 * @since  1.1.0
 	 * @return array<int, string> Map of post_id => title.
 	 */
 	public function get_posts_with_stats(): array {
 		$table = self::get_table_name( $this->wpdb );
+		$posts = $this->wpdb->posts;
 		$rows  = $this->wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			"SELECT DISTINCT post_id FROM {$table} ORDER BY post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			"SELECT s.post_id, p.post_title FROM (SELECT DISTINCT post_id FROM {$table}) s LEFT JOIN {$posts} p ON p.ID = s.post_id ORDER BY s.post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 
 		$result = array();
 		foreach ( $rows as $row ) {
-			$id            = (int) $row->post_id;
-			$result[ $id ] = get_the_title( $id );
+			$result[ (int) $row->post_id ] = (string) ( $row->post_title ?? '' );
 		}
 
 		return $result;

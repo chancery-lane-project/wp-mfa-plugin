@@ -29,7 +29,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
 - **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
 - **OKF-compliant frontmatter and links** - `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
-- **Access statistics** - logs AI agent requests with filterable stats page showing per-agent, per-post, and per-access-method breakdowns with date range filtering and pagination
+- **Access statistics** - logs AI agent requests with a filterable stats page (default: last 7 days) showing a headline summary (recorded requests, most requested page, leading agent and operator), operator cards that filter the report, intent breakdowns, and per-agent, per-post and per-access-method records with date range filtering and pagination
 - **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`, `generate-indexes`
 - **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
 - **Fully unit-tested** - PHPUnit 9.6 test suite
@@ -306,6 +306,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_ai_catalog` | `(array $catalog)` | Modify the ARD catalog document before display |
 | `markdown_for_agents_converter_options` | `(array $options)` | Override the HTML→Markdown converter options |
 | `markdown_for_agents_agent_categories` | `(array $map)` | Modify the intent-category → UA-substring map used to classify agents in stats |
+| `markdown_for_agents_agent_operators` | `(array $map)` | Modify the operator map used for the stats operator cards. Shape: `[ 'key' => [ 'label' => 'Name', 'agents' => [ 'UA-substring', … ] ] ]`, matched case-insensitively against stored agent labels, first match wins. Labels without a reviewed entry are reported as Unattributed. Treat it as append-only: removing an entry moves that agent's history to Unattributed |
 | `markdown_for_agents_tick_budget` | `(int $seconds, string $context)` | Wall-clock seconds one bulk-generation background tick may spend; checked only between batches, never mid-batch, so a single very slow item can still overrun it. `$context` is `cron` for a normal scheduled tick or `nudge` for the short inline catch-up run triggered from an admin request. Defaults to 30s (or 60% of `max_execution_time` when that is lower) for `cron`, 5s for `nudge` |
 
 ---

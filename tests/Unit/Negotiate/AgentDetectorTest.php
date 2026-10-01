@@ -233,4 +233,97 @@ class AgentDetectorTest extends TestCase {
             }
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Operators
+    // ---------------------------------------------------------------------
+
+    public function test_get_operator_maps_headline_operators(): void {
+        $detector = $this->make_detector();
+
+        foreach ( [ 'GPTBot', 'ChatGPT-User', 'OAI-SearchBot' ] as $agent ) {
+            $this->assertSame( 'openai', $detector->get_operator( $agent ), $agent );
+        }
+        foreach ( [ 'ClaudeBot', 'Claude-User', 'Claude-Web', 'Claude-SearchBot', 'anthropic-ai' ] as $agent ) {
+            $this->assertSame( 'anthropic', $detector->get_operator( $agent ), $agent );
+        }
+    }
+
+    public function test_get_operator_matches_stored_label_with_trailing_slash(): void {
+        // Options ship 'meta-externalfetcher/', which is stored verbatim as the label.
+        $this->assertSame( 'meta', $this->make_detector()->get_operator( 'meta-externalfetcher/' ) );
+    }
+
+    public function test_get_operator_is_case_insensitive(): void {
+        $this->assertSame( 'openai', $this->make_detector()->get_operator( 'gptbot' ) );
+    }
+
+    public function test_get_operator_returns_null_for_unreviewed_or_empty_labels(): void {
+        $detector = $this->make_detector();
+
+        foreach ( [ '', '   ', 'Mozilla', 'curl', 'accept-header', 'TwinAgent' ] as $agent ) {
+            $this->assertNull( $detector->get_operator( $agent ), $agent );
+        }
+    }
+
+    public function test_get_operator_label(): void {
+        $detector = $this->make_detector();
+
+        $this->assertSame( 'OpenAI', $detector->get_operator_label( 'openai' ) );
+        $this->assertSame( 'Anthropic', $detector->get_operator_label( 'anthropic' ) );
+        $this->assertSame( 'nope', $detector->get_operator_label( 'nope' ) );
+    }
+
+    public function test_get_operator_respects_filter_override(): void {
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_operators'] = static fn( array $map ): array => $map + array(
+            'acme' => array(
+                'label'  => 'Acme',
+                'agents' => array( 'AcmeBot' ),
+            ),
+        );
+
+        $detector = $this->make_detector();
+        $this->assertSame( 'acme', $detector->get_operator( 'AcmeBot' ) );
+        $this->assertSame( 'Acme', $detector->get_operator_label( 'acme' ) );
+        $this->assertSame( 'openai', $detector->get_operator( 'GPTBot' ) );
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_operators'] );
+    }
+
+    /**
+     * Each request must count once in the operator cards, so no shipped UA
+     * string may match tokens from two different operators.
+     */
+    public function test_no_default_ua_string_matches_two_operators(): void {
+        $detector  = $this->make_detector();
+        $operators = $detector->get_agent_operators();
+
+        foreach ( \Tclp\WpMarkdownForAgents\Core\Options::get_defaults()['ua_agent_strings'] as $string ) {
+            $matches = [];
+            foreach ( $operators as $key => $operator ) {
+                foreach ( $operator['agents'] as $token ) {
+                    if ( false !== stripos( $string, $token ) ) {
+                        $matches[ $key ] = true;
+                    }
+                }
+            }
+
+            $this->assertLessThanOrEqual( 1, count( $matches ), sprintf( 'UA string "%s" matches operators: %s', $string, implode( ', ', array_keys( $matches ) ) ) );
+        }
+    }
+
+    /**
+     * Operator tokens must correspond to categorised agents; a typo would leave
+     * the operator card permanently empty.
+     */
+    public function test_every_operator_token_is_categorised(): void {
+        $detector = $this->make_detector();
+
+        foreach ( $detector->get_agent_operators() as $key => $operator ) {
+            $this->assertNotEmpty( $operator['agents'], $key );
+            foreach ( $operator['agents'] as $token ) {
+                $this->assertNotSame( 'unknown', $detector->categorise_agent( $token ), sprintf( '%s token "%s"', $key, $token ) );
+            }
+        }
+    }
 }
