@@ -1178,6 +1178,47 @@ class StatsPageTest extends TestCase {
         $this->assertMatchesRegularExpression( '/<option value="openai"\s+selected/', $output );
     }
 
+    public function test_default_view_has_no_reset_link(): void {
+        $this->stub_dashboard_repository();
+
+        $this->assertStringNotContainsString( 'mfa-reset', $this->render() );
+    }
+
+    /**
+     * @dataProvider provide_non_default_views
+     */
+    public function test_reset_link_returns_to_default_view( array $query ): void {
+        $_GET = $query;
+        $this->stub_post_search_repository( [ 7 => 'Clause library' ] );
+
+        $this->assertMatchesRegularExpression(
+            '/<a class="button mfa-reset" href="https:\/\/example\.com\/wp-admin\/admin\.php\?page=markdown-for-agents-stats">Reset<\/a>/',
+            $this->render()
+        );
+    }
+
+    public function provide_non_default_views(): array {
+        return [
+            'page'            => [ [ 'post_id' => '7' ] ],
+            'unmatched page'  => [ [ 'post_search' => 'Nope' ] ],
+            'operator'        => [ [ 'operator' => 'openai' ] ],
+            'agent'           => [ [ 'agent' => 'GPTBot' ] ],
+            'access method'   => [ [ 'access_method' => 'ua' ] ],
+            'all time'        => [ [ 'range' => 'all' ] ],
+            'custom dates'    => [ [ 'date_from' => '2026-03-01', 'date_to' => '2026-03-31' ] ],
+            'open-ended date' => [ [ 'date_from' => '2026-03-01' ] ],
+        ];
+    }
+
+    public function test_explicit_default_range_has_no_reset_link(): void {
+        $_GET['date_from'] = gmdate( 'Y-m-d', strtotime( '-6 days' ) );
+        $_GET['date_to']   = gmdate( 'Y-m-d' );
+        $_GET['paged']     = '2';
+        $this->stub_dashboard_repository();
+
+        $this->assertStringNotContainsString( 'mfa-reset', $this->render() );
+    }
+
     public function test_filter_selects_have_accessible_labels(): void {
         $this->stub_dashboard_repository();
 

@@ -310,6 +310,7 @@ wp markdown-agents generate-taxonomies --dry-run
 * Feature: operator cards (OpenAI, Anthropic, Google, …) with per-agent totals. Selecting a card filters the summary, chart and tables while keeping other filters. Agents without reviewed operator details are counted under Unattributed, so the cards always add up to the total. New `markdown_for_agents_agent_operators` filter.
 * Feature: Top pages table listing the 10 most requested pages, with request counts and share of the total, for the selected filters and date range. Tied pages share a rank. Selecting a page filters the whole report.
 * Feature: the statistics page filter is now a type-to-search box with suggestions, replacing a dropdown that listed every page ever requested. Page titles load in a single query.
+* Feature: a Reset button beside Filter on the statistics page, shown whenever a filter or non-default date range is applied. It returns to the default view: all pages, operators, agents and methods over the last 7 days.
 * Fix: the statistics chart now includes Unknown requests (as a grey top layer), so each bar adds up to the day's total and the chart matches the summary and cards.
 * Fix: statistics cards no longer overflow the screen on narrow (phone-width) admin screens.
 * Fix: count only singular Markdown GET selections. HEAD probes and other HTTP methods no longer inflate page-access statistics; negotiated response headers remain available.

@@ -222,6 +222,14 @@ class StatsPage {
 		$active_30d   = ( ! $is_all_time && $date_from === $thirty_ago->format( 'Y-m-d' ) && $date_to === $today_str );
 		$active_month = ( ! $is_all_time && $date_from === $month_start->format( 'Y-m-d' ) && $date_to === $today_str );
 
+		// Anything other than the unfiltered last 7 days gets a Reset link.
+		$is_default_view = $active_7d
+			&& 0 === $filter_post_id
+			&& '' === $post_unmatched
+			&& '' === $filter_operator
+			&& '' === $filter_agent
+			&& '' === $filter_access_method;
+
 		$rows        = $this->repository->get_stats( $filters );
 		$total       = $this->repository->get_total_count( $count_filters );
 		$total_pages = (int) ceil( $total / self::PER_PAGE );
@@ -336,6 +344,9 @@ class StatsPage {
 						<label for="date_to"><?php esc_html_e( 'To', 'markdown-for-agents-and-statistics' ); ?></label>
 						<input type="date" id="date_to" name="date_to" value="<?php echo esc_attr( $date_to ); ?>">
 						<?php submit_button( __( 'Filter', 'markdown-for-agents-and-statistics' ), 'secondary', 'filter', false ); ?>
+						<?php if ( ! $is_default_view ) : ?>
+							<a class="button mfa-reset" href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ); ?>"><?php esc_html_e( 'Reset', 'markdown-for-agents-and-statistics' ); ?></a>
+						<?php endif; ?>
 					</div>
 					<br class="clear">
 				</div>
