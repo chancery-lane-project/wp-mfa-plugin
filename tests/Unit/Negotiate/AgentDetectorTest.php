@@ -99,8 +99,28 @@ class AgentDetectorTest extends TestCase {
         $this->assertSame( 'curl', $this->make_detector()->normalise_ua( 'curl' ) );
     }
 
-    public function test_normalise_ua_returns_first_token_for_mozilla_ua(): void {
-        $this->assertSame( 'Mozilla', $this->make_detector()->normalise_ua( 'Mozilla/5.0 (compatible; MyBot/1.0)' ) );
+    public function test_normalise_ua_uses_compatible_token_in_mozilla_ua(): void {
+        $this->assertSame( 'MyBot', $this->make_detector()->normalise_ua( 'Mozilla/5.0 (compatible; MyBot/1.0)' ) );
+    }
+
+    public function test_normalise_ua_uses_compatible_token_after_browser_tokens(): void {
+        $ua = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36';
+        $this->assertSame( 'bingbot', $this->make_detector()->normalise_ua( $ua ) );
+    }
+
+    public function test_normalise_ua_uses_bot_product_token_without_compatible(): void {
+        $ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)';
+        $this->assertSame( 'Applebot', $this->make_detector()->normalise_ua( $ua ) );
+    }
+
+    public function test_normalise_ua_returns_mozilla_for_plain_browser_ua(): void {
+        $ua = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+        $this->assertSame( 'Mozilla', $this->make_detector()->normalise_ua( $ua ) );
+    }
+
+    public function test_normalise_ua_ignores_compatible_token_without_version(): void {
+        $ua = 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)';
+        $this->assertSame( 'Mozilla', $this->make_detector()->normalise_ua( $ua ) );
     }
 
     public function test_normalise_ua_returns_empty_string_for_empty_input(): void {
