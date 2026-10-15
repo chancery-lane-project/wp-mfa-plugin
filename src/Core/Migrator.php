@@ -21,6 +21,38 @@ class Migrator {
 	public const OPTION_KEY = 'markdown_for_agents_db_version';
 
 	/**
+	 * Option holding every default UA string this site has already been offered.
+	 *
+	 * @since 1.7.3
+	 */
+	public const UA_SEEN_OPTION_KEY = 'markdown_for_agents_ua_defaults_seen';
+
+	/**
+	 * The UA defaults shipped in 1.1.0, before the seen-list existed.
+	 *
+	 * A site with no seen-list is assumed to have been offered these, so a
+	 * baseline string the admin removed is not restored. Strings added later
+	 * cannot be told apart from never-received ones, and are offered once.
+	 *
+	 * @since 1.7.3
+	 */
+	private const BASELINE_UA_AGENT_STRINGS = array(
+		'GPTBot',
+		'ChatGPT-User',
+		'ClaudeBot',
+		'Claude-Web',
+		'anthropic-ai',
+		'PerplexityBot',
+		'Google-Extended',
+		'Amazonbot',
+		'cohere-ai',
+		'meta-externalagent',
+		'Bytespider',
+		'CCBot',
+		'Applebot-Extended',
+	);
+
+	/**
 	 * Run any pending DB migrations.
 	 *
 	 * @since  1.2.0
@@ -77,5 +109,47 @@ class Migrator {
 		);
 
 		update_option( self::OPTION_KEY, StatsRepository::DB_VERSION );
+	}
+
+	/**
+	 * Append newly shipped default UA strings to a saved agent list.
+	 *
+	 * A saved `ua_agent_strings` list replaces the defaults wholesale, so sites
+	 * that saved their settings never receive strings added in later releases.
+	 * This offers each default once: strings the site has not been offered are
+	 * appended to its saved list, and an admin's later removal is respected.
+	 * Returns early, without writes, once every default has been offered.
+	 *
+	 * @since  1.7.3
+	 */
+	public static function maybe_sync_ua_defaults(): void {
+		$defaults = (array) Options::get_defaults()['ua_agent_strings'];
+		$seen     = get_option( self::UA_SEEN_OPTION_KEY, null );
+		$recorded = is_array( $seen );
+		$seen     = $recorded ? $seen : self::BASELINE_UA_AGENT_STRINGS;
+		$unseen   = array_diff( $defaults, $seen );
+
+		if ( $recorded && array() === $unseen ) {
+			return;
+		}
+
+		$saved = get_option( Options::OPTION_KEY, array() );
+		if ( is_array( $saved ) && isset( $saved['ua_agent_strings'] ) && is_array( $saved['ua_agent_strings'] ) ) {
+			$have  = array_map( 'strtolower', $saved['ua_agent_strings'] );
+			$added = false;
+
+			foreach ( $unseen as $string ) {
+				if ( ! in_array( strtolower( $string ), $have, true ) ) {
+					$saved['ua_agent_strings'][] = $string;
+					$added                       = true;
+				}
+			}
+
+			if ( $added ) {
+				update_option( Options::OPTION_KEY, $saved );
+			}
+		}
+
+		update_option( self::UA_SEEN_OPTION_KEY, array_values( array_unique( array_merge( $seen, $defaults ) ) ) );
 	}
 }
