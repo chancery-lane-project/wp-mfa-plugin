@@ -71,7 +71,13 @@ class AgentDetector {
 	 * 'LangChain/0.1.0'), making the label consistent across version changes.
 	 * Returns the raw string if it contains no '/', and '' for empty input.
 	 *
+	 * Browser-style UAs all start with 'Mozilla', so for those the bot's own
+	 * name is preferred where it declares one: a `compatible; Name/x.y` token
+	 * (bingbot, Googlebot), else a product token ending in bot/crawler/spider
+	 * (Applebot). Plain browser UAs keep the 'Mozilla' label.
+	 *
 	 * @since  1.2.0
+	 * @since  1.7.3 Labels bots that use a Mozilla-prefixed UA by their own name.
 	 * @param  string $ua The HTTP User-Agent header value.
 	 * @return string
 	 */
@@ -80,11 +86,24 @@ class AgentDetector {
 			return '';
 		}
 
-		if ( preg_match( '/^([^\/\s]+)/', $ua, $matches ) ) {
+		if ( ! preg_match( '/^([^\/\s]+)/', $ua, $matches ) ) {
+			return $ua;
+		}
+
+		$product = $matches[1];
+		if ( 0 !== strcasecmp( $product, 'Mozilla' ) ) {
+			return $product;
+		}
+
+		if ( preg_match( '/compatible;\s*([^\/;()\s]+)\//i', $ua, $matches ) ) {
 			return $matches[1];
 		}
 
-		return $ua;
+		if ( preg_match( '/([\w.-]*(?:bot|crawler|spider))\/\d/i', $ua, $matches ) ) {
+			return $matches[1];
+		}
+
+		return $product;
 	}
 
 	/**
