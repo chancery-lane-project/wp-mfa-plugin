@@ -305,7 +305,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Changelog ==
 
 = 1.8.0 =
-* Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, delete and regenerate the export (`wp markdown-agents delete --all --yes`, then `wp markdown-agents generate`), or the old flat files are left behind.
+* Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, regenerate (Settings → Generate everything, or `wp markdown-agents generate`) so child pages get their new files. The old flat files are no longer served but stay on disk and in the bundle; run `wp markdown-agents delete --all --yes` before regenerating to remove them.
 * Fix: renaming or moving a post deletes its Markdown file at the old path, and renaming or moving a parent page regenerates its child pages at their new paths (when auto-generate is on).
 * Fix: the `markdown_for_agents_export_path` filter can now point at a directory that does not exist yet. Such paths were previously ignored without warning.
 * Fix: `wp markdown-agents delete --post-type` now removes files in subdirectories too.
@@ -426,7 +426,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Upgrade Notice ==
 
 = 1.8.0 =
-Child pages now export under their parents' slugs (page/about/team.md). If your site has child pages, delete and regenerate the export after upgrading so the old flat files are removed.
+Child pages now export under their parents' slugs (page/about/team.md), so pages sharing a slug under different parents no longer serve each other's Markdown. If your site has child pages, run Generate everything after upgrading. Run wp markdown-agents delete --all --yes first to remove the old flat files.
 
 = 1.4.4 =
 Fixes a cache-poisoning issue where full-page caches (e.g. LiteSpeed) could serve the Markdown variant to regular browsers. Recommended upgrade if you run any reverse-proxy or page cache. Purge your cache after upgrading.

@@ -13,4 +13,5 @@ phpunit.xml.dist
 phpcs.xml
 .distignore
 .gitignore
+CLAUDE.md
 /vendor-prefixed/league/html-to-markdown/bin
