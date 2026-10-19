@@ -510,7 +510,7 @@ class Commands {
 				$fetched = count( $posts );
 
 				foreach ( $posts as $post ) {
-					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$relative_path = ExportPolicy::post_type_relative_path( $post );
 					$type_ids[]    = $post->ID;
 
 					if ( $manifest->is_changed( $post ) ) {
@@ -684,7 +684,11 @@ class Commands {
 	}
 
 	/**
+	 * Delete every .md file under a post type's directory, including child
+	 * pages nested in subdirectories, then remove subdirectories left empty.
+	 *
 	 * @since  1.0.0
+	 * @since  1.8.0 Recurses into subdirectories.
 	 */
 	private function delete_type( string $post_type ): void {
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
@@ -695,17 +699,30 @@ class Commands {
 			return;
 		}
 
-		$files     = glob( $type_dir . '/*.md' );
-		$files     = false !== $files ? $files : array();
 		$real_base = realpath( $type_dir );
-		foreach ( $files as $file ) {
-			$real_file = realpath( $file );
+		$deleted   = 0;
+		$iterator  = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $type_dir, \FilesystemIterator::SKIP_DOTS ),
+			\RecursiveIteratorIterator::CHILD_FIRST
+		);
+
+		foreach ( $iterator as $file ) {
+			/** @var \SplFileInfo $file */
+			$real_file = $file->getRealPath();
 			if ( false === $real_base || false === $real_file || ! str_starts_with( $real_file, $real_base . DIRECTORY_SEPARATOR ) ) {
 				continue;
 			}
-			unlink( $real_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+
+			if ( $file->isDir() ) {
+				// Children come first, so a subdirectory emptied above can go too.
+				if ( ! ( new \FilesystemIterator( $real_file ) )->valid() ) {
+					rmdir( $real_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+				}
+			} elseif ( 'md' === $file->getExtension() && unlink( $real_file ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				++$deleted;
+			}
 		}
 
-		\WP_CLI::log( sprintf( 'Deleted %d files for %s.', count( $files ), $post_type ) );
+		\WP_CLI::log( sprintf( 'Deleted %d files for %s.', $deleted, $post_type ) );
 	}
 }

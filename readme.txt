@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.7.2
+Stable tag: 1.8.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -304,13 +304,22 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
+= 1.8.0 =
+* Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, delete and regenerate the export (`wp markdown-agents delete --all --yes`, then `wp markdown-agents generate`), or the old flat files are left behind.
+* Fix: renaming or moving a post deletes its Markdown file at the old path, and renaming or moving a parent page regenerates its child pages at their new paths (when auto-generate is on).
+* Fix: the `markdown_for_agents_export_path` filter can now point at a directory that does not exist yet. Such paths were previously ignored without warning.
+* Fix: `wp markdown-agents delete --post-type` now removes files in subdirectories too.
+* Fix: sites with saved settings now pick up AI User-Agent strings added to the defaults in later releases. Each new default is added once, so strings an admin removed stay removed. Mozilla-style bot User-Agents (e.g. bingbot, Applebot) are now labelled by their own name in the statistics instead of 'Mozilla'.
+* Feature: new `markdown_for_agents_post_relative_path` filter to change a post's export path. Unlike `markdown_for_agents_export_path`, it is honoured by manifests, index listings and link rewriting as well as generation and serving. The README has snippets for WPML and Polylang sites where translations share a slug.
+* Feature: new `markdown_for_agents_is_eligible` filter to stop otherwise eligible posts being exported.
+* Feature: a Reset button beside Filter on the statistics page, shown whenever a filter or non-default date range is applied. It returns to the default view: all pages, operators, agents and methods over the last 7 days.
+
 = 1.7.2 =
 * Feature: the statistics page opens on the last 7 days by default. Last 30 days, This month, All time and custom dates are unchanged.
 * Feature: statistics dashboard summary showing recorded Markdown requests, most requested page, leading agent and leading operator for the selected filters and date range. Ties are shown as ties, and deleted posts are labelled by ID.
 * Feature: operator cards (OpenAI, Anthropic, Google, …) with per-agent totals. Selecting a card filters the summary, chart and tables while keeping other filters. Agents without reviewed operator details are counted under Unattributed, so the cards always add up to the total. New `markdown_for_agents_agent_operators` filter.
 * Feature: Top pages table listing the 10 most requested pages, with request counts and share of the total, for the selected filters and date range. Tied pages share a rank. Selecting a page filters the whole report.
 * Feature: the statistics page filter is now a type-to-search box with suggestions, replacing a dropdown that listed every page ever requested. Page titles load in a single query.
-* Feature: a Reset button beside Filter on the statistics page, shown whenever a filter or non-default date range is applied. It returns to the default view: all pages, operators, agents and methods over the last 7 days.
 * Fix: the statistics chart now includes Unknown requests (as a grey top layer), so each bar adds up to the day's total and the chart matches the summary and cards.
 * Fix: statistics cards no longer overflow the screen on narrow (phone-width) admin screens.
 * Fix: count only singular Markdown GET selections. HEAD probes and other HTTP methods no longer inflate page-access statistics; negotiated response headers remain available.
@@ -415,6 +424,9 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.8.0 =
+Child pages now export under their parents' slugs (page/about/team.md). If your site has child pages, delete and regenerate the export after upgrading so the old flat files are removed.
 
 = 1.4.4 =
 Fixes a cache-poisoning issue where full-page caches (e.g. LiteSpeed) could serve the Markdown variant to regular browsers. Recommended upgrade if you run any reverse-proxy or page cache. Purge your cache after upgrading.

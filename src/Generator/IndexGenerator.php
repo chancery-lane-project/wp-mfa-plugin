@@ -163,7 +163,7 @@ class IndexGenerator {
 			if ( ExportPolicy::is_eligible( $post, $this->options ) ) {
 				$entries[] = array(
 					'title'       => wp_strip_all_tags( $post->post_title ),
-					'target'      => sanitize_file_name( $post->post_name ) . '.md',
+					'target'      => ExportPolicy::post_type_relative_path( $post ),
 					'description' => wp_strip_all_tags( $post->post_excerpt ),
 				);
 			}
@@ -309,15 +309,18 @@ class IndexGenerator {
 	/**
 	 * Handler for `markdown_for_agents_file_deleted`. The post may already be
 	 * gone by the time this fires, so the post type is derived from the
-	 * deleted file's parent directory name rather than a post lookup.
+	 * deleted file's top-level directory under the export base rather than a
+	 * post lookup (child pages sit deeper, e.g. `page/about/team.md`).
 	 *
 	 * @since  1.6.0
 	 * @param  string $path    The absolute path to the deleted file.
 	 * @param  int    $post_id The deleted post's ID. Unused.
 	 */
 	public function on_file_deleted( string $path, int $post_id ): void {
-		$this->dirty[ 'type:' . basename( dirname( $path ) ) ] = true;
-		$this->dirty['root']                                   = true;
+		$relative = str_replace( '\\', '/', ltrim( substr( $path, strlen( $this->base ) ), '/\\' ) );
+
+		$this->dirty[ 'type:' . strtok( $relative, '/' ) ] = true;
+		$this->dirty['root']                               = true;
 	}
 
 	/**
@@ -514,13 +517,16 @@ class IndexGenerator {
 	}
 
 	/**
+	 * Only a post whose file would land at `{type}/index.md` counts; a child
+	 * page slugged "index" lives in its parent's subdirectory instead.
+	 *
 	 * @since  1.6.0
 	 * @param  \WP_Post[] $posts Published posts.
 	 * @return bool
 	 */
 	private function has_reserved_post_slug( array $posts ): bool {
 		foreach ( $posts as $post ) {
-			if ( 'index' === $post->post_name && 'publish' === $post->post_status ) {
+			if ( 'publish' === $post->post_status && 'index.md' === ExportPolicy::post_type_relative_path( $post ) ) {
 				return true;
 			}
 		}
@@ -606,9 +612,11 @@ class IndexGenerator {
 	}
 
 	/**
-	 * Count the .md files directly inside a directory, excluding index.md.
+	 * Count the .md files in a directory tree, excluding the directory's own
+	 * index.md. Recursive because child pages nest under their parents.
 	 *
 	 * @since  1.6.0
+	 * @since  1.8.0 Counts subdirectories too.
 	 * @param  string $dir Absolute directory path.
 	 * @return int
 	 */
@@ -617,12 +625,22 @@ class IndexGenerator {
 			return 0;
 		}
 
-		$files = glob( $dir . '/*.md' );
-		$files = false === $files ? array() : $files;
-
-		return count(
-			array_filter( $files, static fn( string $file ): bool => 'index.md' !== basename( $file ) )
+		$dir      = rtrim( $dir, '/\\' );
+		$count    = 0;
+		$iterator = new \RecursiveIteratorIterator(
+			new \RecursiveDirectoryIterator( $dir, \FilesystemIterator::SKIP_DOTS )
 		);
+
+		foreach ( $iterator as $file ) {
+			/** @var \SplFileInfo $file */
+			$is_own_index = 'index.md' === $file->getFilename() && $dir === $file->getPath();
+
+			if ( 'md' === $file->getExtension() && ! $is_own_index ) {
+				++$count;
+			}
+		}
+
+		return $count;
 	}
 
 	/**
