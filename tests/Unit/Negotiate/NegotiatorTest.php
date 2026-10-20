@@ -43,6 +43,7 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_is_tax']      = false;
         $GLOBALS['_mock_queried_object'] = null;
         $GLOBALS['_mock_sent_headers']   = [];
+        $GLOBALS['_mock_ob_buffers']     = [];
         $GLOBALS['_mock_post_meta']      = [];
         $_SERVER['HTTP_ACCEPT']          = '';
         $_SERVER['REQUEST_METHOD']       = 'GET';
@@ -624,6 +625,29 @@ class NegotiatorTest extends TestCase {
         $this->assertContains( 'Content-Signal: ai-input=yes, search=yes', $GLOBALS['_mock_sent_headers'] );
         $this->assertContains( 'X-Markdown-Source: markdown-for-agents', $GLOBALS['_mock_sent_headers'] );
         unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] );
+    }
+
+    public function test_discards_buffered_output_before_streaming_markdown(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        // Stray whitespace from a theme file, inside nested buffers.
+        $GLOBALS['_mock_ob_buffers']     = [ "\t", "\n" ];
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $buffers_at_readfile = null;
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \RuntimeException $e ) {
+            $buffers_at_readfile = $GLOBALS['_mock_ob_buffers'];
+        }
+
+        $this->assertSame( $md_file, $GLOBALS['_mock_readfile_path'] );
+        $this->assertSame( [], $buffers_at_readfile );
     }
 
     public function test_emits_cache_bypass_headers_to_prevent_full_page_cache_poisoning(): void {
