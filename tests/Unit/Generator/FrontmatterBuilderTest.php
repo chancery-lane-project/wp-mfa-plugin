@@ -366,4 +366,49 @@ class FrontmatterBuilderTest extends TestCase {
         $result = $builder->build($this->make_post());
         $this->assertSame(['Alice Example', ['speaker' => 'Alice Example', 'related' => 'Related clause']], $result['speakers']);
     }
+
+    public function test_html_field_values_are_cleaned_to_plain_text(): void {
+        $GLOBALS['_mock_post_meta'][42]['clause_summary'] = "<p>First &amp; foremost.</p>\n<p>Second <strong>para</strong>.</p>";
+        $GLOBALS['_mock_post_meta'][42]['notes']          = [ '<em>Nested</em> value', 'Plain < text' ];
+
+        $result = $this->make_builder( [
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => [ 'clause_summary', 'notes' ] ],
+            ],
+        ] )->build( $this->make_post() );
+
+        $this->assertSame( 'First & foremost. Second para.', $result['clause_summary'] );
+        $this->assertSame( [ 'Nested value', 'Plain < text' ], $result['notes'] );
+    }
+
+    public function test_html_field_with_only_markup_is_omitted(): void {
+        $GLOBALS['_mock_post_meta'][42]['clause_summary'] = '<p></p>';
+
+        $result = $this->make_builder( [
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => [ 'clause_summary' ] ],
+            ],
+        ] )->build( $this->make_post() );
+
+        $this->assertArrayNotHasKey( 'clause_summary', $result );
+    }
+
+    public function test_multi_paragraph_excerpt_keeps_word_boundaries(): void {
+        $post   = $this->make_post( [ 'post_excerpt' => '<p>One.</p><p>Two&nbsp;words.</p>' ] );
+        $result = $this->make_builder()->build( $post );
+
+        $this->assertSame( 'One. Two words.', $result['excerpt'] );
+    }
+
+    public function test_html_field_drops_script_contents_and_keeps_encoded_text(): void {
+        $GLOBALS['_mock_post_meta'][42]['clause_summary'] = '<p>Use &lt;b&gt; tags.</p><script>alert(1)</script>';
+
+        $result = $this->make_builder( [
+            'post_type_configs' => [
+                'post' => [ 'frontmatter_fields' => [ 'clause_summary' ] ],
+            ],
+        ] )->build( $this->make_post() );
+
+        $this->assertSame( 'Use <b> tags.', $result['clause_summary'] );
+    }
 }

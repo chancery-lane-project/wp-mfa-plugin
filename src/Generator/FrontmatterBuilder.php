@@ -36,13 +36,13 @@ class FrontmatterBuilder {
 	 */
 	public function build( \WP_Post $post ): array {
 		$frontmatter = array(
-			'title'     => wp_strip_all_tags( $post->post_title ),
+			'title'     => self::clean_text( $post->post_title ),
 			'date'      => $this->to_iso8601( $post->post_date_gmt ),
 			'modified'  => $this->to_iso8601( $post->post_modified_gmt ),
 			'permalink' => get_permalink( $post->ID ),
 			'type'      => $post->post_type,
 			'status'    => $post->post_status,
-			'excerpt'   => wp_strip_all_tags( $post->post_excerpt ),
+			'excerpt'   => self::clean_text( $post->post_excerpt ),
 			'wpid'      => $post->ID,
 		);
 
@@ -61,9 +61,9 @@ class FrontmatterBuilder {
 
 		foreach ( $fm_fields as $field_path ) {
 			$key   = $field_keys[ $field_path ];
-			$value = $this->field_resolver->resolve( $post->ID, $field_path );
+			$value = self::normalize_value( $this->field_resolver->resolve( $post->ID, $field_path ) );
 			if ( null !== $value && '' !== $value ) {
-				$frontmatter[ $key ] = self::normalize_value( $value );
+				$frontmatter[ $key ] = $value;
 			}
 		}
 
@@ -154,7 +154,7 @@ class FrontmatterBuilder {
 
 			$alt = get_post_meta( $thumbnail_id, '_wp_attachment_image_alt', true );
 			if ( $alt ) {
-				$frontmatter['featured_image_alt'] = wp_strip_all_tags( (string) $alt );
+				$frontmatter['featured_image_alt'] = self::clean_text( (string) $alt );
 			}
 		}
 
@@ -165,7 +165,8 @@ class FrontmatterBuilder {
 	 * Normalize a field value for safe YAML serialisation.
 	 *
 	 * Converts WP_Post objects (e.g. from ACF relationship fields) to their
-	 * titles and WP_Term objects to their names. Recursively normalizes arrays.
+	 * titles and WP_Term objects to their names, and cleans HTML out of strings
+	 * (e.g. ACF WYSIWYG fields). Recursively normalizes arrays.
 	 *
 	 * @since  1.1.0
 	 * @param  mixed $value The raw field value.
@@ -184,7 +185,41 @@ class FrontmatterBuilder {
 			return array_map( array( self::class, 'normalize_value' ), $value );
 		}
 
+		if ( is_string( $value ) ) {
+			return self::clean_text( $value );
+		}
+
 		return $value;
+	}
+
+	/**
+	 * Reduce an HTML string to single-line plain text for frontmatter.
+	 *
+	 * Strings with no tags or entities are returned unchanged, so plain values
+	 * such as "a < b" or deliberate line breaks are kept. Otherwise, block-level
+	 * tags become spaces (so paragraphs do not run together), then
+	 * wp_strip_all_tags() strips tags and collapses whitespace, and entities
+	 * are decoded last so encoded text such as "&lt;b&gt;" is not stripped.
+	 *
+	 * @since  1.7.3
+	 * @param  string $value The raw string.
+	 * @return string Plain text.
+	 */
+	private static function clean_text( string $value ): string {
+		$has_tag    = 1 === preg_match( '/<\/?[a-z!][^>]*>/i', $value );
+		$has_entity = 1 === preg_match( '/&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]*);/i', $value );
+
+		if ( ! $has_tag && ! $has_entity ) {
+			return $value;
+		}
+
+		// wp_strip_all_tags() does not separate adjacent blocks, so do that first.
+		$text = preg_replace( '/<\/?(?:p|div|br|hr|li|ul|ol|h[1-6]|blockquote|pre|table|tr|td|th|section|article)\b[^>]*>/i', ' ', $value ) ?? $value;
+		// Turn non-breaking spaces into plain spaces so the collapse below catches them.
+		$text = str_ireplace( array( '&nbsp;', '&#160;', '&#xa0;', "\u{00A0}" ), ' ', $text );
+		$text = wp_strip_all_tags( $text, true );
+
+		return html_entity_decode( $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 	}
 
 	/**

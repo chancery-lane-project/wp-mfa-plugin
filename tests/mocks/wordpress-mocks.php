@@ -408,8 +408,14 @@ if (!function_exists('get_queried_object')) {
 // ---------------------------------------------------------------------------
 
 if (!function_exists('wp_strip_all_tags')) {
+    // Mirrors core: drops script/style contents, strips tags, optionally collapses breaks, trims.
     function wp_strip_all_tags(string $string, bool $remove_breaks = false): string {
-        return strip_tags($string); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
+        $string = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $string) ?? $string;
+        $string = strip_tags($string); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
+        if ($remove_breaks) {
+            $string = preg_replace('/[\r\n\t ]+/', ' ', $string) ?? $string;
+        }
+        return trim($string);
     }
 }
 
