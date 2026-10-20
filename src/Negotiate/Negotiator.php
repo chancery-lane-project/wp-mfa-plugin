@@ -389,6 +389,14 @@ class Negotiator {
 			header( 'Content-Signal: ' . $content_signal );
 		}
 
+		// Discard anything already buffered, such as whitespace a theme or
+		// plugin printed outside its PHP tags, so the body starts with the
+		// file's front matter. Output that has already been flushed to the
+		// client cannot be recalled.
+		for ( $level = ob_get_level(); $level > 0; $level-- ) {
+			ob_end_clean();
+		}
+
 		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
 		exit;
 	}

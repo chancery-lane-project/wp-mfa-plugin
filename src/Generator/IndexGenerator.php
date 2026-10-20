@@ -616,7 +616,7 @@ class IndexGenerator {
 	 * index.md. Recursive because child pages nest under their parents.
 	 *
 	 * @since  1.6.0
-	 * @since  1.8.0 Counts subdirectories too.
+	 * @since  1.7.3 Counts subdirectories too.
 	 * @param  string $dir Absolute directory path.
 	 * @return int
 	 */

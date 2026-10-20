@@ -29,6 +29,25 @@ namespace Tclp\WpMarkdownForAgents\Negotiate {
     }
 
     /**
+     * Namespace-scoped stubs for PHP's output-buffer built-ins.
+     *
+     * Model the buffer stack as $GLOBALS['_mock_ob_buffers'] so tests can
+     * check buffered output is discarded without closing PHPUnit's own
+     * buffer.
+     */
+    function ob_get_level(): int {
+        return count( $GLOBALS['_mock_ob_buffers'] ?? [] );
+    }
+
+    function ob_end_clean(): bool {
+        if ( empty( $GLOBALS['_mock_ob_buffers'] ) ) {
+            return false;
+        }
+        array_pop( $GLOBALS['_mock_ob_buffers'] );
+        return true;
+    }
+
+    /**
      * Namespace-scoped stub for PHP's readfile() built-in.
      *
      * Records the path and throws to prevent the subsequent exit() from

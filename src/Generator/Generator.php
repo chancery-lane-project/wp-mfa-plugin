@@ -451,7 +451,7 @@ class Generator {
 	 * its new path and its old file removed. Trashing and restoring rename the
 	 * slug too, but those are left to on_transition_post_status.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  int      $post_id     The post ID.
 	 * @param  \WP_Post $post_after  The post as saved.
 	 * @param  \WP_Post $post_before The post before the update.
@@ -509,7 +509,7 @@ class Generator {
 	/**
 	 * Delete an export file left at a superseded path, if there is one.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  string $path    Absolute path to the old file.
 	 * @param  int    $post_id The post the file belonged to.
 	 */

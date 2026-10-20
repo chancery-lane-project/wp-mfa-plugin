@@ -688,7 +688,7 @@ class Commands {
 	 * pages nested in subdirectories, then remove subdirectories left empty.
 	 *
 	 * @since  1.0.0
-	 * @since  1.8.0 Recurses into subdirectories.
+	 * @since  1.7.3 Recurses into subdirectories.
 	 */
 	private function delete_type( string $post_type ): void {
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );

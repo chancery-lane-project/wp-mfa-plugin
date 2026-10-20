@@ -110,7 +110,7 @@ class FileWriter {
 	 * where sys_get_temp_dir() returns a symlink path.
 	 *
 	 * @since  1.0.0
-	 * @since  1.8.0 Public, so Generator can vet filtered export paths.
+	 * @since  1.7.3 Public, so Generator can vet filtered export paths.
 	 * @param  string $filepath The path to validate.
 	 * @return bool
 	 */

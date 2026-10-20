@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.8.0
+Stable tag: 1.7.3
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -304,11 +304,12 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= 1.8.0 =
+= 1.7.3 =
 * Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, regenerate (Settings → Generate everything, or `wp markdown-agents generate`) so child pages get their new files. The old flat files are no longer served but stay on disk and in the bundle; run `wp markdown-agents delete --all --yes` before regenerating to remove them.
 * Fix: renaming or moving a post deletes its Markdown file at the old path, and renaming or moving a parent page regenerates its child pages at their new paths (when auto-generate is on).
 * Fix: the `markdown_for_agents_export_path` filter can now point at a directory that does not exist yet. Such paths were previously ignored without warning.
 * Fix: `wp markdown-agents delete --post-type` now removes files in subdirectories too.
+* Fix: Markdown responses no longer start with stray whitespace printed by a theme or another plugin (for example a tab after a closing `?>`), which stopped strict parsers from finding the front matter.
 * Fix: sites with saved settings now pick up AI User-Agent strings added to the defaults in later releases. Each new default is added once, so strings an admin removed stay removed. Mozilla-style bot User-Agents (e.g. bingbot, Applebot) are now labelled by their own name in the statistics instead of 'Mozilla'.
 * Feature: new `markdown_for_agents_post_relative_path` filter to change a post's export path. Unlike `markdown_for_agents_export_path`, it is honoured by manifests, index listings and link rewriting as well as generation and serving. The README has snippets for WPML and Polylang sites where translations share a slug.
 * Feature: new `markdown_for_agents_is_eligible` filter to stop otherwise eligible posts being exported.
@@ -425,7 +426,7 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Upgrade Notice ==
 
-= 1.8.0 =
+= 1.7.3 =
 Child pages now export under their parents' slugs (page/about/team.md), so pages sharing a slug under different parents no longer serve each other's Markdown. If your site has child pages, run Generate everything after upgrading. Run wp markdown-agents delete --all --yes first to remove the old flat files.
 
 = 1.4.4 =

@@ -62,7 +62,7 @@ final class ExportPolicy {
 		 * the export (e.g. to the default language on a multilingual site) but
 		 * never widen it to drafts or password-protected posts.
 		 *
-		 * @since  1.8.0
+		 * @since  1.7.3
 		 * @param  bool     $eligible Always true when the filter runs.
 		 * @param  \WP_Post $post     The post.
 		 */
@@ -78,7 +78,7 @@ final class ExportPolicy {
 	 * among siblings.
 	 *
 	 * @since  1.6.0
-	 * @since  1.8.0 Hierarchical types nest under their ancestors; filterable.
+	 * @since  1.7.3 Hierarchical types nest under their ancestors; filterable.
 	 * @param  \WP_Post $post The post.
 	 * @return string
 	 */
@@ -94,7 +94,7 @@ final class ExportPolicy {
 		 * inside the post type's directory and end in `.md`; anything else is
 		 * ignored and the default is used.
 		 *
-		 * @since  1.8.0
+		 * @since  1.7.3
 		 * @param  string   $path Default path, e.g. `page/about/team.md`.
 		 * @param  \WP_Post $post The post.
 		 */
@@ -109,7 +109,7 @@ final class ExportPolicy {
 	 * This is the form manifests and post-type index listings use, e.g.
 	 * `about/team.md` for `page/about/team.md`.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  \WP_Post $post The post.
 	 * @return string
 	 */
@@ -124,7 +124,7 @@ final class ExportPolicy {
 	 * Uses the passed object's own post_name rather than re-reading it, so
 	 * callers can pass a clone with a restored slug (see the trash handler).
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  \WP_Post $post The post.
 	 * @return string
 	 */
@@ -148,7 +148,7 @@ final class ExportPolicy {
 	/**
 	 * Check a filtered path stays inside its post type's directory.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  string $path Candidate path relative to the export base.
 	 * @param  string $type Sanitised post type.
 	 * @return bool
