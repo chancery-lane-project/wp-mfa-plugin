@@ -1152,7 +1152,7 @@ class StatsPage {
 	/**
 	 * Split an object key into its type and ID.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  string $key Object key from DashboardSummary::object_key().
 	 * @return array{0: string, 1: int}
 	 */
@@ -1165,7 +1165,7 @@ class StatsPage {
 	/**
 	 * Display label for a post or term archive, by object key.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  string $key Object key from DashboardSummary::object_key().
 	 * @return string
 	 */
@@ -1186,7 +1186,7 @@ class StatsPage {
 	/**
 	 * Report URL filtered to one post or term archive, by object key.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  string $key Object key from DashboardSummary::object_key().
 	 * @return string
 	 */
@@ -1204,7 +1204,7 @@ class StatsPage {
 	 * Deleted terms stay identifiable by ID. An unregistered taxonomy falls back
 	 * to its slug.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  int    $term_id
 	 * @param  string $name     Term name, or '' for a deleted term.
 	 * @param  string $taxonomy Taxonomy slug.

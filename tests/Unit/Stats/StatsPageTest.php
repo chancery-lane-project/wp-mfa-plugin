@@ -1230,7 +1230,7 @@ class StatsPageTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
-    // Term archive rows (1.7.4)
+    // Term archive rows (1.7.3)
     // -----------------------------------------------------------------------
 
     private function stub_term_news(): void {

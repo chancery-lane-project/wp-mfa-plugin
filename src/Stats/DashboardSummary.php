@@ -151,7 +151,7 @@ class DashboardSummary {
 	 *
 	 * Post and term IDs overlap, so pages are keyed by type and ID together.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  string $object_type StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
 	 * @param  int    $object_id   Post or term ID.
 	 * @return string

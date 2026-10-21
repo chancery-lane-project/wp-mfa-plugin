@@ -370,7 +370,7 @@ class StatsRepository {
 	 * One round trip, like get_posts_with_stats(). A deleted term maps to an
 	 * empty name and taxonomy.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @return array<int, array{name: string, taxonomy: string}> Map of term_id => name and taxonomy.
 	 */
 	public function get_terms_with_stats(): array {

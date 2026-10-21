@@ -132,7 +132,7 @@ class Negotiator {
 	 *
 	 * Counts GET selections only, not HEAD probes or other HTTP methods.
 	 *
-	 * @since  1.7.4
+	 * @since  1.7.3
 	 * @param  int    $object_id     Post ID, or term ID for term archives.
 	 * @param  string $object_type   StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
 	 * @param  string $ua            Sanitised User-Agent header.
