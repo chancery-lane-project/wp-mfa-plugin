@@ -32,6 +32,22 @@ class AccessLoggerTest extends TestCase {
         $this->logger->log_access( 42, 'GPTBot', 'ua' );
     }
 
+    public function test_log_access_defaults_to_post_object_type(): void {
+        $this->repository->expects( $this->once() )
+            ->method( 'record_access' )
+            ->with( 42, 'GPTBot', 'ua', StatsRepository::OBJECT_POST );
+
+        $this->logger->log_access( 42, 'GPTBot', 'ua' );
+    }
+
+    public function test_log_access_passes_term_object_type(): void {
+        $this->repository->expects( $this->once() )
+            ->method( 'record_access' )
+            ->with( 7, 'ClaudeBot', 'ua', StatsRepository::OBJECT_TERM );
+
+        $this->logger->log_access( 7, 'ClaudeBot', 'ua', StatsRepository::OBJECT_TERM );
+    }
+
     public function test_log_access_passes_accept_header_method(): void {
         $this->repository->expects( $this->once() )
             ->method( 'record_access' )

@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Negotiate;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
+use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
 /**
  * Handles HTTP content negotiation for Markdown responses.
@@ -94,15 +95,7 @@ class Negotiator {
 				return;
 			}
 
-			// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
-			// Falls back to normalised UA so query-param / accept-header requests still
-			// record the caller's product name even when no known-agent pattern matches.
-			$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
-
-			// Count page GET selections, not HEAD probes or other HTTP methods.
-			if ( 'GET' === $method ) {
-				$this->access_logger->log_access( $post->ID, $agent, $access_method );
-			}
+			$this->log_access( $post->ID, StatsRepository::OBJECT_POST, $ua, $method, $access_method );
 			$this->send_markdown_file( $filepath, $access_method );
 			return;
 		}
@@ -129,8 +122,34 @@ class Negotiator {
 				return;
 			}
 
+			$this->log_access( $term->term_id, StatsRepository::OBJECT_TERM, $ua, $method, $access_method );
 			$this->send_markdown_file( $filepath, $access_method );
 		}
+	}
+
+	/**
+	 * Record a served Markdown request in the access stats.
+	 *
+	 * Counts GET selections only, not HEAD probes or other HTTP methods.
+	 *
+	 * @since  1.7.4
+	 * @param  int    $object_id     Post ID, or term ID for term archives.
+	 * @param  string $object_type   StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
+	 * @param  string $ua            Sanitised User-Agent header.
+	 * @param  string $method        HTTP request method.
+	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
+	 */
+	private function log_access( int $object_id, string $object_type, string $ua, string $method, string $access_method ): void {
+		if ( 'GET' !== $method ) {
+			return;
+		}
+
+		// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
+		// Falls back to normalised UA so query-param / accept-header requests still
+		// record the caller's product name even when no known-agent pattern matches.
+		$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
+
+		$this->access_logger->log_access( $object_id, $agent, $access_method, $object_type );
 	}
 
 	/**

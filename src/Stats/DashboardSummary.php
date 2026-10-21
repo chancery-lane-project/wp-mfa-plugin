@@ -54,15 +54,15 @@ class DashboardSummary {
 	 * @param  array<int, object> $daily_rows      Rows from StatsRepository::get_daily_agent_totals()
 	 *                                             (agent, total) for the report filters.
 	 * @param  array<int, object> $post_rows       Rows from StatsRepository::get_post_totals()
-	 *                                             (post_id, total), ordered by total descending.
+	 *                                             (post_id, object_type, total), ordered by total descending.
 	 * @param  int                $post_scan_limit The limit passed to get_post_totals(), so a tie
 	 *                                             that fills every row is reported as capped.
 	 * @return array{
 	 *     total: int,
-	 *     top_page: array{total: int, items: list<int>, count: int, capped: bool}|null,
+	 *     top_page: array{total: int, items: list<string>, count: int, capped: bool}|null,
 	 *     top_agent: array{total: int, items: list<string>, count: int, capped: bool}|null,
 	 *     top_operator: array{total: int, items: list<string>, count: int, capped: bool}|null,
-	 *     top_pages: list<array{rank: int, post_id: int, total: int, share: float}>,
+	 *     top_pages: list<array{rank: int, key: string, total: int, share: float}>,
 	 *     operators: list<array{key: string, label: string, total: int, agents: list<array{label: string, total: int}>, more: int}>
 	 * }
 	 */
@@ -147,6 +147,30 @@ class DashboardSummary {
 	}
 
 	/**
+	 * Key identifying a stats object across types, e.g. 'post:7' or 'term:12'.
+	 *
+	 * Post and term IDs overlap, so pages are keyed by type and ID together.
+	 *
+	 * @since  1.7.4
+	 * @param  string $object_type StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
+	 * @param  int    $object_id   Post or term ID.
+	 * @return string
+	 */
+	public static function object_key( string $object_type, int $object_id ): string {
+		return $object_type . ':' . $object_id;
+	}
+
+	/**
+	 * Object key for a stats row; rows without an object type are posts.
+	 *
+	 * @param  object $row Row with post_id and optionally object_type.
+	 * @return string
+	 */
+	private static function object_key_of( object $row ): string {
+		return self::object_key( (string) ( $row->object_type ?? StatsRepository::OBJECT_POST ), (int) ( $row->post_id ?? 0 ) );
+	}
+
+	/**
 	 * Rank the most-requested pages from rows ordered by total descending.
 	 *
 	 * Tied pages share a rank (1, 1, 3). Share is the fraction of the report
@@ -154,7 +178,7 @@ class DashboardSummary {
 	 *
 	 * @param  array<int, object> $post_rows
 	 * @param  int                $total     Report total for the same filters.
-	 * @return list<array{rank: int, post_id: int, total: int, share: float}>
+	 * @return list<array{rank: int, key: string, total: int, share: float}>
 	 */
 	private function top_pages( array $post_rows, int $total ): array {
 		$pages    = array();
@@ -170,10 +194,10 @@ class DashboardSummary {
 				$previous = $value;
 			}
 			$pages[] = array(
-				'rank'    => $rank,
-				'post_id' => (int) ( $row->post_id ?? 0 ),
-				'total'   => $value,
-				'share'   => $total > 0 ? $value / $total : 0.0,
+				'rank'  => $rank,
+				'key'   => self::object_key_of( $row ),
+				'total' => $value,
+				'share' => $total > 0 ? $value / $total : 0.0,
 			);
 		}
 
@@ -228,7 +252,7 @@ class DashboardSummary {
 	 *
 	 * @param  array<int, object> $post_rows
 	 * @param  int                $scan_limit Row limit used by the query.
-	 * @return array{total: int, items: list<int>, count: int, capped: bool}|null
+	 * @return array{total: int, items: list<string>, count: int, capped: bool}|null
 	 */
 	private function page_leader( array $post_rows, int $scan_limit ): ?array {
 		$max  = 0;
@@ -239,7 +263,7 @@ class DashboardSummary {
 				break;
 			}
 			$max    = $value;
-			$tied[] = (int) ( $row->post_id ?? 0 );
+			$tied[] = self::object_key_of( $row );
 		}
 
 		if ( empty( $tied ) ) {

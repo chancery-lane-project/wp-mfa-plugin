@@ -8,7 +8,11 @@ namespace Tclp\WpMarkdownForAgents\Stats;
  * Database access layer for agent access statistics.
  *
  * All queries against the custom `{prefix}mfa_access_stats` table go through
- * this class. Counters are aggregated daily per post + agent combination.
+ * this class. Counters are aggregated daily per object + agent combination.
+ *
+ * An object is a post or a taxonomy term (archive), told apart by the
+ * `object_type` column. The `post_id` column holds the object's ID: a post ID
+ * for posts, a term ID for terms. Filters and rows keep the `post_id` name.
  *
  * @since  1.1.0
  * @package Tclp\WpMarkdownForAgents\Stats
@@ -18,7 +22,13 @@ class StatsRepository {
 	private const TABLE_SUFFIX = 'mfa_access_stats';
 
 	/** DB schema version. Increment when the table structure changes. */
-	public const DB_VERSION = '1.1';
+	public const DB_VERSION = '1.2';
+
+	/** Object type for posts (any post type). */
+	public const OBJECT_POST = 'post';
+
+	/** Object type for taxonomy term archives. */
+	public const OBJECT_TERM = 'term';
 
 	/**
 	 * @since  1.1.0
@@ -47,12 +57,13 @@ class StatsRepository {
 		return "CREATE TABLE {$table} (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
         post_id bigint(20) unsigned NOT NULL,
+        object_type varchar(20) NOT NULL DEFAULT 'post',
         agent varchar(100) NOT NULL DEFAULT '',
         access_method varchar(20) NOT NULL DEFAULT '',
         access_date date NOT NULL,
         count int unsigned NOT NULL DEFAULT 1,
         PRIMARY KEY  (id),
-        UNIQUE KEY post_agent_date (post_id, agent, access_method, access_date),
+        UNIQUE KEY object_agent_date (object_type, post_id, agent, access_method, access_date),
         KEY access_date (access_date)
     ) {$charset};";
 	}
@@ -61,20 +72,22 @@ class StatsRepository {
 	 * Record a single access — upserts the daily counter.
 	 *
 	 * @since  1.1.0
-	 * @param  int    $post_id       The accessed post ID.
+	 * @param  int    $post_id       The accessed object ID: a post ID, or a term ID for terms.
 	 * @param  string $agent         Agent identity substring, or '' for unknown.
 	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
+	 * @param  string $object_type   self::OBJECT_POST or self::OBJECT_TERM.
 	 */
-	public function record_access( int $post_id, string $agent, string $access_method ): void {
+	public function record_access( int $post_id, string $agent, string $access_method, string $object_type = self::OBJECT_POST ): void {
 		$table = self::get_table_name( $this->wpdb );
 		$date  = gmdate( 'Y-m-d' );
 
 		$sql = $this->wpdb->prepare(
-			'INSERT INTO %i (post_id, agent, access_method, access_date, count)
-         VALUES (%d, %s, %s, %s, 1)
+			'INSERT INTO %i (post_id, object_type, agent, access_method, access_date, count)
+         VALUES (%d, %s, %s, %s, %s, 1)
          ON DUPLICATE KEY UPDATE count = count + 1',
 			$table,
 			$post_id,
+			$object_type,
 			$agent,
 			$access_method,
 			$date
@@ -101,7 +114,7 @@ class StatsRepository {
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $table is $wpdb->prefix only; $where_sql is built by build_where() with safe placeholders; spread arg count is dynamic but correct.
 		$sql = $this->wpdb->prepare(
-			"SELECT post_id, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT %d OFFSET %d",
+			"SELECT post_id, object_type, agent, access_method, access_date, count FROM {$table} {$where_sql} ORDER BY access_date DESC LIMIT %d OFFSET %d",
 			...array_merge( $values, array( $limit, $offset ) )
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
@@ -134,8 +147,9 @@ class StatsRepository {
 	/**
 	 * Build a WHERE clause and prepared values from a filters array.
 	 *
-	 * Supports 'post_id' (int), 'agent' (string), 'access_method' (string),
-	 * 'date_from' (string Y-m-d), and 'date_to' (string Y-m-d) keys, plus
+	 * Supports 'post_id' (int), 'object_type' (string), 'agent' (string),
+	 * 'access_method' (string), 'date_from' (string Y-m-d), and 'date_to'
+	 * (string Y-m-d) keys, plus
 	 * 'agents_in' / 'agents_not_in' (string[]) for operator filtering. An empty
 	 * 'agents_in' list matches nothing; an empty 'agents_not_in' list is ignored.
 	 *
@@ -150,6 +164,11 @@ class StatsRepository {
 		if ( ! empty( $filters['post_id'] ) ) {
 			$where[]  = 'post_id = %d';
 			$values[] = (int) $filters['post_id'];
+		}
+
+		if ( ! empty( $filters['object_type'] ) ) {
+			$where[]  = 'object_type = %s';
+			$values[] = (string) $filters['object_type'];
 		}
 
 		if ( ! empty( $filters['agent'] ) ) {
@@ -230,7 +249,7 @@ class StatsRepository {
 		$where_sql = $clause['sql'];
 		$values    = $clause['values'];
 
-		$sql = "SELECT agent, access_method, SUM(`count`) AS total, COUNT(DISTINCT post_id) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent, access_method ORDER BY total DESC"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$sql = "SELECT agent, access_method, SUM(`count`) AS total, COUNT(DISTINCT CONCAT(object_type, ':', post_id)) AS unique_posts FROM {$table} {$where_sql} GROUP BY agent, access_method ORDER BY total DESC"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( ! empty( $values ) ) {
 			$sql = $this->wpdb->prepare( $sql, ...$values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
@@ -266,16 +285,16 @@ class StatsRepository {
 	}
 
 	/**
-	 * Return the most-requested posts for the given filters.
+	 * Return the most-requested objects (posts and terms) for the given filters.
 	 *
-	 * Ordered by total descending, then post ID, and capped at $limit rows so the
-	 * query stays bounded however many posts have stats. Callers wanting to detect
-	 * ties should request more than one row.
+	 * Ordered by total descending, then object type and ID, and capped at $limit
+	 * rows so the query stays bounded however many objects have stats. Callers
+	 * wanting to detect ties should request more than one row.
 	 *
 	 * @since  1.7.2
 	 * @param  array<string, mixed> $filters Supports the build_where() keys.
 	 * @param  int                  $limit   Maximum rows to return (>= 1).
-	 * @return array<int, object>            Each object has post_id (int) and total (int).
+	 * @return array<int, object>            Each object has post_id (int), object_type (string) and total (int).
 	 */
 	public function get_post_totals( array $filters = array(), int $limit = 10 ): array {
 		$table  = self::get_table_name( $this->wpdb );
@@ -286,7 +305,7 @@ class StatsRepository {
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $table is $wpdb->prefix only; $where_sql is built by build_where() with safe placeholders; spread arg count is dynamic but correct.
 		$sql = $this->wpdb->prepare(
-			"SELECT post_id, SUM(`count`) AS total FROM {$table} {$where_sql} GROUP BY post_id ORDER BY total DESC, post_id ASC LIMIT %d",
+			"SELECT post_id, object_type, SUM(`count`) AS total FROM {$table} {$where_sql} GROUP BY object_type, post_id ORDER BY total DESC, object_type ASC, post_id ASC LIMIT %d",
 			...array_merge( $values, array( max( 1, $limit ) ) )
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
@@ -334,12 +353,40 @@ class StatsRepository {
 		$table = self::get_table_name( $this->wpdb );
 		$posts = $this->wpdb->posts;
 		$rows  = $this->wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-			"SELECT s.post_id, p.post_title FROM (SELECT DISTINCT post_id FROM {$table}) s LEFT JOIN {$posts} p ON p.ID = s.post_id ORDER BY s.post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			"SELECT s.post_id, p.post_title FROM (SELECT DISTINCT post_id FROM {$table} WHERE object_type = 'post') s LEFT JOIN {$posts} p ON p.ID = s.post_id ORDER BY s.post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		);
 
 		$result = array();
 		foreach ( $rows as $row ) {
 			$result[ (int) $row->post_id ] = (string) ( $row->post_title ?? '' );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Return term IDs, names and taxonomies for terms that have at least one stat row.
+	 *
+	 * One round trip, like get_posts_with_stats(). A deleted term maps to an
+	 * empty name and taxonomy.
+	 *
+	 * @since  1.7.4
+	 * @return array<int, array{name: string, taxonomy: string}> Map of term_id => name and taxonomy.
+	 */
+	public function get_terms_with_stats(): array {
+		$table         = self::get_table_name( $this->wpdb );
+		$terms         = $this->wpdb->terms;
+		$term_taxonomy = $this->wpdb->term_taxonomy;
+		$rows          = $this->wpdb->get_results( // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"SELECT s.post_id, t.name, tt.taxonomy FROM (SELECT DISTINCT post_id FROM {$table} WHERE object_type = 'term') s LEFT JOIN {$terms} t ON t.term_id = s.post_id LEFT JOIN {$term_taxonomy} tt ON tt.term_id = s.post_id ORDER BY s.post_id ASC" // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		);
+
+		$result = array();
+		foreach ( $rows as $row ) {
+			$result[ (int) $row->post_id ] = array(
+				'name'     => (string) ( $row->name ?? '' ),
+				'taxonomy' => (string) ( $row->taxonomy ?? '' ),
+			);
 		}
 
 		return $result;

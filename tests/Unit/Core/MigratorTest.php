@@ -20,6 +20,7 @@ class MigratorTest extends TestCase {
         $this->wpdb = new \wpdb();
         $GLOBALS['_mock_options']        = [];
         $GLOBALS['_mock_dbdelta_queries'] = [];
+        $GLOBALS['_mock_schema_events']   = [];
     }
 
     public function test_maybe_migrate_does_nothing_when_version_matches(): void {
@@ -46,6 +47,41 @@ class MigratorTest extends TestCase {
         $queries = array_column( $this->wpdb->queries, 'query' );
         $drop    = array_filter( $queries, fn( string $q ) => str_contains( $q, 'DROP INDEX' ) );
         $this->assertNotEmpty( $drop );
+    }
+
+    public function test_maybe_migrate_creates_object_type_column_and_index(): void {
+        Migrator::maybe_migrate( $this->wpdb );
+
+        $schema = $GLOBALS['_mock_dbdelta_queries'][0];
+        $this->assertStringContainsString( "object_type varchar(20) NOT NULL DEFAULT 'post'", $schema );
+        $this->assertStringContainsString( 'UNIQUE KEY object_agent_date (object_type, post_id, agent, access_method, access_date)', $schema );
+    }
+
+    public function test_maybe_migrate_adds_new_index_before_dropping_old_one(): void {
+        // The table must never be left without a unique key, or concurrent
+        // upserts would insert duplicate daily rows and block the new index.
+        $this->wpdb->mock_get_var = '1';
+
+        Migrator::maybe_migrate( $this->wpdb );
+
+        $this->assertSame(
+            [ 'dbDelta', 'ALTER TABLE wp_mfa_access_stats DROP INDEX post_agent_date' ],
+            $GLOBALS['_mock_schema_events']
+        );
+    }
+
+    public function test_maybe_migrate_drops_four_column_old_index(): void {
+        // 1.1 sites have a 4-column post_agent_date; the lookup must match it
+        // by name alone, not by its third column as the 1.0 check did.
+        Migrator::maybe_migrate( $this->wpdb );
+
+        $lookup = array_values( array_filter(
+            array_column( $this->wpdb->queries, 'query' ),
+            fn( string $q ) => str_contains( $q, 'information_schema.STATISTICS' )
+        ) );
+        $this->assertNotEmpty( $lookup );
+        $this->assertStringContainsString( "index_name = 'post_agent_date'", $lookup[0] );
+        $this->assertStringNotContainsString( 'seq_in_index', $lookup[0] );
     }
 
     public function test_maybe_migrate_skips_drop_when_index_absent(): void {

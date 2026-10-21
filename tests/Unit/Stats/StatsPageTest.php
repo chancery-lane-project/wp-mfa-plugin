@@ -1228,4 +1228,114 @@ class StatsPageTest extends TestCase {
             $this->assertStringContainsString( 'aria-label="' . $label . '"', $output );
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Term archive rows (1.7.4)
+    // -----------------------------------------------------------------------
+
+    private function stub_term_news(): void {
+        $GLOBALS['_mock_terms_by_id'][12]  = new \WP_Term( [ 'term_id' => 12, 'taxonomy' => 'category', 'slug' => 'news', 'name' => 'News' ] );
+        $GLOBALS['_mock_taxonomy_objects'] = [
+            'category' => (object) [ 'name' => 'category', 'labels' => (object) [ 'name' => 'Categories', 'singular_name' => 'Category' ] ],
+        ];
+    }
+
+    private function clear_term_news(): void {
+        unset( $GLOBALS['_mock_terms_by_id'], $GLOBALS['_mock_taxonomy_objects'] );
+    }
+
+    public function test_post_filter_is_restricted_to_post_rows(): void {
+        $_GET['post_id'] = '12';
+        $this->stub_post_search_repository( [ 12 => 'Clause library' ], $captured );
+
+        $this->render();
+
+        $this->assertSame( 12, $captured['post_id'] );
+        $this->assertSame( 'post', $captured['object_type'] );
+    }
+
+    public function test_term_id_filters_report_to_term_rows(): void {
+        $_GET['term_id'] = '12';
+        $this->stub_term_news();
+        $this->stub_post_search_repository( [], $captured );
+
+        $output = $this->render();
+        $this->clear_term_news();
+
+        $this->assertSame( 12, $captured['post_id'] );
+        $this->assertSame( 'term', $captured['object_type'] );
+        $this->assertMatchesRegularExpression( '/name="post_search"[^>]*value="Category: News"/s', $output );
+    }
+
+    public function test_top_pages_label_and_link_term_rows(): void {
+        $today = gmdate( 'Y-m-d' );
+        $this->stub_term_news();
+        $GLOBALS['_mock_post_titles'] = [ 12 => 'Clause library' ];
+        $this->stub_dashboard_repository(
+            [ (object) [ 'access_date' => $today, 'agent' => 'GPTBot', 'total' => 9 ] ],
+            [
+                (object) [ 'post_id' => 12, 'object_type' => 'term', 'total' => 5 ],
+                (object) [ 'post_id' => 12, 'object_type' => 'post', 'total' => 4 ],
+            ]
+        );
+
+        $output = $this->render();
+        $this->clear_term_news();
+        $GLOBALS['_mock_post_titles'] = [];
+
+        $this->assertMatchesRegularExpression( '/Most requested page.*?href="[^"]*term_id=12[^"]*">Category: News</s', $output );
+        $this->assertMatchesRegularExpression( '/<td><a href="[^"]*term_id=12[^"]*">Category: News<\/a><\/td>/', $output );
+        $this->assertMatchesRegularExpression( '/<td><a href="[^"]*post_id=12[^"]*">Clause library<\/a><\/td>/', $output );
+    }
+
+    public function test_daily_records_label_term_rows(): void {
+        $this->stub_term_news();
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [
+            (object) [ 'post_id' => 12, 'object_type' => 'term', 'agent' => 'GPTBot', 'access_method' => 'ua', 'access_date' => '2026-10-20', 'count' => 3 ],
+        ] );
+        $this->repository->method( 'get_total_count' )->willReturn( 1 );
+
+        $output = $this->render();
+        $this->clear_term_news();
+
+        $this->assertStringContainsString( '<td>Category: News</td>', $output );
+    }
+
+    public function test_page_search_offers_and_resolves_term_archives(): void {
+        $_GET['post_search'] = 'category: news';
+        $this->stub_term_news();
+        $this->repository->method( 'get_terms_with_stats' )->willReturn( [ 12 => [ 'name' => 'News', 'taxonomy' => 'category' ] ] );
+        $this->stub_post_search_repository( [ 12 => 'Clause library' ], $captured );
+
+        $output = $this->render();
+        $this->clear_term_news();
+
+        $this->assertStringContainsString( '<option value="Category: News">', $output );
+        $this->assertSame( 12, $captured['post_id'] );
+        $this->assertSame( 'term', $captured['object_type'] );
+    }
+
+    public function test_page_search_disambiguates_post_and_term_with_same_label(): void {
+        $_GET['post_search'] = 'News (term #12)';
+        $GLOBALS['_mock_taxonomy_objects'] = [ 'category' => (object) [ 'labels' => (object) [ 'name' => 'Categories', 'singular_name' => '' ] ] ];
+        $this->repository->method( 'get_terms_with_stats' )->willReturn( [ 12 => [ 'name' => 'News', 'taxonomy' => 'category' ] ] );
+        $this->stub_post_search_repository( [ 12 => 'News' ], $captured );
+
+        $output = $this->render();
+        unset( $GLOBALS['_mock_taxonomy_objects'] );
+
+        $this->assertStringContainsString( '<option value="News (#12)">', $output );
+        $this->assertStringContainsString( '<option value="News (term #12)">', $output );
+        $this->assertSame( 'term', $captured['object_type'] );
+    }
+
+    public function test_deleted_term_stays_identifiable(): void {
+        $_GET['term_id'] = '99';
+        $this->stub_post_search_repository( [] );
+
+        $output = $this->render();
+
+        $this->assertStringContainsString( 'Showing (deleted term #99) only.', $output );
+    }
 }

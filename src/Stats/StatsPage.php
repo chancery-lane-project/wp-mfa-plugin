@@ -96,26 +96,34 @@ class StatsPage {
 		}
 
 		$filter_post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;    // phpcs:ignore WordPress.Security.NonceVerification
+		$filter_term_id = isset( $_GET['term_id'] ) ? absint( $_GET['term_id'] ) : 0;    // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_agent         = isset( $_GET['agent'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['agent'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_access_method = isset( $_GET['access_method'] ) ? sanitize_key( (string) $_GET['access_method'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$filter_operator      = isset( $_GET['operator'] ) ? sanitize_key( (string) $_GET['operator'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification
 		$paged          = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;             // phpcs:ignore WordPress.Security.NonceVerification
 
-		// Page filter: the search box submits post_search (a datalist label), which
-		// wins over post_id; summary links set post_id and drop post_search.
-		$posts          = $this->repository->get_posts_with_stats();
-		$post_options   = $this->post_options( $posts );
+		// Page filter, keyed by object (DashboardSummary::object_key()): a post or
+		// a term archive. The search box submits post_search (a datalist label),
+		// which wins over post_id and term_id; summary links set one of those and
+		// drop post_search. post_id wins if both are present.
+		$filter_object = '';
+		if ( $filter_post_id > 0 ) {
+			$filter_object = DashboardSummary::object_key( StatsRepository::OBJECT_POST, $filter_post_id );
+		} elseif ( $filter_term_id > 0 ) {
+			$filter_object = DashboardSummary::object_key( StatsRepository::OBJECT_TERM, $filter_term_id );
+		}
+		$post_options   = $this->post_options( $this->repository->get_posts_with_stats(), $this->repository->get_terms_with_stats() );
 		$post_search    = isset( $_GET['post_search'] ) ? trim( sanitize_text_field( wp_unslash( (string) $_GET['post_search'] ) ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification
 		$post_unmatched = '';
 		if ( null !== $post_search ) {
-			$filter_post_id = $this->resolve_post_search( $post_search, $post_options );
-			if ( 0 === $filter_post_id && '' !== $post_search ) {
+			$filter_object = $this->resolve_post_search( $post_search, $post_options );
+			if ( '' === $filter_object && '' !== $post_search ) {
 				$post_unmatched = $post_search;
 			}
 		}
 		$post_search_value = '' !== $post_unmatched
 			? $post_unmatched
-			: ( $post_options[ $filter_post_id ] ?? ( $filter_post_id > 0 ? $this->post_label( $filter_post_id ) : '' ) );
+			: ( $post_options[ $filter_object ] ?? ( '' !== $filter_object ? $this->object_label( $filter_object ) : '' ) );
 
 		if ( '' !== $filter_operator && DashboardSummary::UNATTRIBUTED !== $filter_operator && ! array_key_exists( $filter_operator, $this->agent_detector->get_agent_operators() ) ) {
 			$filter_operator = '';
@@ -180,8 +188,10 @@ class StatsPage {
 		}
 
 		$count_filters = array();
-		if ( $filter_post_id > 0 ) {
-			$count_filters['post_id'] = $filter_post_id;
+		if ( '' !== $filter_object ) {
+			list( $object_type, $object_id ) = $this->parse_object_key( $filter_object );
+			$count_filters['post_id']        = $object_id;
+			$count_filters['object_type']    = $object_type;
 		}
 		if ( '' !== $filter_agent ) {
 			$count_filters['agent'] = $filter_agent;
@@ -224,7 +234,7 @@ class StatsPage {
 
 		// Anything other than the unfiltered last 7 days gets a Reset link.
 		$is_default_view = $active_7d
-			&& 0 === $filter_post_id
+			&& '' === $filter_object
 			&& '' === $post_unmatched
 			&& '' === $filter_operator
 			&& '' === $filter_agent
@@ -255,8 +265,8 @@ class StatsPage {
 			'page'     => $this->leader_html(
 				$dashboard['top_page'],
 				'page',
-				fn( $id ) => $this->post_label( (int) $id ),
-				fn( $id ) => $this->filter_url( array( 'post_id' => (int) $id ), array( 'post_search' ) )
+				fn( $key ) => $this->object_label( (string) $key ),
+				fn( $key ) => $this->object_filter_url( (string) $key )
 			),
 			'agent'    => $this->leader_html(
 				$dashboard['top_agent'],
@@ -610,13 +620,13 @@ class StatsPage {
 			<?php endif; ?>
 
 			<h2 class="mfa-section-title"><?php esc_html_e( 'Top pages', 'markdown-for-agents-and-statistics' ); ?></h2>
-			<?php if ( $filter_post_id > 0 ) : ?>
+			<?php if ( '' !== $filter_object ) : ?>
 				<p class="description">
 					<?php
 					/* translators: %s: page title. */
-					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->post_label( $filter_post_id ) ) );
+					echo esc_html( sprintf( __( 'Showing %s only.', 'markdown-for-agents-and-statistics' ), $this->object_label( $filter_object ) ) );
 					?>
-					<a href="<?php echo esc_url( $this->filter_url( array(), array( 'post_id', 'post_search' ) ) ); ?>"><?php esc_html_e( 'Clear page filter', 'markdown-for-agents-and-statistics' ); ?></a>
+					<a href="<?php echo esc_url( $this->filter_url( array(), array( 'post_id', 'term_id', 'post_search' ) ) ); ?>"><?php esc_html_e( 'Clear page filter', 'markdown-for-agents-and-statistics' ); ?></a>
 				</p>
 			<?php elseif ( empty( $dashboard['top_pages'] ) ) : ?>
 				<p><?php esc_html_e( 'No pages requested in this range.', 'markdown-for-agents-and-statistics' ); ?></p>
@@ -635,7 +645,7 @@ class StatsPage {
 						<?php foreach ( $dashboard['top_pages'] as $page_row ) : ?>
 							<tr>
 								<td class="num"><?php echo esc_html( number_format_i18n( $page_row['rank'] ) ); ?></td>
-								<td><a href="<?php echo esc_url( $this->filter_url( array( 'post_id' => $page_row['post_id'] ), array( 'post_search' ) ) ); ?>"><?php echo esc_html( $this->post_label( $page_row['post_id'] ) ); ?></a></td>
+								<td><a href="<?php echo esc_url( $this->object_filter_url( $page_row['key'] ) ); ?>"><?php echo esc_html( $this->object_label( $page_row['key'] ) ); ?></a></td>
 								<td class="num"><?php echo esc_html( number_format_i18n( $page_row['total'] ) ); ?></td>
 								<td class="num"><?php echo esc_html( $this->share_label( $page_row['share'] ) ); ?></td>
 							</tr>
@@ -699,7 +709,7 @@ class StatsPage {
 					<?php else : ?>
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
-								<td><?php echo esc_html( $this->post_label( (int) $row->post_id ) ); ?></td>
+								<td><?php echo esc_html( $this->object_label( DashboardSummary::object_key( (string) ( $row->object_type ?? StatsRepository::OBJECT_POST ), (int) $row->post_id ) ) ); ?></td>
 								<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
 								<td><?php echo esc_html( $row->access_method ); ?></td>
 								<td><?php echo esc_html( $row->access_date ); ?></td>
@@ -1067,23 +1077,31 @@ class StatsPage {
 	/**
 	 * Datalist labels for the page search, sorted by label.
 	 *
-	 * Untitled and deleted posts fall back to post_label(); duplicate labels get
-	 * a "(#id)" suffix so every label resolves to exactly one post.
+	 * Covers posts and term archives. Untitled and deleted posts fall back to
+	 * post_label(); duplicate labels get a "(#id)" suffix, or "(term #id)" for
+	 * terms, so every label resolves to exactly one object.
 	 *
 	 * @since  1.7.2
-	 * @param  array<int, string> $posts Map of post_id => title from get_posts_with_stats().
-	 * @return array<int, string>        Map of post_id => unique label.
+	 * @param  array<int, string>                                $posts Map of post_id => title from get_posts_with_stats().
+	 * @param  array<int, array{name: string, taxonomy: string}> $terms Map of term_id => name and taxonomy from get_terms_with_stats().
+	 * @return array<string, string>                                    Map of object key => unique label.
 	 */
-	private function post_options( array $posts ): array {
+	private function post_options( array $posts, array $terms = array() ): array {
 		$labels = array();
 		foreach ( $posts as $id => $title ) {
-			$labels[ (int) $id ] = '' !== $title ? $title : $this->post_label( (int) $id );
+			$labels[ DashboardSummary::object_key( StatsRepository::OBJECT_POST, (int) $id ) ] = '' !== $title ? $title : $this->post_label( (int) $id );
+		}
+		foreach ( $terms as $id => $term ) {
+			$labels[ DashboardSummary::object_key( StatsRepository::OBJECT_TERM, (int) $id ) ] = $this->format_term_label( (int) $id, $term['name'], $term['taxonomy'] );
 		}
 
 		$counts = array_count_values( array_map( 'mb_strtolower', $labels ) );
-		foreach ( $labels as $id => $label ) {
+		foreach ( $labels as $key => $label ) {
 			if ( $counts[ mb_strtolower( $label ) ] > 1 ) {
-				$labels[ $id ] = sprintf( '%s (#%d)', $label, $id );
+				list( $type, $id ) = $this->parse_object_key( $key );
+				$labels[ $key ]    = StatsRepository::OBJECT_TERM === $type
+					? sprintf( '%s (term #%d)', $label, $id )
+					: sprintf( '%s (#%d)', $label, $id );
 			}
 		}
 
@@ -1093,38 +1111,118 @@ class StatsPage {
 	}
 
 	/**
-	 * Resolve page search text to a post ID.
+	 * Resolve page search text to an object key.
 	 *
 	 * Tries an exact label, then a case-insensitive one, then a trailing "#123"
-	 * for a post with stats. Returns 0 for empty or unmatched text.
+	 * for a post (or "term #123" for a term) with stats. Returns '' for empty or
+	 * unmatched text.
 	 *
 	 * @since  1.7.2
-	 * @param  string             $search  Text from the search box.
-	 * @param  array<int, string> $options Map of post_id => label from post_options().
-	 * @return int
+	 * @param  string                $search  Text from the search box.
+	 * @param  array<string, string> $options Map of object key => label from post_options().
+	 * @return string
 	 */
-	private function resolve_post_search( string $search, array $options ): int {
+	private function resolve_post_search( string $search, array $options ): string {
 		if ( '' === $search ) {
-			return 0;
+			return '';
 		}
 
-		$id = array_search( $search, $options, true );
-		if ( false !== $id ) {
-			return (int) $id;
+		$key = array_search( $search, $options, true );
+		if ( false !== $key ) {
+			return (string) $key;
 		}
 
 		$needle = mb_strtolower( $search );
-		foreach ( $options as $id => $label ) {
+		foreach ( $options as $key => $label ) {
 			if ( mb_strtolower( $label ) === $needle ) {
-				return (int) $id;
+				return (string) $key;
 			}
 		}
 
-		if ( preg_match( '/#(\d+)\)?$/', $search, $m ) && isset( $options[ (int) $m[1] ] ) ) {
-			return (int) $m[1];
+		if ( preg_match( '/(term )?#(\d+)\)?$/i', $search, $m ) ) {
+			$key = DashboardSummary::object_key( '' !== $m[1] ? StatsRepository::OBJECT_TERM : StatsRepository::OBJECT_POST, (int) $m[2] );
+			if ( isset( $options[ $key ] ) ) {
+				return $key;
+			}
 		}
 
-		return 0;
+		return '';
+	}
+
+	/**
+	 * Split an object key into its type and ID.
+	 *
+	 * @since  1.7.4
+	 * @param  string $key Object key from DashboardSummary::object_key().
+	 * @return array{0: string, 1: int}
+	 */
+	private function parse_object_key( string $key ): array {
+		$parts = explode( ':', $key, 2 );
+
+		return array( $parts[0], (int) ( $parts[1] ?? 0 ) );
+	}
+
+	/**
+	 * Display label for a post or term archive, by object key.
+	 *
+	 * @since  1.7.4
+	 * @param  string $key Object key from DashboardSummary::object_key().
+	 * @return string
+	 */
+	private function object_label( string $key ): string {
+		list( $type, $id ) = $this->parse_object_key( $key );
+
+		if ( StatsRepository::OBJECT_TERM !== $type ) {
+			return $this->post_label( $id );
+		}
+
+		$term = get_term( $id );
+
+		return $term instanceof \WP_Term
+			? $this->format_term_label( $id, $term->name, $term->taxonomy )
+			: $this->format_term_label( $id, '', '' );
+	}
+
+	/**
+	 * Report URL filtered to one post or term archive, by object key.
+	 *
+	 * @since  1.7.4
+	 * @param  string $key Object key from DashboardSummary::object_key().
+	 * @return string
+	 */
+	private function object_filter_url( string $key ): string {
+		list( $type, $id ) = $this->parse_object_key( $key );
+
+		return StatsRepository::OBJECT_TERM === $type
+			? $this->filter_url( array( 'term_id' => $id ), array( 'post_id', 'post_search' ) )
+			: $this->filter_url( array( 'post_id' => $id ), array( 'term_id', 'post_search' ) );
+	}
+
+	/**
+	 * Display label for a term archive, e.g. "Category: News".
+	 *
+	 * Deleted terms stay identifiable by ID. An unregistered taxonomy falls back
+	 * to its slug.
+	 *
+	 * @since  1.7.4
+	 * @param  int    $term_id
+	 * @param  string $name     Term name, or '' for a deleted term.
+	 * @param  string $taxonomy Taxonomy slug.
+	 * @return string
+	 */
+	private function format_term_label( int $term_id, string $name, string $taxonomy ): string {
+		if ( '' === $name ) {
+			/* translators: %d: term ID. */
+			return sprintf( __( '(deleted term #%d)', 'markdown-for-agents-and-statistics' ), $term_id );
+		}
+
+		$tax_object = '' !== $taxonomy ? get_taxonomy( $taxonomy ) : false;
+		$tax_label  = $tax_object ? (string) ( $tax_object->labels->singular_name ?? $tax_object->labels->name ?? $taxonomy ) : $taxonomy;
+
+		return '' !== $tax_label
+			/* translators: 1: taxonomy singular name, e.g. "Category". 2: term name. */
+			? sprintf( __( '%1$s: %2$s', 'markdown-for-agents-and-statistics' ), $tax_label, $name )
+			: $name;
 	}
 
 	/**
