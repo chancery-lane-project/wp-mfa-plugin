@@ -39,9 +39,52 @@ class StatsRepositoryTest extends TestCase {
         $this->assertStringContainsString( 'access_method', $sql );
     }
 
-    public function test_get_create_table_sql_unique_index_includes_access_method(): void {
+    public function test_get_create_table_sql_unique_index_includes_object_type_and_access_method(): void {
         $sql = StatsRepository::get_create_table_sql( $this->wpdb );
-        $this->assertMatchesRegularExpression( '/UNIQUE KEY post_agent_date \(post_id, agent, access_method, access_date\)/', $sql );
+        $this->assertMatchesRegularExpression( '/UNIQUE KEY object_agent_date \(object_type, post_id, agent, access_method, access_date\)/', $sql );
+    }
+
+    public function test_get_create_table_sql_defaults_object_type_to_post(): void {
+        $sql = StatsRepository::get_create_table_sql( $this->wpdb );
+        $this->assertStringContainsString( "object_type varchar(20) NOT NULL DEFAULT 'post'", $sql );
+    }
+
+    public function test_record_access_defaults_to_post_object_type(): void {
+        $this->repo->record_access( 42, 'GPTBot', 'ua' );
+
+        $prepared = $this->wpdb->queries[0];
+        $this->assertStringContainsString( '(post_id, object_type, agent,', $prepared['query'] );
+        $this->assertSame( StatsRepository::OBJECT_POST, $prepared['args'][2] );
+    }
+
+    public function test_record_access_stores_term_object_type(): void {
+        $this->repo->record_access( 12, 'GPTBot', 'ua', StatsRepository::OBJECT_TERM );
+
+        $prepared = $this->wpdb->queries[0];
+        $this->assertSame( 12, $prepared['args'][1] );
+        $this->assertSame( StatsRepository::OBJECT_TERM, $prepared['args'][2] );
+    }
+
+    public function test_object_type_filter_builds_where_clause(): void {
+        $this->repo->get_stats( [ 'post_id' => 12, 'object_type' => StatsRepository::OBJECT_TERM ] );
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( "post_id = 12 AND object_type = 'term'", $last['query'] );
+    }
+
+    public function test_get_stats_selects_object_type_column(): void {
+        $this->repo->get_stats();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( 'SELECT post_id, object_type,', $last['query'] );
+    }
+
+    public function test_get_agent_summary_counts_unique_objects_across_types(): void {
+        // Post 12 and term 12 are different pages.
+        $this->repo->get_agent_summary();
+
+        $last = end( $this->wpdb->queries );
+        $this->assertStringContainsString( "COUNT(DISTINCT CONCAT(object_type, ':', post_id)) AS unique_posts", $last['query'] );
     }
 
     public function test_record_access_builds_upsert_query(): void {
@@ -146,6 +189,37 @@ class StatsRepositoryTest extends TestCase {
 
         $this->assertCount( 1, $this->wpdb->queries );
         $this->assertStringContainsString( 'LEFT JOIN wp_posts', $this->wpdb->queries[0]['query'] );
+    }
+
+    public function test_get_posts_with_stats_excludes_term_rows(): void {
+        $this->repo->get_posts_with_stats();
+
+        $this->assertStringContainsString( "WHERE object_type = 'post'", $this->wpdb->queries[0]['query'] );
+    }
+
+    public function test_get_terms_with_stats_returns_names_and_taxonomies(): void {
+        $this->wpdb->mock_get_results = [
+            (object) [ 'post_id' => 4, 'name' => 'News', 'taxonomy' => 'category' ],
+            (object) [ 'post_id' => 9, 'name' => null, 'taxonomy' => null ],
+        ];
+
+        $this->assertSame(
+            [
+                4 => [ 'name' => 'News', 'taxonomy' => 'category' ],
+                9 => [ 'name' => '', 'taxonomy' => '' ],
+            ],
+            $this->repo->get_terms_with_stats()
+        );
+    }
+
+    public function test_get_terms_with_stats_joins_names_in_one_query(): void {
+        $this->repo->get_terms_with_stats();
+
+        $this->assertCount( 1, $this->wpdb->queries );
+        $query = $this->wpdb->queries[0]['query'];
+        $this->assertStringContainsString( "WHERE object_type = 'term'", $query );
+        $this->assertStringContainsString( 'LEFT JOIN wp_terms', $query );
+        $this->assertStringContainsString( 'LEFT JOIN wp_term_taxonomy', $query );
     }
 
     public function test_get_stats_with_post_id_and_agent_filters(): void {
@@ -256,7 +330,7 @@ class StatsRepositoryTest extends TestCase {
     }
 
     public function test_db_version_constant_is_defined(): void {
-        $this->assertSame( '1.1', StatsRepository::DB_VERSION );
+        $this->assertSame( '1.2', StatsRepository::DB_VERSION );
     }
 
     public function test_delete_before_date_issues_delete_query(): void {
@@ -315,8 +389,9 @@ class StatsRepositoryTest extends TestCase {
         $this->repo->get_post_totals( [ 'date_from' => '2026-09-17', 'agents_in' => [ 'GPTBot' ] ], 50 );
 
         $last = end( $this->wpdb->queries );
-        $this->assertStringContainsString( 'GROUP BY post_id', $last['query'] );
-        $this->assertStringContainsString( 'ORDER BY total DESC, post_id ASC', $last['query'] );
+        $this->assertStringContainsString( 'SELECT post_id, object_type, SUM', $last['query'] );
+        $this->assertStringContainsString( 'GROUP BY object_type, post_id', $last['query'] );
+        $this->assertStringContainsString( 'ORDER BY total DESC, object_type ASC, post_id ASC', $last['query'] );
         $this->assertStringContainsString( "agent IN ('GPTBot')", $last['query'] );
         $this->assertStringContainsString( 'LIMIT 50', $last['query'] );
     }

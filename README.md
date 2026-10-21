@@ -29,7 +29,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
 - **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
 - **OKF-compliant frontmatter and links** - `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
-- **Access statistics** - logs AI agent requests with a filterable stats page (default: last 7 days) showing a headline summary (recorded requests, most requested page, leading agent and operator), operator cards that filter the report, intent breakdowns, and per-agent, per-post and per-access-method records with date range filtering and pagination
+- **Access statistics** - logs AI agent requests with a filterable stats page (default: last 7 days) showing a headline summary (recorded requests, most requested page, leading agent and operator), operator cards that filter the report, intent breakdowns, and per-agent, per-page (posts and taxonomy term archives) and per-access-method records with date range filtering and pagination
 - **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`, `generate-indexes`
 - **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
 - **Fully unit-tested** - PHPUnit 9.6 test suite
