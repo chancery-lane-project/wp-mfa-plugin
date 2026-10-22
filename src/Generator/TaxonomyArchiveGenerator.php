@@ -242,11 +242,10 @@ class TaxonomyArchiveGenerator {
 			$title   = wp_strip_all_tags( $post->post_title );
 			$excerpt = wp_strip_all_tags( $post->post_excerpt );
 
+			$url = (string) get_permalink( $post->ID );
+
 			if ( in_array( $post->post_type, $enabled_post_types, true ) ) {
-				$url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options )
-					. '/' . ExportPolicy::post_relative_path( $post );
-			} else {
-				$url = get_permalink( $post->ID );
+				$url = LinkRewriter::markdown_url( $url );
 			}
 
 			$line = '- [' . $title . '](' . $url . ')';

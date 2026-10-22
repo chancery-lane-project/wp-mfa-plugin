@@ -236,6 +236,77 @@ class BundleGeneratorTest extends TestCase {
         $this->assertStringContainsString( '[clause](clause/foo.md)', $entries['index.md'] );
     }
 
+    public function test_build_rewrites_markdown_page_urls_via_frontmatter_permalinks(): void {
+        $this->write_file( 'post/other.md', "---\npermalink: \"https://example.com/other/\"\n---\n\n# Other\n" );
+        $this->write_file( 'taxonomy/category/news.md', "---\npermalink: \"https://example.com/category/news/\"\n---\n\n# News\n" );
+        $this->write_file(
+            'post/hello.md',
+            "---\npermalink: \"https://example.com/hello/\"\n---\n\n"
+            . "[o](https://example.com/other/?output_format=md#part) [n](https://example.com/category/news/?output_format=md) [me](https://example.com/hello/?output_format=md)\n"
+        );
+
+        $this->generator->build();
+
+        $rewritten = $this->read_archive_entries( $this->generator->bundle_path() )['post/hello.md'];
+
+        $this->assertStringContainsString( '[o](other.md#part)', $rewritten );
+        $this->assertStringContainsString( '[n](../taxonomy/category/news.md)', $rewritten );
+        $this->assertStringContainsString( '[me](hello.md)', $rewritten );
+        $this->assertStringContainsString( 'permalink: "https://example.com/hello/"', $rewritten );
+    }
+
+    public function test_build_maps_front_page_and_plain_permalinks(): void {
+        $this->write_file( 'page/home.md', "---\npermalink: \"https://example.com/\"\n---\n" );
+        $this->write_file( 'post/plain.md', "---\npermalink: \"https://example.com/?p=12\"\n---\n" );
+        $this->write_file(
+            'index.md',
+            "[home](https://example.com/?output_format=md) [plain](https://example.com/?p=12&output_format=md)\n"
+        );
+
+        $this->generator->build();
+
+        $rewritten = $this->read_archive_entries( $this->generator->bundle_path() )['index.md'];
+
+        $this->assertStringContainsString( '[home](page/home.md)', $rewritten );
+        $this->assertStringContainsString( '[plain](post/plain.md)', $rewritten );
+    }
+
+    public function test_build_maps_a_relocated_file_to_where_it_actually_is(): void {
+        // A post moved by the markdown_for_agents_export_path filter.
+        $this->write_file( 'guides/2026/other.md', "---\npermalink: \"https://example.com/other/\"\n---\n" );
+        $this->write_file( 'post/hello.md', "[o](https://example.com/other/?output_format=md)\n" );
+
+        $this->generator->build();
+
+        $rewritten = $this->read_archive_entries( $this->generator->bundle_path() )['post/hello.md'];
+
+        $this->assertStringContainsString( '[o](../guides/2026/other.md)', $rewritten );
+    }
+
+    public function test_build_leaves_page_urls_without_an_exported_file_absolute(): void {
+        $this->write_file( 'post/hello.md', "[gone](https://example.com/missing/?output_format=md)\n" );
+        // Frontmatter without a permalink key, e.g. removed by a filter.
+        $this->write_file( 'post/nokey.md', "---\ntitle: No key\n---\n\n[x](https://example.com/nokey/?output_format=md)\n" );
+
+        $this->generator->build();
+
+        $entries = $this->read_archive_entries( $this->generator->bundle_path() );
+
+        $this->assertStringContainsString( '[gone](https://example.com/missing/?output_format=md)', $entries['post/hello.md'] );
+        $this->assertStringContainsString( '[x](https://example.com/nokey/?output_format=md)', $entries['post/nokey.md'] );
+    }
+
+    public function test_build_ignores_a_permalink_key_outside_the_frontmatter(): void {
+        $this->write_file( 'post/body.md', "---\ntitle: Body\n---\n\npermalink: https://example.com/fake/\n" );
+        $this->write_file( 'post/hello.md', "[f](https://example.com/fake/?output_format=md)\n" );
+
+        $this->generator->build();
+
+        $rewritten = $this->read_archive_entries( $this->generator->bundle_path() )['post/hello.md'];
+
+        $this->assertStringContainsString( '[f](https://example.com/fake/?output_format=md)', $rewritten );
+    }
+
     public function test_build_includes_manifest_json_verbatim(): void {
         $manifest = '{"files":{"post/hello.md":"abc123"}}';
         $this->write_file( 'manifest.json', $manifest );

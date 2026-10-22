@@ -695,13 +695,22 @@ class Generator {
 				continue;
 			}
 
-			$links    = array();
-			$base_url = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base_url( $this->options );
+			$links = array();
 
 			foreach ( $terms as $term ) {
+				$link = get_term_link( $term );
+
+				if ( ! is_string( $link ) ) {
+					continue;
+				}
+
 				$name    = html_entity_decode( $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
-				$url     = $base_url . '/' . ExportPolicy::term_relative_path( $term->taxonomy, $term->slug );
+				$url     = LinkRewriter::markdown_url( $link );
 				$links[] = "[{$name}]({$url})";
+			}
+
+			if ( empty( $links ) ) {
+				continue;
 			}
 
 			$lines[] = '**' . wp_specialchars_decode( (string) $taxonomy->label, ENT_QUOTES ) . ':** ' . implode( ', ', $links );

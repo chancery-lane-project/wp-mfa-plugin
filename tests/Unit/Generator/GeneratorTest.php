@@ -509,7 +509,7 @@ class GeneratorTest extends TestCase {
         $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
         $gen->generate_post( $post );
 
-        $expected_url = 'https://example.com/wp-content/uploads/' . $this->export_subdir . '/taxonomy/category/news.md';
+        $expected_url = 'https://example.com/category/news/?output_format=md';
         $this->assertStringContainsString( '## Topics', $written );
         $this->assertStringContainsString( "[News]({$expected_url})", $written );
         $this->assertStringContainsString( 'Categories', $written );
@@ -676,13 +676,12 @@ class GeneratorTest extends TestCase {
     // Link rewriting
     // -----------------------------------------------------------------------
 
-    public function test_rewrites_internal_links_to_md_urls(): void {
+    public function test_rewrites_internal_links_to_markdown_page_urls(): void {
         $post = $this->make_post( ['ID' => 42] );
 
-        $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
+        $map = [ 'https://example.com/other-post/' => 'https://example.com/other-post/' ];
         $link_rewriter = new LinkRewriter(
-            fn( string $url ): ?string => $map[ $url ] ?? null,
-            'https://example.com/wp-content/uploads/wp-mfa-exports'
+            fn( string $url ): ?string => $map[ $url ] ?? null
         );
 
         $written = '';
@@ -700,7 +699,7 @@ class GeneratorTest extends TestCase {
         $gen->generate_post( $post );
 
         $this->assertStringContainsString(
-            '[other post](https://example.com/wp-content/uploads/wp-mfa-exports/post/other-post.md)',
+            '[other post](https://example.com/other-post/?output_format=md)',
             $written
         );
     }
