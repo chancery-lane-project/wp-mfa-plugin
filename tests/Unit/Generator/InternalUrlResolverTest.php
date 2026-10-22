@@ -23,6 +23,7 @@ class InternalUrlResolverTest extends TestCase {
 		$GLOBALS['_mock_posts']               = [];
 		$GLOBALS['_mock_get_posts_args']      = [];
 		$GLOBALS['_mock_fired_actions']       = [];
+		$GLOBALS['_mock_permalinks']          = [];
 	}
 
 	protected function tearDown(): void {
@@ -36,7 +37,8 @@ class InternalUrlResolverTest extends TestCase {
 			$GLOBALS['_mock_term_link'],
 			$GLOBALS['_mock_posts'],
 			$GLOBALS['_mock_get_posts_args'],
-			$GLOBALS['_mock_fired_actions']
+			$GLOBALS['_mock_fired_actions'],
+			$GLOBALS['_mock_permalinks']
 		);
 	}
 
@@ -95,10 +97,35 @@ class InternalUrlResolverTest extends TestCase {
 		$post = $this->make_post();
 		$GLOBALS['_mock_post_objects'][1]  = $post;
 		$GLOBALS['_mock_url_to_postid']['https://example.com/my-post/'] = 1;
+		$GLOBALS['_mock_permalinks'][1] = 'https://example.com/my-post/';
 
 		$r = $this->resolver();
 
-		$this->assertSame( 'post/my-post.md', $r->resolve( 'https://example.com/my-post/' ) );
+		$this->assertSame( 'https://example.com/my-post/', $r->resolve( 'https://example.com/my-post/' ) );
+	}
+
+	public function test_root_relative_url_resolves_as_same_host(): void {
+		$GLOBALS['_mock_post_objects'][1] = $this->make_post();
+		$GLOBALS['_mock_url_to_postid']['https://example.com/my-post/'] = 1;
+		$GLOBALS['_mock_permalinks'][1] = 'https://example.com/my-post/';
+
+		$r = $this->resolver();
+
+		$this->assertSame( 'https://example.com/my-post/', $r->resolve( '/my-post/' ) );
+	}
+
+	public function test_protocol_relative_url_is_not_treated_as_root_relative(): void {
+		$r = $this->resolver();
+
+		$this->assertNull( $r->resolve( '//elsewhere.org/my-post/' ) );
+		$this->assertSame( [], $this->unresolved_events() );
+	}
+
+	public function test_unresolved_root_relative_link_is_reported_in_absolute_form(): void {
+		$r = $this->resolver();
+		$r->resolve( '/nowhere/' );
+
+		$this->assertSame( [ [ 'https://example.com/nowhere/', 'not_found' ] ], $this->unresolved_events() );
 	}
 
 	public function test_post_of_non_enabled_type_returns_null(): void {
@@ -142,14 +169,14 @@ class InternalUrlResolverTest extends TestCase {
 		$this->assertNull( $r->resolve( 'https://example.com/my-post/' ) );
 	}
 
-	public function test_term_url_resolves_to_taxonomy_path(): void {
+	public function test_term_url_resolves_to_term_link(): void {
 		$term = $this->make_term();
 		$GLOBALS['_mock_taxonomy_terms']['category'] = [ $term ];
 		$GLOBALS['_mock_term_link'][10] = 'https://example.com/category/climate-law/';
 
 		$r = $this->resolver();
 
-		$this->assertSame( 'taxonomy/category/climate-law.md', $r->resolve( 'https://example.com/category/climate-law/' ) );
+		$this->assertSame( 'https://example.com/category/climate-law/', $r->resolve( 'https://example.com/category/climate-law/' ) );
 	}
 
 	public function test_term_url_comparison_is_trailing_slash_insensitive(): void {
@@ -159,7 +186,7 @@ class InternalUrlResolverTest extends TestCase {
 
 		$r = $this->resolver();
 
-		$this->assertSame( 'taxonomy/category/climate-law.md', $r->resolve( 'https://example.com/category/climate-law' ) );
+		$this->assertSame( 'https://example.com/category/climate-law/', $r->resolve( 'https://example.com/category/climate-law' ) );
 	}
 
 	public function test_unknown_internal_url_returns_null(): void {
@@ -189,14 +216,15 @@ class InternalUrlResolverTest extends TestCase {
 		$this->assertSame( 1, $GLOBALS['_mock_url_to_postid_calls'] );
 	}
 
-	public function test_old_slug_resolves_to_current_export_path(): void {
+	public function test_old_slug_resolves_to_current_permalink(): void {
 		$post = $this->make_post( [ 'post_name' => 'scope-1-2-and-3-emissions' ] );
 		$this->register_old_slug( $post, 'scope-emissions' );
+		$GLOBALS['_mock_permalinks'][1] = 'https://example.com/glossary/scope-1-2-and-3-emissions/';
 
 		$r = $this->resolver();
 
 		$this->assertSame(
-			'post/scope-1-2-and-3-emissions.md',
+			'https://example.com/glossary/scope-1-2-and-3-emissions/',
 			$r->resolve( 'https://example.com/glossary/scope-emissions/' )
 		);
 	}
@@ -299,7 +327,7 @@ class InternalUrlResolverTest extends TestCase {
 		$r->resolve( 'https://example.com/category/net-zero/' );
 
 		// Both terms are already available in the taxonomy map built on first lookup.
-		$this->assertSame( 'taxonomy/category/climate-law.md', $r->resolve( 'https://example.com/category/climate-law/' ) );
-		$this->assertSame( 'taxonomy/category/net-zero.md', $r->resolve( 'https://example.com/category/net-zero/' ) );
+		$this->assertSame( 'https://example.com/category/climate-law/', $r->resolve( 'https://example.com/category/climate-law/' ) );
+		$this->assertSame( 'https://example.com/category/net-zero/', $r->resolve( 'https://example.com/category/net-zero/' ) );
 	}
 }

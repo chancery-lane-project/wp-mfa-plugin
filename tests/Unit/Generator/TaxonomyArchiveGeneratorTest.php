@@ -250,7 +250,7 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
     // generate_term — body links
     // -----------------------------------------------------------------------
 
-    public function test_body_links_to_md_files(): void {
+    public function test_body_links_to_markdown_page_urls(): void {
         $GLOBALS['_mock_posts']     = [
             new \WP_Post( ['ID' => 1, 'post_title' => 'Post One', 'post_excerpt' => '', 'post_name' => 'post-one', 'post_type' => 'post'] ),
         ];
@@ -268,10 +268,10 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $gen->generate_term( $this->make_term() );
 
         $this->assertStringContainsString(
-            '- [Post One](https://example.com/wp-content/uploads/' . $this->export_subdir . '/post/post-one.md)',
+            '- [Post One](https://example.com/post-one/?output_format=md)',
             $captured
         );
-        $this->assertStringNotContainsString( 'https://example.com/post-one/', $captured );
+        $this->assertStringNotContainsString( 'wp-content/uploads', $captured );
     }
 
     public function test_keeps_permalink_for_non_enabled_post_type(): void {

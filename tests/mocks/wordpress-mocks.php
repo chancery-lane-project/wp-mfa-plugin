@@ -321,7 +321,9 @@ if (!function_exists('get_object_taxonomies')) {
 
 if (!function_exists('get_permalink')) {
     function get_permalink(int|\WP_Post $post): string|false {
-        return $GLOBALS['_mock_permalink'];
+        // Per-post override: $GLOBALS['_mock_permalinks'][ $id ] = 'https://…'.
+        $id = $post instanceof \WP_Post ? $post->ID : $post;
+        return $GLOBALS['_mock_permalinks'][ $id ] ?? $GLOBALS['_mock_permalink'] ?? false;
     }
 }
 

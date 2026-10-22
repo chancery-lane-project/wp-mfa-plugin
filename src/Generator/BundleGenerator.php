@@ -11,8 +11,9 @@ use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
  * Builds, maintains, and tears down the OKF `.zip` bundle.
  *
  * Packages the export tree (minus sync/administrative files) into a single
- * zip archive (deflated entries), rewriting `.md` internal links from absolute upload URLs
- * to paths relative to each linking file (`../post/slug.md`) on the way in. The archive
+ * zip archive (deflated entries), rewriting `.md` internal links from
+ * `?output_format=md` page URLs (and the absolute upload URLs written before
+ * 1.7.3) to paths relative to each linking file (`../post/slug.md`) on the way in. The archive
  * is built at a process-unique temporary path and atomically renamed into
  * place so a concurrent download never observes a partial file.
  *
@@ -40,6 +41,20 @@ class BundleGenerator {
 	 * @since  1.6.0
 	 */
 	private const EXCLUDED_FILES = array( 'changes.json', 'ai-catalog.json' );
+
+	/**
+	 * Lines read from the top of a file when looking for its frontmatter permalink.
+	 *
+	 * @since  1.7.3
+	 */
+	private const FRONTMATTER_MAX_LINES = 200;
+
+	/**
+	 * Untrailingslashed permalink → bundle path, for the build in progress.
+	 *
+	 * @var array<string, string>
+	 */
+	private array $permalink_map = array();
 
 	/**
 	 * @since  1.6.0
@@ -111,7 +126,8 @@ class BundleGenerator {
 		$tmp_zip = $bundle_path . '.tmp-' . getmypid() . '.zip';
 
 		try {
-			$base_url = Options::get_export_base_url( $this->options );
+			$base_url            = Options::get_export_base_url( $this->options );
+			$this->permalink_map = $this->build_permalink_map( $base );
 
 			// ZipArchive buffers entries and flushes once on close(), so a
 			// whole tree costs a single archive write. PharData::addFromString()
@@ -314,8 +330,84 @@ class BundleGenerator {
 	}
 
 	/**
-	 * Rewrite absolute upload-URL `.md` links in a bundle file to paths
-	 * relative to that file's own position in the bundle tree.
+	 * Map each exported file's frontmatter `permalink` to its bundle path.
+	 *
+	 * Read from the files themselves, so a post relocated by the
+	 * `markdown_for_agents_export_path` filter maps to where it actually is.
+	 * Only the frontmatter block is read. A file without a `permalink` key
+	 * (e.g. removed by a frontmatter filter) is left out, and links to it stay
+	 * absolute web URLs in the bundle.
+	 *
+	 * @since  1.7.3
+	 * @param  string $base Absolute export base directory.
+	 * @return array<string, string>
+	 */
+	private function build_permalink_map( string $base ): array {
+		$map = array();
+
+		foreach ( $this->iterate_export_tree( $base ) as $relative_path => $absolute_path ) {
+			if ( ! str_ends_with( $relative_path, '.md' ) ) {
+				continue;
+			}
+
+			$permalink = $this->read_frontmatter_permalink( $absolute_path );
+
+			if ( null !== $permalink ) {
+				$map[ rtrim( $permalink, '/' ) ] = $relative_path;
+			}
+		}
+
+		return $map;
+	}
+
+	/**
+	 * Read the top-level `permalink` value from a file's YAML frontmatter.
+	 *
+	 * @since  1.7.3
+	 * @param  string $path Absolute file path.
+	 * @return string|null
+	 */
+	private function read_frontmatter_permalink( string $path ): ?string {
+		$handle = fopen( $path, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+
+		if ( false === $handle ) {
+			return null;
+		}
+
+		$permalink = null;
+
+		try {
+			if ( "---\n" !== fgets( $handle ) ) {
+				return null;
+			}
+
+			for ( $i = 0; $i < self::FRONTMATTER_MAX_LINES; $i++ ) {
+				$line = fgets( $handle );
+
+				if ( false === $line || "---\n" === $line || '---' === $line ) {
+					break;
+				}
+
+				if ( preg_match( '/^permalink:\s*"?([^"\s]+)"?\s*$/', $line, $m ) ) {
+					$permalink = $m[1];
+					break;
+				}
+			}
+		} finally {
+			fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		}
+
+		return $permalink;
+	}
+
+	/**
+	 * Rewrite internal Markdown links in a bundle file to paths relative to
+	 * that file's own position in the bundle tree.
+	 *
+	 * Handles both `?output_format=md` page URLs (matched against the
+	 * permalink map) and absolute upload `.md` URLs, which exports written
+	 * before 1.7.3 still contain until they are regenerated. Page URLs with no
+	 * exported file are left as absolute web links.
 	 *
 	 * Root-absolute bundle paths (`/post/slug.md`) were tried first but many
 	 * extractors (incl. Google's) treat a leading `/` as an external/root
@@ -323,6 +415,7 @@ class BundleGenerator {
 	 * (`../post/slug.md`) are the OKF §3 norm and work everywhere.
 	 *
 	 * @since  1.6.0
+	 * @since  1.7.3 Also rewrites `?output_format=md` page URLs.
 	 * @param  string $content       Markdown file content.
 	 * @param  string $relative_path This file's own path within the bundle.
 	 * @param  string $base_url      Export base URL, no trailing slash.
@@ -333,6 +426,20 @@ class BundleGenerator {
 		$from_dir = ( '.' === $from_dir ) ? '' : $from_dir;
 
 		$pattern = '/\]\(' . preg_quote( $base_url, '/' ) . '\/([^)\s]+)\)/';
+
+		$content = (string) preg_replace_callback(
+			'/\]\(([^)\s]+?)[?&]output_format=md(#[^)\s]*)?\)/',
+			function ( array $matches ) use ( $from_dir ): string {
+				$target = $this->permalink_map[ rtrim( $matches[1], '/' ) ] ?? null;
+
+				if ( null === $target ) {
+					return $matches[0];
+				}
+
+				return '](' . $this->relative_path( $from_dir, $target ) . ( $matches[2] ?? '' ) . ')';
+			},
+			$content
+		);
 
 		return (string) preg_replace_callback(
 			$pattern,
