@@ -94,7 +94,7 @@ class Generator {
 		}
 
 		$frontmatter = $this->frontmatter_builder->build( $post );
-		$html        = $this->get_post_content( $post );
+		$html        = $this->render_as_permalink_request( $post, fn(): string => $this->get_post_content( $post ) );
 		$html        = $this->content_filter->filter( $html );
 		$markdown    = $this->converter->convert( $html, $post );
 
@@ -610,6 +610,46 @@ class Generator {
 
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WP filter, not plugin-owned.
 		return apply_filters( 'the_content', $html );
+	}
+
+	/**
+	 * Run a render callback with REQUEST_URI pointing at the post's permalink.
+	 *
+	 * Generation usually runs inside an admin request (the block editor's
+	 * meta-box save, an AJAX batch), and core builds pagination and other
+	 * self-links from REQUEST_URI via get_pagenum_link() and add_query_arg().
+	 * Without this, a Query Loop's page links export as
+	 * `wp-admin/post.php?…&meta-box-loader-nonce=…`, leaking a nonce and
+	 * sending agents to the editor. The original value, or its absence under
+	 * WP-CLI and cron, is restored afterwards.
+	 *
+	 * @since  1.7.3
+	 * @param  \WP_Post         $post   The post being rendered.
+	 * @param  \Closure():string $render The render callback.
+	 * @return string
+	 */
+	private function render_as_permalink_request( \WP_Post $post, \Closure $render ): string {
+		$permalink = get_permalink( $post );
+		$path      = is_string( $permalink ) ? wp_parse_url( $permalink, PHP_URL_PATH ) : null;
+
+		if ( ! is_string( $path ) || '' === $path ) {
+			$path = '/';
+		}
+
+		$had_uri  = array_key_exists( 'REQUEST_URI', $_SERVER );
+		$original = $_SERVER['REQUEST_URI'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- Saved verbatim and restored, never output.
+
+		$_SERVER['REQUEST_URI'] = $path;
+
+		try {
+			return $render();
+		} finally {
+			if ( $had_uri ) {
+				$_SERVER['REQUEST_URI'] = $original;
+			} else {
+				unset( $_SERVER['REQUEST_URI'] );
+			}
+		}
 	}
 
 	/**
