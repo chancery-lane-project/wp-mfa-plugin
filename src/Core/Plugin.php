@@ -137,6 +137,8 @@ class Plugin {
 
 		if ( ! empty( $options['auto_generate'] ) ) {
 			$this->loader->add_action( 'save_post', $generator, 'on_save_post', 10, 2 );
+			// post_updated fires before save_post, so the old file is gone before the new one is written.
+			$this->loader->add_action( 'post_updated', $generator, 'on_post_updated', 10, 3 );
 			$this->loader->add_action( 'before_delete_post', $generator, 'cache_post_terms', 10, 1 );
 			$this->loader->add_action( 'after_delete_post',  $generator, 'regenerate_term_archives_after_delete', 10, 2 );
 		}

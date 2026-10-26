@@ -39,6 +39,9 @@ class IndexGeneratorTest extends TestCase {
         $GLOBALS['_mock_taxonomy_objects']   = [
             'category' => (object) [ 'name' => 'category', 'labels' => (object) [ 'name' => 'Category' ] ],
         ];
+        $GLOBALS['_mock_post_objects']       = [];
+        $GLOBALS['_mock_post_ancestors']     = [];
+        $GLOBALS['_mock_hierarchical_types'] = [ 'page' ];
         unset( $GLOBALS['_mock_apply_filters'] );
 
         // Real FileWriter — the tests assert against files on disk.
@@ -50,6 +53,8 @@ class IndexGeneratorTest extends TestCase {
     protected function tearDown(): void {
         $this->remove_dir( $this->base_dir );
         unset( $GLOBALS['_mock_upload_dir'], $GLOBALS['_mock_apply_filters'] );
+        $GLOBALS['_mock_post_objects']   = [];
+        $GLOBALS['_mock_post_ancestors'] = [];
     }
 
     private function make_generator( array $options = [] ): IndexGenerator {
@@ -117,6 +122,16 @@ class IndexGeneratorTest extends TestCase {
             . "* [taxonomy](taxonomy/) - Term archives grouped by taxonomy\n";
 
         $this->assertSame( $expected, $content );
+    }
+
+    public function test_generate_root_counts_child_pages_in_subdirectories(): void {
+        $this->touch_md( 'page', 'about.md' );
+        $this->touch_md( 'page', 'index.md' );
+        $this->touch_md( 'page/about', 'team.md' );
+
+        $this->generator->generate_root();
+
+        $this->assertStringContainsString( '* [page](page/) - 2 documents', file_get_contents( $this->base_dir . '/index.md' ) );
     }
 
     public function test_generate_root_omits_taxonomies_section_when_no_taxonomy_dir(): void {
@@ -198,6 +213,23 @@ class IndexGeneratorTest extends TestCase {
         $this->assertStringNotContainsString( 'Excluded', $content );
     }
 
+    public function test_generate_for_post_type_lists_child_pages_by_nested_path(): void {
+        $about = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_title' => 'About', 'post_name' => 'about' ] );
+        $GLOBALS['_mock_post_objects'][5]   = $about;
+        $GLOBALS['_mock_post_ancestors'][6] = [ 5 ];
+        $GLOBALS['_mock_posts']             = [
+            $about,
+            $this->make_post( [ 'ID' => 6, 'post_type' => 'page', 'post_title' => 'Team', 'post_name' => 'team' ] ),
+        ];
+
+        $this->generator->generate_for_post_type( 'page' );
+
+        $this->assertSame(
+            "# Pages\n\n* [About](about.md)\n* [Team](about/team.md)\n",
+            file_get_contents( $this->base_dir . '/page/index.md' )
+        );
+    }
+
     // -----------------------------------------------------------------------
     // Reserved-name guard — post types
     // -----------------------------------------------------------------------
@@ -211,6 +243,19 @@ class IndexGeneratorTest extends TestCase {
 
         $this->assertFalse( $result );
         $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_child_page_slugged_index_does_not_block_type_index(): void {
+        $about = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_title' => 'About', 'post_name' => 'about' ] );
+        $GLOBALS['_mock_post_objects'][5]   = $about;
+        $GLOBALS['_mock_post_ancestors'][6] = [ 5 ];
+        $GLOBALS['_mock_posts']             = [
+            $about,
+            $this->make_post( [ 'ID' => 6, 'post_type' => 'page', 'post_title' => 'About index', 'post_name' => 'index' ] ),
+        ];
+
+        $this->assertTrue( $this->generator->generate_for_post_type( 'page' ) );
+        $this->assertFileExists( $this->base_dir . '/page/index.md' );
     }
 
     public function test_generate_all_counts_reserved_name_skip(): void {
@@ -461,6 +506,14 @@ class IndexGeneratorTest extends TestCase {
         $this->generator->flush_dirty();
 
         $this->assertFileExists( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_on_file_deleted_derives_type_from_nested_child_page_path(): void {
+        $this->generator->on_file_deleted( $this->base_dir . '/page/about/team.md', 6 );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/page/index.md' );
+        $this->assertDirectoryDoesNotExist( $this->base_dir . '/about' );
     }
 
     public function test_flush_dirty_is_idempotent(): void {

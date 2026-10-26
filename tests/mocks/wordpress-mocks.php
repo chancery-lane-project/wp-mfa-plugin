@@ -306,6 +306,14 @@ if (!function_exists('get_post_ancestors')) {
     }
 }
 
+if (!function_exists('get_pages')) {
+    /** @return \WP_Post[]|false Descendants keyed by $GLOBALS['_mock_get_pages'][child_of]. */
+    function get_pages(array $args = []): array|false {
+        $GLOBALS['_mock_get_pages_args'] = $args;
+        return $GLOBALS['_mock_get_pages'][(int) ($args['child_of'] ?? 0)] ?? [];
+    }
+}
+
 if (!function_exists('get_the_terms')) {
     function get_the_terms(int $post_id, string $taxonomy): array|false|\WP_Error {
         return $GLOBALS['_mock_terms'][$post_id][$taxonomy] ?? false;
@@ -605,6 +613,7 @@ if (!class_exists('WP_Post')) {
         public string $post_modified_gmt = '2025-06-01 12:00:00';
         public string $post_author   = '1';
         public string $post_password = '';
+        public int $post_parent = 0;
 
         public function __construct(array $props = []) {
             foreach ($props as $key => $value) {

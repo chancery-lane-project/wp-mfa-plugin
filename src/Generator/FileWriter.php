@@ -110,10 +110,11 @@ class FileWriter {
 	 * where sys_get_temp_dir() returns a symlink path.
 	 *
 	 * @since  1.0.0
+	 * @since  1.7.3 Public, so Generator can vet filtered export paths.
 	 * @param  string $filepath The path to validate.
 	 * @return bool
 	 */
-	private function is_safe_path( string $filepath ): bool {
+	public function is_safe_path( string $filepath ): bool {
 		$dir      = dirname( $filepath );
 		$resolved = $this->resolve_path( $dir );
 

@@ -204,7 +204,8 @@ class Generator {
 	/**
 	 * Return the full filesystem path for a post's Markdown export file.
 	 *
-	 * Path pattern: {export_dir}/{post-type}/{post-slug}.md
+	 * Path pattern: {export_dir}/{post-type}/{post-slug}.md, with ancestor slugs
+	 * as directories for hierarchical types (see ExportPolicy::post_relative_path()).
 	 *
 	 * @since  1.0.0
 	 * @param  \WP_Post|int $post The post object or ID.
@@ -227,18 +228,14 @@ class Generator {
 		 */
 		$filtered = (string) apply_filters( 'markdown_for_agents_export_path', $path, $post );
 
-		// Reject any filtered path that escapes the export base directory.
-		$real_base     = realpath( $base );
-		$filtered_dir  = realpath( dirname( $filtered ) );
-		if (
-			false !== $real_base &&
-			false !== $filtered_dir &&
-			str_starts_with( $filtered_dir . DIRECTORY_SEPARATOR, $real_base . DIRECTORY_SEPARATOR )
-		) {
-			return $filtered;
+		if ( $filtered === $path ) {
+			return $path;
 		}
 
-		return $path;
+		// Reject any filtered path that escapes the export base directory. The
+		// check tolerates directories that do not exist yet, which FileWriter
+		// creates on write.
+		return $this->file_writer->is_safe_path( $filtered ) ? $filtered : $path;
 	}
 
 	/**
@@ -323,7 +320,7 @@ class Generator {
 
 				foreach ( $posts as $post ) {
 					$full_path     = $this->get_export_path( $post );
-					$relative_path = sanitize_file_name( $post->post_name ) . '.md';
+					$relative_path = ExportPolicy::post_type_relative_path( $post );
 					$type_ids[]    = $post->ID;
 
 					if ( file_exists( $full_path ) ) {
@@ -441,6 +438,84 @@ class Generator {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
 				error_log( 'WP Markdown for Agents: on_transition_post_status failed for post ' . $post->ID . ': ' . $e->getMessage() );
 			}
+		}
+	}
+
+	/**
+	 * Hook callback for post_updated — moves export files when a post's slug
+	 * or parent changes.
+	 *
+	 * Deletes the post's file at its old path; on_save_post, which runs next,
+	 * writes the new one. Child pages' paths include their ancestors' slugs,
+	 * so for hierarchical types each published descendant is regenerated at
+	 * its new path and its old file removed. Trashing and restoring rename the
+	 * slug too, but those are left to on_transition_post_status.
+	 *
+	 * @since  1.7.3
+	 * @param  int      $post_id     The post ID.
+	 * @param  \WP_Post $post_after  The post as saved.
+	 * @param  \WP_Post $post_before The post before the update.
+	 */
+	public function on_post_updated( int $post_id, \WP_Post $post_after, \WP_Post $post_before ): void {
+		if ( $post_after->post_name === $post_before->post_name && $post_after->post_parent === $post_before->post_parent ) {
+			return;
+		}
+
+		if ( 'trash' === $post_after->post_status || 'trash' === $post_before->post_status ) {
+			return;
+		}
+
+		try {
+			$old_path = $this->get_export_path( $post_before );
+			$new_path = $this->get_export_path( $post_after );
+
+			if ( $old_path === $new_path ) {
+				return;
+			}
+
+			$this->delete_file_if_exists( $old_path, $post_id );
+
+			if ( ! is_post_type_hierarchical( $post_after->post_type ) ) {
+				return;
+			}
+
+			// A descendant's path starts with its ancestor's path minus `.md`.
+			$old_dir     = substr( $old_path, 0, -3 );
+			$new_dir     = substr( $new_path, 0, -3 );
+			$descendants = get_pages(
+				array(
+					'child_of'  => $post_id,
+					'post_type' => $post_after->post_type,
+				)
+			);
+
+			foreach ( is_array( $descendants ) ? $descendants : array() as $descendant ) {
+				$path = $this->get_export_path( $descendant );
+
+				if ( str_starts_with( $path, $new_dir . DIRECTORY_SEPARATOR ) ) {
+					$this->delete_file_if_exists( $old_dir . substr( $path, strlen( $new_dir ) ), $descendant->ID );
+				}
+
+				$this->generate_post( $descendant );
+			}
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+				error_log( 'WP Markdown for Agents: on_post_updated failed for post ' . $post_id . ': ' . $e->getMessage() );
+			}
+		}
+	}
+
+	/**
+	 * Delete an export file left at a superseded path, if there is one.
+	 *
+	 * @since  1.7.3
+	 * @param  string $path    Absolute path to the old file.
+	 * @param  int    $post_id The post the file belonged to.
+	 */
+	private function delete_file_if_exists( string $path, int $post_id ): void {
+		if ( file_exists( $path ) && $this->file_writer->delete( $path ) ) {
+			do_action( 'markdown_for_agents_file_deleted', $path, $post_id );
 		}
 	}
 
