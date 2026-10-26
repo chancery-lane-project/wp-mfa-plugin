@@ -1032,6 +1032,10 @@ if (!class_exists('wpdb')) {
 
         public function query(string $query): int|bool {
             $this->queries[] = ['query' => $query, 'args' => []];
+            // Schema changes share an ordered log with dbDelta() calls.
+            if (str_starts_with(ltrim($query), 'ALTER TABLE')) {
+                $GLOBALS['_mock_schema_events'][] = $query;
+            }
             return true;
         }
 
@@ -1088,6 +1092,7 @@ if (!function_exists('add_menu_page')) {
 if (!function_exists('dbDelta')) {
     function dbDelta(string|array $queries = '', bool $execute = true): array {
         $GLOBALS['_mock_dbdelta_queries'] = is_array($queries) ? $queries : [$queries];
+        $GLOBALS['_mock_schema_events'][]  = 'dbDelta';
         return [];
     }
 }

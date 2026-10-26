@@ -97,7 +97,7 @@ class DashboardSummaryTest extends TestCase {
             50
         );
 
-        $this->assertSame( [ 'total' => 30, 'items' => [ 7 ], 'count' => 1, 'capped' => false ], $result['top_page'] );
+        $this->assertSame( [ 'total' => 30, 'items' => [ 'post:7' ], 'count' => 1, 'capped' => false ], $result['top_page'] );
         $this->assertSame( [ 'total' => 40, 'items' => [ 'GPTBot' ], 'count' => 1, 'capped' => false ], $result['top_agent'] );
         $this->assertSame( [ 'total' => 40, 'items' => [ 'openai' ], 'count' => 1, 'capped' => false ], $result['top_operator'] );
     }
@@ -122,7 +122,7 @@ class DashboardSummaryTest extends TestCase {
         $this->assertSame( 4, $result['top_operator']['count'] );
         $this->assertSame( [ 'anthropic', 'bytedance', 'openai' ], $result['top_operator']['items'] );
 
-        $this->assertSame( [ 'total' => 4, 'items' => [ 2, 5 ], 'count' => 2, 'capped' => false ], $result['top_page'] );
+        $this->assertSame( [ 'total' => 4, 'items' => [ 'post:2', 'post:5' ], 'count' => 2, 'capped' => false ], $result['top_page'] );
     }
 
     public function test_page_tie_filling_the_scan_is_capped(): void {
@@ -135,7 +135,7 @@ class DashboardSummaryTest extends TestCase {
 
         $this->assertSame( 5, $leader['count'] );
         $this->assertTrue( $leader['capped'] );
-        $this->assertSame( [ 1, 2, 3 ], $leader['items'] );
+        $this->assertSame( [ 'post:1', 'post:2', 'post:3' ], $leader['items'] );
     }
 
     public function test_non_agent_labels_never_lead_but_stay_counted(): void {
@@ -177,9 +177,9 @@ class DashboardSummaryTest extends TestCase {
 
         $this->assertSame(
             [
-                [ 'rank' => 1, 'post_id' => 7, 'total' => 10, 'share' => 0.5 ],
-                [ 'rank' => 2, 'post_id' => 2, 'total' => 5, 'share' => 0.25 ],
-                [ 'rank' => 2, 'post_id' => 9, 'total' => 5, 'share' => 0.25 ],
+                [ 'rank' => 1, 'key' => 'post:7', 'total' => 10, 'share' => 0.5 ],
+                [ 'rank' => 2, 'key' => 'post:2', 'total' => 5, 'share' => 0.25 ],
+                [ 'rank' => 2, 'key' => 'post:9', 'total' => 5, 'share' => 0.25 ],
             ],
             $result['top_pages']
         );
@@ -194,7 +194,19 @@ class DashboardSummaryTest extends TestCase {
         $pages = $this->summary->build( [ $this->row( 'GPTBot', 200 ) ], $posts, 50 )['top_pages'];
 
         $this->assertCount( 10, $pages );
-        $this->assertSame( 10, $pages[9]['post_id'] );
+        $this->assertSame( 'post:10', $pages[9]['key'] );
+    }
+
+    public function test_post_and_term_sharing_an_id_stay_separate(): void {
+        $rows = [
+            (object) [ 'post_id' => 12, 'object_type' => 'term', 'total' => 6 ],
+            (object) [ 'post_id' => 12, 'object_type' => 'post', 'total' => 6 ],
+        ];
+
+        $result = $this->summary->build( [ $this->row( 'GPTBot', 12 ) ], $rows, 50 );
+
+        $this->assertSame( [ 'term:12', 'post:12' ], $result['top_page']['items'] );
+        $this->assertSame( [ 'term:12', 'post:12' ], array_column( $result['top_pages'], 'key' ) );
     }
 
     public function test_numeric_agent_labels_stay_strings(): void {
