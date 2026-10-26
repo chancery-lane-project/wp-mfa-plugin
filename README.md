@@ -211,13 +211,17 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 
 - `index.md` directory listings (see file structure above) are generated at the export root and in every post-type and taxonomy directory, and regenerated automatically when files change. The root index declares `okf_version: "0.1"`.
 - Frontmatter gains `timestamp` (mirrors `modified`) and `tags` — a flat, deduplicated list of term names across **all** taxonomies. `tags` replaces the previous post_tag-only value; per-taxonomy keys (`categories`, custom slugs) are unchanged. New `markdown_for_agents_flat_tags` filter.
-- Internal links in post bodies and taxonomy archive listings are rewritten to absolute `.md` upload URLs (e.g. `https://site/wp-content/uploads/{export_dir}/post/other-slug.md`), so cross-links work whether the file is fetched from the uploads tree or served via content negotiation.
+- Internal links in post bodies, Topics sections and taxonomy archive listings are rewritten to the target's canonical URL with `?output_format=md` (e.g. `https://site/other-slug/?output_format=md`). Root-relative links (`/other-slug/`) and links to a post's former slug are resolved too. These URLs are served by the plugin with `Content-Type: text/markdown` and recorded in the statistics, and fall back to the HTML page if the plugin is deactivated. Links do not point at the static `.md` files in uploads because their Content-Type depends on the web server: nginx hosts without a `.md` MIME mapping (including WordPress.com/wpcloud) serve them as `application/octet-stream`, and Apache honours the export directory's `Deny from all`.
+- Pagination links (`?paged=2`, `?query-1-page=2`, `/page/2/`) stay HTML, because only the first page of a listing is exported. Content is rendered as if requested at the post's own permalink, so pagination built during an editor save no longer points into `wp-admin`.
+- Exports written before 1.7.3 still contain upload-URL links until regenerated (`wp markdown-agents generate`). The bundle relativises both forms.
 
 **Limitations:**
 
 - Links inside fenced code blocks are rewritten like any other link.
 - A post relocated via the legacy `markdown_for_agents_export_path` filter is not seen by the link resolver, manifests or index listings, so they point at the default path (OKF §5.3 tolerates broken links). Use `markdown_for_agents_post_relative_path` instead, which all of them honour.
 - A post or term slugged `index` keeps its existing export file — the directory listing for that location is skipped, and such a corpus cannot be fully OKF §9-conformant (reserved filenames, §3.1). Posts slugged `log` similarly shadow the reserved `log.md` name.
+- Each followed link is a PHP request, where a static file was not. Responses are `private, no-store` by default; see `markdown_for_agents_cache_headers` to let a cache that keys on the query string store them.
+- The `index.md` directory listings have no page URL, so their links stay relative file paths and depend on the web server's Content-Type for `.md`.
 - Rewritten links are domain-absolute; a corpus copied to another domain needs regeneration. The `.zip` bundle (below) rewrites links to relative form instead, so an extracted bundle is traversable offline regardless of domain.
 
 ### Bundle (.zip)
@@ -225,7 +229,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 **Behind the "Build downloadable bundle" toggle (off by default; no other toggle required):** the plugin packages the entire export tree into a single zip archive (deflated entries) at `wp-content/uploads/{site-name}-okf.zip`, where `{site-name}` is the site's title (`sanitize_file_name(get_bloginfo('name'))`), falling back to `{export_dir}` if the site name sanitizes to an empty string. Every bundle rebuild also (re)generates `manifest.json` and, on the settings page, displays the ARD discovery catalog panel described below — both are automatic whenever this toggle is on.
 
 - **Contents:** everything under the export tree except `changes.json` (a sync delta, not content) — all `.md` files (posts, taxonomy archives, indexes) and `manifest.json`.
-- **Links:** internal links inside bundled `.md` files are rewritten from absolute upload URLs to paths relative to each linking file (OKF §5.2, e.g. `](../post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain. Relative form is used rather than root-absolute (`](/post/…)`) because many consumers treat a leading `/` as an external link and drop it.
+- **Links:** internal links inside bundled `.md` files are rewritten from `?output_format=md` page URLs (matched to files through each file's frontmatter `permalink`, so relocated posts map correctly) and pre-1.7.3 absolute upload URLs to paths relative to each linking file (OKF §5.2, e.g. `](../post/other-slug.md)`), so the extracted bundle can be traversed offline without knowing the source domain. Relative form is used rather than root-absolute (`](/post/…)`) because many consumers treat a leading `/` as an external link and drop it.
 - **Location and stability:** the archive is built at a temporary path and atomically renamed into place, so the public URL is always stable and a concurrent download never sees a partial file.
 - **Rebuild policy:** the bundle is rebuilt as the final background stage of a bulk generation job (the admin "Generate everything" button), or synchronously at the end of `wp markdown-agents generate` / `generate-taxonomies` on the command line. A single post save instead marks the bundle stale and schedules a debounced WP-Cron event five minutes out, collapsing a burst of edits into one rebuild. That delay assumes the default WP-Cron behaviour of firing on the next page load; on sites with `DISABLE_WP_CRON` set, the rebuild instead fires on the next system-cron hit to `wp-cron.php`. You can also force a rebuild with `wp markdown-agents bundle`.
 - **Statistics caveat:** bundle downloads are served directly by the web server as a static file and never touch PHP, so they do not appear in the plugin's access statistics.
@@ -348,7 +352,7 @@ Run a full regeneration after adding either filter.
 | `markdown_for_agents_file_deleted` | Fired after a `.md` file is deleted |
 | `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
 | `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
-| `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Hook to audit export coverage |
+| `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Root-relative links are reported in absolute form. Hook to audit export coverage |
 
 ---
 

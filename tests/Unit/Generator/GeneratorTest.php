@@ -646,7 +646,7 @@ class GeneratorTest extends TestCase {
         $gen = $this->make_generator( ['include_taxonomy_topics' => true] );
         $gen->generate_post( $post );
 
-        $expected_url = 'https://example.com/wp-content/uploads/' . $this->export_subdir . '/taxonomy/category/news.md';
+        $expected_url = 'https://example.com/category/news/?output_format=md';
         $this->assertStringContainsString( '## Topics', $written );
         $this->assertStringContainsString( "[News]({$expected_url})", $written );
         $this->assertStringContainsString( 'Categories', $written );
@@ -746,6 +746,59 @@ class GeneratorTest extends TestCase {
         $this->assertStringContainsString( 'Hello', $output );
     }
 
+    public function test_get_post_markdown_renders_content_against_the_permalink_request_uri(): void {
+        // Simulates generation from the block editor's meta-box save request.
+        $_SERVER['REQUEST_URI']       = '/wp-admin/post.php?post=115&action=edit&meta-box-loader=1&meta-box-loader-nonce=abc123';
+        $GLOBALS['_mock_permalink']   = 'https://example.com/blog/hello/';
+        $seen                         = null;
+        $GLOBALS['_mock_apply_filters']['the_content'] = function ( $value ) use ( &$seen ) {
+            $seen = $_SERVER['REQUEST_URI'];
+            return $value;
+        };
+
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+        $this->generator->get_post_markdown( $post );
+
+        unset( $GLOBALS['_mock_apply_filters']['the_content'] );
+
+        $this->assertSame( '/blog/hello/', $seen );
+        $this->assertSame(
+            '/wp-admin/post.php?post=115&action=edit&meta-box-loader=1&meta-box-loader-nonce=abc123',
+            $_SERVER['REQUEST_URI'],
+            'The original REQUEST_URI must be restored after rendering.'
+        );
+        unset( $_SERVER['REQUEST_URI'] );
+    }
+
+    public function test_get_post_markdown_restores_absent_request_uri(): void {
+        // WP-CLI and cron runs have no REQUEST_URI at all.
+        unset( $_SERVER['REQUEST_URI'] );
+        $GLOBALS['_mock_permalink'] = 'https://example.com/';
+
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+        $this->generator->get_post_markdown( $post );
+
+        $this->assertArrayNotHasKey( 'REQUEST_URI', $_SERVER );
+    }
+
+    public function test_get_post_markdown_restores_request_uri_when_rendering_throws(): void {
+        $_SERVER['REQUEST_URI'] = '/wp-admin/post.php?post=1';
+        $GLOBALS['_mock_apply_filters']['the_content'] = function () {
+            throw new \RuntimeException( 'render failed' );
+        };
+
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+
+        try {
+            $this->generator->get_post_markdown( $post );
+            $this->fail( 'Expected the render exception to propagate.' );
+        } catch ( \RuntimeException $e ) {
+            $this->assertSame( '/wp-admin/post.php?post=1', $_SERVER['REQUEST_URI'] );
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['the_content'], $_SERVER['REQUEST_URI'] );
+        }
+    }
+
     public function test_get_post_markdown_returns_null_for_ineligible_post(): void {
         $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'draft'] );
 
@@ -760,13 +813,12 @@ class GeneratorTest extends TestCase {
     // Link rewriting
     // -----------------------------------------------------------------------
 
-    public function test_rewrites_internal_links_to_md_urls(): void {
+    public function test_rewrites_internal_links_to_markdown_page_urls(): void {
         $post = $this->make_post( ['ID' => 42] );
 
-        $map = [ 'https://example.com/other-post/' => 'post/other-post.md' ];
+        $map = [ 'https://example.com/other-post/' => 'https://example.com/other-post/' ];
         $link_rewriter = new LinkRewriter(
-            fn( string $url ): ?string => $map[ $url ] ?? null,
-            'https://example.com/wp-content/uploads/wp-mfa-exports'
+            fn( string $url ): ?string => $map[ $url ] ?? null
         );
 
         $written = '';
@@ -784,7 +836,7 @@ class GeneratorTest extends TestCase {
         $gen->generate_post( $post );
 
         $this->assertStringContainsString(
-            '[other post](https://example.com/wp-content/uploads/wp-mfa-exports/post/other-post.md)',
+            '[other post](https://example.com/other-post/?output_format=md)',
             $written
         );
     }

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Generator;
 
 /**
- * Resolves absolute site URLs to bundle-relative Markdown file paths.
+ * Resolves site URLs to the canonical URL of an exported document.
  *
  * Posts resolve via url_to_postid(), falling back to a `_wp_old_slug` lookup
  * for links written against a since-renamed post; taxonomy term archives via a
- * lazily built map of term links. Results mirror the path logic used by
- * Generator::get_export_path() and TaxonomyArchiveGenerator::get_export_path().
+ * lazily built map of term links. Root-relative links (`/about/`) are treated
+ * as same-host. The canonical URL (current permalink or term link) is what
+ * LinkRewriter turns into a `?output_format=md` link, so a link written
+ * against an old slug skips the 301, which would drop the query argument.
  *
  * Same-host URLs that resolve to nothing fire `markdown_for_agents_unresolved_link`,
  * so the links left as HTML permalinks in an otherwise Markdown-linked document
@@ -21,7 +23,7 @@ namespace Tclp\WpMarkdownForAgents\Generator;
  */
 class InternalUrlResolver {
 
-	/** @var array<string, string>|null Term link (untrailingslashed) → bundle path. */
+	/** @var array<string, string>|null Term link (untrailingslashed) → canonical term link. */
 	private ?array $term_map = null;
 
 	/** @var array<string, string|null> Memoised results keyed by URL. */
@@ -41,11 +43,13 @@ class InternalUrlResolver {
 	public function __construct( private readonly array $options ) {}
 
 	/**
-	 * Resolve a URL to a bundle-relative path, or null if not an exported document.
+	 * Resolve a URL to an exported document's canonical URL, or null if it is not one.
 	 *
 	 * @since  1.6.0
-	 * @param  string $url Absolute URL.
-	 * @return string|null e.g. `post/my-post.md` or `taxonomy/category/climate.md`.
+	 * @since  1.7.3 Returns the canonical URL rather than a bundle path, and
+	 *               accepts root-relative URLs.
+	 * @param  string $url Absolute or root-relative URL.
+	 * @return string|null e.g. `https://example.com/my-post/`.
 	 */
 	public function resolve( string $url ): ?string {
 		if ( array_key_exists( $url, $this->resolved ) ) {
@@ -53,11 +57,12 @@ class InternalUrlResolver {
 		}
 
 		$this->reason = 'not_found';
-		$path         = $this->do_resolve( $url );
+		$absolute     = $this->absolutise( $url );
+		$target       = $this->do_resolve( $absolute );
 
-		$this->resolved[ $url ] = $path;
+		$this->resolved[ $url ] = $target;
 
-		if ( null === $path && $this->is_internal( $url ) ) {
+		if ( null === $target && $this->is_internal( $absolute ) ) {
 			/**
 			 * Fires when a same-host link could not be mapped to an exported document.
 			 *
@@ -66,14 +71,43 @@ class InternalUrlResolver {
 			 * audit export coverage. Fires at most once per unique URL per request.
 			 *
 			 * @since 1.6.1
+			 * @since 1.7.3 Root-relative links are reported in absolute form.
 			 * @param string $url    The unresolved absolute URL.
 			 * @param string $reason Either `not_found` (no matching post or term) or
 			 *                       `ineligible` (a post matched but is not exported).
 			 */
-			do_action( 'markdown_for_agents_unresolved_link', $url, $this->reason );
+			do_action( 'markdown_for_agents_unresolved_link', $absolute, $this->reason );
 		}
 
-		return $path;
+		return $target;
+	}
+
+	/**
+	 * Prefix a root-relative URL (`/about/`) with the site's scheme and host.
+	 *
+	 * Uses the host only, not home_url()'s path, because a root-relative link
+	 * already carries the full path, including any subdirectory install.
+	 * Protocol-relative (`//host/x`) and all other URLs pass through unchanged.
+	 *
+	 * @since  1.7.3
+	 * @param  string $url Link URL.
+	 * @return string
+	 */
+	private function absolutise( string $url ): string {
+		if ( ! str_starts_with( $url, '/' ) || str_starts_with( $url, '//' ) ) {
+			return $url;
+		}
+
+		$home   = home_url();
+		$scheme = (string) wp_parse_url( $home, PHP_URL_SCHEME );
+		$host   = (string) wp_parse_url( $home, PHP_URL_HOST );
+		$port   = wp_parse_url( $home, PHP_URL_PORT );
+
+		if ( '' === $host ) {
+			return $url;
+		}
+
+		return ( '' !== $scheme ? $scheme : 'https' ) . '://' . $host . ( $port ? ':' . $port : '' ) . $url;
 	}
 
 	/**
@@ -109,10 +143,10 @@ class InternalUrlResolver {
 		}
 
 		if ( $post_id > 0 ) {
-			return $this->post_path( $post_id );
+			return $this->post_url( $post_id );
 		}
 
-		return $this->term_path( $url );
+		return $this->term_url( $url );
 	}
 
 	/**
@@ -190,13 +224,14 @@ class InternalUrlResolver {
 	}
 
 	/**
-	 * Build the bundle path for a post, or null if it is not an exported document.
+	 * Return a post's canonical permalink, or null if it is not an exported document.
 	 *
 	 * @since  1.6.0
+	 * @since  1.7.3 Returns the permalink rather than a bundle path.
 	 * @param  int $post_id Post ID.
 	 * @return string|null
 	 */
-	private function post_path( int $post_id ): ?string {
+	private function post_url( int $post_id ): ?string {
 		$post = get_post( $post_id );
 
 		if ( ! $post instanceof \WP_Post ) {
@@ -209,17 +244,20 @@ class InternalUrlResolver {
 			return null;
 		}
 
-		return ExportPolicy::post_relative_path( $post );
+		$permalink = get_permalink( $post );
+
+		return is_string( $permalink ) && '' !== $permalink ? $permalink : null;
 	}
 
 	/**
 	 * Look up a URL in the lazily built term-link map.
 	 *
 	 * @since  1.6.0
+	 * @since  1.7.3 Returns the term link rather than a bundle path.
 	 * @param  string $url Absolute URL.
 	 * @return string|null
 	 */
-	private function term_path( string $url ): ?string {
+	private function term_url( string $url ): ?string {
 		if ( null === $this->term_map ) {
 			$this->term_map = $this->build_term_map();
 		}
@@ -228,7 +266,7 @@ class InternalUrlResolver {
 	}
 
 	/**
-	 * Build the full term-link → bundle-path map across all public taxonomies.
+	 * Build the full term-link → canonical term link map across all public taxonomies.
 	 *
 	 * Eagerly built once per resolver instance (i.e. once per request), rather
 	 * than cached across requests: acceptable at modest term counts, but
@@ -260,7 +298,7 @@ class InternalUrlResolver {
 					continue;
 				}
 
-				$map[ untrailingslashit( $link ) ] = ExportPolicy::term_relative_path( $term->taxonomy, $term->slug );
+				$map[ untrailingslashit( $link ) ] = $link;
 			}
 		}
 

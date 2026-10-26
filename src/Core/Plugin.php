@@ -107,8 +107,7 @@ class Plugin {
 		// Built once, outside the closure, so URL memoisation and the term-link map persist across every link resolved this request.
 		$url_resolver  = new InternalUrlResolver( $options );
 		$link_rewriter = new LinkRewriter(
-			fn( string $url ): ?string => $url_resolver->resolve( $url ),
-			Options::get_export_base_url( $options )
+			fn( string $url ): ?string => $url_resolver->resolve( $url )
 		);
 
 		$generator = new Generator(
