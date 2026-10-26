@@ -25,15 +25,16 @@ class AccessLogger {
 	 * Record a Markdown access event.
 	 *
 	 * @since  1.1.0
-	 * @param  int    $post_id       The accessed post ID.
+	 * @param  int    $post_id       The accessed object ID: a post ID, or a term ID for terms.
 	 * @param  string $agent         Agent identity substring, or '' for unknown.
 	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
+	 * @param  string $object_type   StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
 	 */
-	public function log_access( int $post_id, string $agent, string $access_method ): void {
+	public function log_access( int $post_id, string $agent, string $access_method, string $object_type = StatsRepository::OBJECT_POST ): void {
 		if ( $post_id <= 0 ) {
 			return;
 		}
 
-		$this->repository->record_access( $post_id, mb_substr( $agent, 0, 100 ), $access_method );
+		$this->repository->record_access( $post_id, mb_substr( $agent, 0, 100 ), $access_method, $object_type );
 	}
 }

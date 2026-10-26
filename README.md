@@ -29,7 +29,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 - **Manifest + incremental export** - content-hash manifest, refreshed automatically before every bundle rebuild or on demand via `--with-manifest`/`--incremental`; `changes.json` delta for RAG sync
 - **OKF directory indexes** - `index.md` listings at the export root and in every post-type and taxonomy directory ([Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) §6), kept current automatically
 - **OKF-compliant frontmatter and links** - `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
-- **Access statistics** - logs AI agent requests with a filterable stats page (default: last 7 days) showing a headline summary (recorded requests, most requested page, leading agent and operator), operator cards that filter the report, intent breakdowns, and per-agent, per-post and per-access-method records with date range filtering and pagination
+- **Access statistics** - logs AI agent requests with a filterable stats page (default: last 7 days) showing a headline summary (recorded requests, most requested page, leading agent and operator), operator cards that filter the report, intent breakdowns, and per-agent, per-page (posts and taxonomy term archives) and per-access-method records with date range filtering and pagination
 - **WP-CLI commands** - `generate`, `status`, `delete`, `generate-taxonomies`, `generate-indexes`
 - **Filterable** - numerous WordPress filters to customise output, frontmatter, and serving behaviour
 - **Fully unit-tested** - PHPUnit 9.6 test suite
@@ -146,6 +146,7 @@ wp-content/uploads/{export_dir}/
   {post-type}/
     index.md                   ← directory listing (title + excerpt per post)
     {slug}.md                  ← singular post file
+    {parent-slug}/{slug}.md    ← child page of a hierarchical type (e.g. page/about/team.md)
     manifest.json              ← content hashes + change tracking
     changes.json               ← delta since last export (for RAG sync)
   taxonomy/
@@ -217,6 +218,7 @@ The export tree follows [OKF v0.1](https://github.com/GoogleCloudPlatform/knowle
 **Limitations:**
 
 - Links inside fenced code blocks are rewritten like any other link.
+- A post relocated via the legacy `markdown_for_agents_export_path` filter is not seen by the link resolver, manifests or index listings, so they point at the default path (OKF §5.3 tolerates broken links). Use `markdown_for_agents_post_relative_path` instead, which all of them honour.
 - A post or term slugged `index` keeps its existing export file — the directory listing for that location is skipped, and such a corpus cannot be fully OKF §9-conformant (reserved filenames, §3.1). Posts slugged `log` similarly shadow the reserved `log.md` name.
 - Each followed link is a PHP request, where a static file was not. Responses are `private, no-store` by default; see `markdown_for_agents_cache_headers` to let a cache that keys on the query string store them.
 - The `index.md` directory listings have no page URL, so their links stay relative file paths and depend on the web server's Content-Type for `.md`.
@@ -295,6 +297,9 @@ wp markdown-agents bundle --if-stale
 | Filter | Signature | Description |
 |---|---|---|
 | `markdown_for_agents_serve_enabled` | `(bool $enabled, WP_Post $post)` | Enable/disable serving for a specific post |
+| `markdown_for_agents_is_eligible` | `(bool $eligible, WP_Post $post)` | Return false to stop an otherwise eligible post being exported. Only runs for published, non-password-protected, non-excluded posts of an enabled type, so it can narrow the export but not widen it. Files already written are not removed: regenerate after changing it |
+| `markdown_for_agents_post_relative_path` | `(string $path, WP_Post $post)` | Change a post's export path, relative to the export base (default `{post-type}/{slug}.md`, or `{post-type}/{parent-slug}/{slug}.md` for child pages). Honoured by generation, serving, manifests, index listings and link rewriting. The result must stay inside `{post-type}/` and end in `.md`, otherwise the default is used. See [Multilingual sites](#multilingual-sites) |
+| `markdown_for_agents_export_path` | `(string $path, WP_Post $post)` | Legacy: change a post's absolute export path. Only generation and serving honour it; prefer `markdown_for_agents_post_relative_path` |
 | `markdown_for_agents_serve_post_types` | `(array $types)` | Modify the list of serveable post types |
 | `markdown_for_agents_serve_taxonomies` | `(bool $enabled)` | Enable/disable serving for taxonomy archives |
 | `markdown_for_agents_frontmatter` | `(array $fm, WP_Post $post)` | Modify frontmatter before serialisation |
@@ -311,6 +316,31 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_agent_categories` | `(array $map)` | Modify the intent-category → UA-substring map used to classify agents in stats |
 | `markdown_for_agents_agent_operators` | `(array $map)` | Modify the operator map used for the stats operator cards. Shape: `[ 'key' => [ 'label' => 'Name', 'agents' => [ 'UA-substring', … ] ] ]`, matched case-insensitively against stored agent labels, first match wins. Labels without a reviewed entry are reported as Unattributed. Treat it as append-only: removing an entry moves that agent's history to Unattributed |
 | `markdown_for_agents_tick_budget` | `(int $seconds, string $context)` | Wall-clock seconds one bulk-generation background tick may spend; checked only between batches, never mid-batch, so a single very slow item can still overrun it. `$context` is `cron` for a normal scheduled tick or `nudge` for the short inline catch-up run triggered from an admin request. Defaults to 30s (or 60% of `max_execution_time` when that is lower) for `cron`, 5s for `nudge` |
+
+### Multilingual sites
+
+The plugin does not detect multilingual plugins. On sites where translations share a slug (WPML and Polylang both allow `/de/same-page/` and `/en/same-page/`), every translation maps to the same file and the last one generated wins. Give each translation its own file with `markdown_for_agents_post_relative_path`. The default language keeps its existing path, so nothing moves for it.
+
+WPML:
+
+```php
+add_filter( 'markdown_for_agents_post_relative_path', function ( string $path, WP_Post $post ): string {
+	$details = apply_filters( 'wpml_post_language_details', null, $post->ID );
+	$lang    = is_array( $details ) ? (string) ( $details['language_code'] ?? '' ) : '';
+
+	if ( '' === $lang || apply_filters( 'wpml_default_language', null ) === $lang ) {
+		return $path;
+	}
+
+	return substr( $path, 0, -3 ) . '.' . sanitize_file_name( $lang ) . '.md'; // page/same-page.de.md
+}, 10, 2 );
+```
+
+Polylang: the same, with `$lang = (string) pll_get_post_language( $post->ID );` and `pll_default_language()` for the default.
+
+To export only the default language, add a `markdown_for_agents_is_eligible` filter that returns false for other languages. Agents requesting a translation then get the HTML page. Keep the path filter as well: without it a translation still shares the default language's path, so trashing or renaming the translation deletes the default language's file.
+
+Run a full regeneration after adding either filter.
 
 ---
 

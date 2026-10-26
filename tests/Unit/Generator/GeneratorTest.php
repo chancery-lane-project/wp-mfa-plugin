@@ -69,6 +69,9 @@ class GeneratorTest extends TestCase {
         $GLOBALS['_mock_permalink']    = 'https://example.com/test/';
         $GLOBALS['_mock_post_objects'] = [];
         $GLOBALS['_mock_wp_query']     = null;
+        $GLOBALS['_mock_post_ancestors'] = [];
+        $GLOBALS['_mock_get_pages']      = [];
+        $GLOBALS['_mock_hierarchical_types'] = [ 'page' ];
 
         $GLOBALS['_mock_object_taxonomies'] = [];
         $GLOBALS['_mock_terms']             = [];
@@ -82,7 +85,9 @@ class GeneratorTest extends TestCase {
 
     protected function tearDown(): void {
         $this->remove_dir( $this->base_dir );
-        unset( $GLOBALS['_mock_upload_dir'] );
+        unset( $GLOBALS['_mock_upload_dir'], $GLOBALS['_mock_apply_filters']['markdown_for_agents_export_path'] );
+        $GLOBALS['_mock_post_ancestors'] = [];
+        $GLOBALS['_mock_get_pages']      = [];
     }
 
     private function make_generator( array $options = [] ): Generator {
@@ -135,6 +140,33 @@ class GeneratorTest extends TestCase {
             null,
             $link_rewriter
         );
+    }
+
+    private function make_generator_with_real_file_writer(): Generator {
+        return new Generator(
+            [ 'post_types' => [ 'post', 'page' ], 'export_dir' => $this->export_subdir ],
+            $this->frontmatter_builder,
+            $this->content_filter,
+            $this->converter,
+            $this->yaml_formatter,
+            new FileWriter( $this->base_dir ),
+            new FieldResolver()
+        );
+    }
+
+    private function touch_export( string $relative ): void {
+        $path = $this->base_dir . '/' . $relative;
+        if ( ! is_dir( dirname( $path ) ) ) {
+            mkdir( dirname( $path ), 0755, true );
+        }
+        file_put_contents( $path, 'old' );
+    }
+
+    private function stub_pipeline(): void {
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
     }
 
     private function make_post( array $props = [] ): \WP_Post {
@@ -286,6 +318,111 @@ class GeneratorTest extends TestCase {
 
         $this->assertStringContainsString( 'post', $path );
         $this->assertStringContainsString( 'my-slug.md', $path );
+    }
+
+    public function test_get_export_path_accepts_filtered_path_in_new_directory(): void {
+        $generator = $this->make_generator_with_real_file_writer();
+        $wanted    = $this->base_dir . '/post/de/my-slug.md';
+
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_export_path'] = fn() => $wanted;
+
+        $this->assertDirectoryDoesNotExist( $this->base_dir . '/post/de' );
+        $this->assertSame( $wanted, $generator->get_export_path( $this->make_post( [ 'post_name' => 'my-slug' ] ) ) );
+    }
+
+    public function test_get_export_path_rejects_filtered_path_outside_base(): void {
+        $generator = $this->make_generator_with_real_file_writer();
+
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_export_path'] = fn() => $this->base_dir . '/../elsewhere/my-slug.md';
+
+        $this->assertSame(
+            $this->base_dir . '/post/my-slug.md',
+            $generator->get_export_path( $this->make_post( [ 'post_name' => 'my-slug' ] ) )
+        );
+    }
+
+    public function test_get_export_path_nests_child_page_under_parent(): void {
+        $GLOBALS['_mock_post_objects'][5]   = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_name' => 'about' ] );
+        $GLOBALS['_mock_post_ancestors'][1] = [ 5 ];
+
+        $path = $this->generator->get_export_path( $this->make_post( [ 'post_type' => 'page', 'post_name' => 'team' ] ) );
+
+        $this->assertSame( $this->base_dir . '/page/about/team.md', $path );
+    }
+
+    // -----------------------------------------------------------------------
+    // on_post_updated()
+    // -----------------------------------------------------------------------
+
+    public function test_on_post_updated_ignores_unchanged_slug_and_parent(): void {
+        $post = $this->make_post();
+
+        $this->file_writer->expects( $this->never() )->method( 'delete' );
+
+        $this->generator->on_post_updated( 1, $post, clone $post );
+    }
+
+    public function test_on_post_updated_deletes_old_file_after_rename(): void {
+        $before = $this->make_post( [ 'post_name' => 'old-slug' ] );
+        $after  = $this->make_post( [ 'post_name' => 'new-slug' ] );
+        $this->touch_export( 'post/old-slug.md' );
+
+        $this->file_writer->expects( $this->once() )
+            ->method( 'delete' )
+            ->with( $this->base_dir . '/post/old-slug.md' )
+            ->willReturn( true );
+
+        $GLOBALS['_mock_fired_actions'] = [];
+        $this->generator->on_post_updated( 1, $after, $before );
+
+        $this->assertSame(
+            [ [ $this->base_dir . '/post/old-slug.md', 1 ] ],
+            $GLOBALS['_mock_fired_actions']['markdown_for_agents_file_deleted'] ?? []
+        );
+    }
+
+    public function test_on_post_updated_skips_trash(): void {
+        $before = $this->make_post( [ 'post_name' => 'slug' ] );
+        $after  = $this->make_post( [ 'post_name' => 'slug__trashed', 'post_status' => 'trash' ] );
+        $this->touch_export( 'post/slug.md' );
+
+        $this->file_writer->expects( $this->never() )->method( 'delete' );
+
+        $this->generator->on_post_updated( 1, $after, $before );
+    }
+
+    public function test_on_post_updated_moves_descendants_of_renamed_parent(): void {
+        $before = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_name' => 'about' ] );
+        $after  = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_name' => 'about-us' ] );
+        $child  = $this->make_post( [ 'ID' => 6, 'post_type' => 'page', 'post_name' => 'team', 'post_parent' => 5 ] );
+
+        // The database already holds the new parent slug when post_updated fires.
+        $GLOBALS['_mock_post_objects'][5]   = $after;
+        $GLOBALS['_mock_post_ancestors'][6] = [ 5 ];
+        $GLOBALS['_mock_get_pages'][5]      = [ $child ];
+
+        $this->touch_export( 'page/about.md' );
+        $this->touch_export( 'page/about/team.md' );
+
+        $deleted = [];
+        $this->file_writer->method( 'delete' )->willReturnCallback(
+            function ( string $path ) use ( &$deleted ): bool {
+                $deleted[] = $path;
+                return true;
+            }
+        );
+        $this->file_writer->expects( $this->once() )
+            ->method( 'write' )
+            ->with( $this->base_dir . '/page/about-us/team.md' )
+            ->willReturn( true );
+        $this->stub_pipeline();
+
+        $this->generator->on_post_updated( 5, $after, $before );
+
+        $this->assertSame(
+            [ $this->base_dir . '/page/about.md', $this->base_dir . '/page/about/team.md' ],
+            $deleted
+        );
     }
 
     // -----------------------------------------------------------------------

@@ -248,7 +248,7 @@ class AgentDetector {
 	 * reviewed entry return null — an operator is never guessed from an arbitrary
 	 * User-Agent, so callers should report those as unattributed.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  string $agent The stored agent label (matched substring or product name).
 	 * @return string|null   Operator key (e.g. 'openai'), or null when unattributed.
 	 */
@@ -272,7 +272,7 @@ class AgentDetector {
 	/**
 	 * Return the display name for an operator key.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @param  string $key Operator key from get_operator().
 	 * @return string      Display name, or the key itself when unknown.
 	 */
@@ -294,7 +294,7 @@ class AgentDetector {
 	 * from labels already in the stats table, so removing an entry retrospectively
 	 * moves that agent's history into the unattributed bucket.
 	 *
-	 * @since  1.8.0
+	 * @since  1.7.3
 	 * @return array<string, array{label: string, agents: string[]}>
 	 */
 	public function get_agent_operators(): array {

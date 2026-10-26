@@ -65,18 +65,24 @@ class Migrator {
 
 		$table = StatsRepository::get_table_name( $wpdb );
 
-		// Drop the old 3-column unique index if it exists so dbDelta can
-		// create the new 4-column version. dbDelta will not alter an existing
-		// index — it only adds indexes whose name is entirely absent.
+		// dbDelta adds missing columns and the object_agent_date unique index,
+		// but never alters or drops an existing index. The new index is added
+		// before the old one is dropped, so the table always has a unique key
+		// and concurrent upserts cannot create duplicate daily rows.
+		if ( ! function_exists( 'dbDelta' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		}
+		dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
+
+		// Drop the superseded post_agent_date index (3-column in 1.0, 4-column
+		// in 1.1). Left in place it would reject a term row sharing a post's ID.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional migration query, caching not appropriate here.
 		$old_index = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(1) FROM information_schema.STATISTICS
 				 WHERE table_schema = DATABASE()
 				 AND table_name = %s
-				 AND index_name = 'post_agent_date'
-				 AND seq_in_index = 3
-				 AND column_name = 'access_date'",
+				 AND index_name = 'post_agent_date'",
 				$table
 			)
 		);
@@ -85,11 +91,6 @@ class Migrator {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Intentional schema migration; $table is $wpdb->prefix value only.
 			$wpdb->query( "ALTER TABLE {$table} DROP INDEX post_agent_date" );
 		}
-
-		if ( ! function_exists( 'dbDelta' ) ) {
-			require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-		}
-		dbDelta( StatsRepository::get_create_table_sql( $wpdb ) );
 
 		// Convert old rows where agent stored the method for unknown agents.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Intentional migration query, caching not appropriate here.

@@ -11,6 +11,7 @@ use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
+use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Negotiate\Negotiator
@@ -43,6 +44,7 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_is_tax']      = false;
         $GLOBALS['_mock_queried_object'] = null;
         $GLOBALS['_mock_sent_headers']   = [];
+        $GLOBALS['_mock_ob_buffers']     = [];
         $GLOBALS['_mock_post_meta']      = [];
         $_SERVER['HTTP_ACCEPT']          = '';
         $_SERVER['REQUEST_METHOD']       = 'GET';
@@ -626,6 +628,29 @@ class NegotiatorTest extends TestCase {
         unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_content_signal'] );
     }
 
+    public function test_discards_buffered_output_before_streaming_markdown(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        // Stray whitespace from a theme file, inside nested buffers.
+        $GLOBALS['_mock_ob_buffers']     = [ "\t", "\n" ];
+
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        $buffers_at_readfile = null;
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \RuntimeException $e ) {
+            $buffers_at_readfile = $GLOBALS['_mock_ob_buffers'];
+        }
+
+        $this->assertSame( $md_file, $GLOBALS['_mock_readfile_path'] );
+        $this->assertSame( [], $buffers_at_readfile );
+    }
+
     public function test_emits_cache_bypass_headers_to_prevent_full_page_cache_poisoning(): void {
         $md_file = $this->tmp_dir . '/test-post.md';
         file_put_contents( $md_file, '# Test' );
@@ -1048,6 +1073,56 @@ class NegotiatorTest extends TestCase {
 
         $this->assertContains( 'Content-Type: text/markdown; charset=utf-8', $GLOBALS['_mock_sent_headers'] );
         $this->assertSame( $md_file, $GLOBALS['_mock_readfile_path'] );
+    }
+
+    public function test_taxonomy_branch_logs_term_access(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 12, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/html';
+        $_SERVER['HTTP_USER_AGENT']      = 'GPTBot/1.0';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( 12, 'GPTBot', 'ua', StatsRepository::OBJECT_TERM );
+
+        $neg = $this->make_negotiator( [
+            'ua_force_enabled' => true,
+            'ua_agent_strings' => [ 'GPTBot' ],
+        ] );
+        try { $neg->maybe_serve_markdown(); } catch ( \RuntimeException $e ) {}
+    }
+
+    public function test_taxonomy_branch_does_not_log_head_requests(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 12, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        $_SERVER['REQUEST_METHOD']       = 'HEAD';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        try { $this->make_negotiator()->maybe_serve_markdown(); } catch ( \RuntimeException $e ) {}
+    }
+
+    public function test_taxonomy_branch_does_not_log_when_md_file_missing(): void {
+        $GLOBALS['_mock_is_singular']    = false;
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 12, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( '/nonexistent/news.md' );
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $this->make_negotiator()->maybe_serve_markdown();
     }
 
     // -----------------------------------------------------------------------

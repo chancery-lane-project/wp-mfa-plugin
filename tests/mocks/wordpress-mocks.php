@@ -306,6 +306,14 @@ if (!function_exists('get_post_ancestors')) {
     }
 }
 
+if (!function_exists('get_pages')) {
+    /** @return \WP_Post[]|false Descendants keyed by $GLOBALS['_mock_get_pages'][child_of]. */
+    function get_pages(array $args = []): array|false {
+        $GLOBALS['_mock_get_pages_args'] = $args;
+        return $GLOBALS['_mock_get_pages'][(int) ($args['child_of'] ?? 0)] ?? [];
+    }
+}
+
 if (!function_exists('get_the_terms')) {
     function get_the_terms(int $post_id, string $taxonomy): array|false|\WP_Error {
         return $GLOBALS['_mock_terms'][$post_id][$taxonomy] ?? false;
@@ -410,8 +418,14 @@ if (!function_exists('get_queried_object')) {
 // ---------------------------------------------------------------------------
 
 if (!function_exists('wp_strip_all_tags')) {
+    // Mirrors core: drops script/style contents, strips tags, optionally collapses breaks, trims.
     function wp_strip_all_tags(string $string, bool $remove_breaks = false): string {
-        return strip_tags($string); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
+        $string = preg_replace('@<(script|style)[^>]*?>.*?</\\1>@si', '', $string) ?? $string;
+        $string = strip_tags($string); // phpcs:ignore WordPress.WP.AlternativeFunctions.strip_tags_strip_tags
+        if ($remove_breaks) {
+            $string = preg_replace('/[\r\n\t ]+/', ' ', $string) ?? $string;
+        }
+        return trim($string);
     }
 }
 
@@ -601,6 +615,7 @@ if (!class_exists('WP_Post')) {
         public string $post_modified_gmt = '2025-06-01 12:00:00';
         public string $post_author   = '1';
         public string $post_password = '';
+        public int $post_parent = 0;
 
         public function __construct(array $props = []) {
             foreach ($props as $key => $value) {
@@ -1019,6 +1034,10 @@ if (!class_exists('wpdb')) {
 
         public function query(string $query): int|bool {
             $this->queries[] = ['query' => $query, 'args' => []];
+            // Schema changes share an ordered log with dbDelta() calls.
+            if (str_starts_with(ltrim($query), 'ALTER TABLE')) {
+                $GLOBALS['_mock_schema_events'][] = $query;
+            }
             return true;
         }
 
@@ -1075,6 +1094,7 @@ if (!function_exists('add_menu_page')) {
 if (!function_exists('dbDelta')) {
     function dbDelta(string|array $queries = '', bool $execute = true): array {
         $GLOBALS['_mock_dbdelta_queries'] = is_array($queries) ? $queries : [$queries];
+        $GLOBALS['_mock_schema_events'][]  = 'dbDelta';
         return [];
     }
 }

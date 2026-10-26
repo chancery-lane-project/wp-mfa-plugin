@@ -22,6 +22,7 @@ use Tclp\WpMarkdownForAgents\Generator\Generator;
  * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::bundle_status_line
  * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::bundle
  * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::rebuild_bundle
+ * @covers \Tclp\WpMarkdownForAgents\CLI\Commands::delete
  */
 class CommandsTest extends TestCase {
 
@@ -53,6 +54,35 @@ class CommandsTest extends TestCase {
             null,
             $bundle_generator
         );
+    }
+
+    public function test_delete_post_type_removes_nested_child_page_files(): void {
+        $subdir = 'wp-mfa-commands-delete-' . uniqid();
+        $base   = sys_get_temp_dir() . '/' . $subdir;
+        mkdir( $base . '/page/about/people', 0755, true );
+        file_put_contents( $base . '/page/about.md', 'a' );
+        file_put_contents( $base . '/page/about/team.md', 'b' );
+        file_put_contents( $base . '/page/about/people/jo.md', 'c' );
+        file_put_contents( $base . '/page/manifest.json', '{}' );
+
+        $GLOBALS['_mock_upload_dir'] = [ 'basedir' => sys_get_temp_dir(), 'baseurl' => 'https://example.com/wp-content/uploads' ];
+
+        try {
+            $commands = new Commands(
+                array_merge( Options::get_defaults(), [ 'export_dir' => $subdir ] ),
+                $this->createMock( Generator::class )
+            );
+            $commands->delete( [], [ 'post-type' => 'page' ] );
+
+            $this->assertFileDoesNotExist( $base . '/page/about.md' );
+            $this->assertDirectoryDoesNotExist( $base . '/page/about' );
+            $this->assertFileExists( $base . '/page/manifest.json' );
+        } finally {
+            unset( $GLOBALS['_mock_upload_dir'] );
+            @unlink( $base . '/page/manifest.json' );
+            @rmdir( $base . '/page' );
+            @rmdir( $base );
+        }
     }
 
     private function invoke_bundle_status_line( Commands $commands ): string {
