@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Handles all filesystem I/O for Markdown export files.
  *

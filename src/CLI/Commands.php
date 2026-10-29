@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\CLI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ManifestGenerator;
+use Tclp\WpMarkdownForAgents\Generator\OrphanPruner;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
@@ -99,9 +104,15 @@ class Commands {
 		if ( $incremental && $this->file_writer ) {
 			$this->generate_incremental( $export_base, $types, $dry_run );
 		} else {
+			$pruner = new OrphanPruner( $this->options );
+			$since  = $dry_run ? null : $pruner->mark();
+			$failed = 0;
+
 			foreach ( $types as $type ) {
-				$this->generate_type( $type, $dry_run );
+				$failed += $this->generate_type( $type, $dry_run );
 			}
+
+			$this->prune_orphans( $pruner, $types, $since, $failed );
 
 			if ( isset( $assoc_args['with-manifest'] ) && $this->file_writer ) {
 				$result = $this->generator->write_manifests( $export_base, $types );
@@ -441,10 +452,10 @@ class Commands {
 	/**
 	 * @since  1.0.0
 	 */
-	private function generate_type( string $post_type, bool $dry_run ): void {
+	private function generate_type( string $post_type, bool $dry_run ): int {
 		if ( $dry_run ) {
 			\WP_CLI::log( "[dry-run] Would generate all published posts of type: {$post_type}" );
-			return;
+			return 0;
 		}
 
 		$progress = \WP_CLI\Utils\make_progress_bar( "Generating {$post_type}", 0 );
@@ -469,6 +480,39 @@ class Commands {
 				$results['failed']
 			)
 		);
+
+		return (int) $results['failed'];
+	}
+
+	/**
+	 * Delete Markdown files a full generation run did not rewrite.
+	 *
+	 * Skipped when any post failed: its previous file must stay.
+	 *
+	 * @since  1.7.3
+	 * @param  OrphanPruner $pruner Pruner.
+	 * @param  string[]     $types  Post types the run generated.
+	 * @param  int|null     $since  Time from OrphanPruner::mark(), or null to skip.
+	 * @param  int          $failed Posts that failed to generate.
+	 */
+	private function prune_orphans( OrphanPruner $pruner, array $types, ?int $since, int $failed ): void {
+		if ( null === $since ) {
+			return;
+		}
+
+		if ( $failed > 0 ) {
+			\WP_CLI::warning( 'Old Markdown files were kept because some posts failed to generate.' );
+			return;
+		}
+
+		$pruned = 0;
+		foreach ( $types as $type ) {
+			$pruned += $pruner->prune( (string) $type, $since );
+		}
+
+		if ( $pruned > 0 ) {
+			\WP_CLI::log( sprintf( 'Removed %d old Markdown files that no longer match a post.', $pruned ) );
+		}
 	}
 
 	/**
@@ -691,6 +735,13 @@ class Commands {
 	 * @since  1.7.3 Recurses into subdirectories.
 	 */
 	private function delete_type( string $post_type ): void {
+		// Post type names are keys, so anything else (e.g. `..`) would point
+		// the recursive delete outside the type's own directory.
+		if ( '' === $post_type || sanitize_key( $post_type ) !== $post_type ) {
+			\WP_CLI::error( "Invalid post type: {$post_type}" );
+			return;
+		}
+
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 		$type_dir    = $export_base . '/' . $post_type;
 

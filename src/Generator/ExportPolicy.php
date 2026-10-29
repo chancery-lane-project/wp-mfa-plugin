@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Single source of truth for export eligibility and file-path shape.
  *
@@ -129,7 +133,7 @@ final class ExportPolicy {
 	 * @return string
 	 */
 	private static function slug_path( \WP_Post $post ): string {
-		$segments = array( sanitize_file_name( $post->post_name ) );
+		$segments = array( self::slug_segment( $post ) );
 
 		if ( is_post_type_hierarchical( $post->post_type ) ) {
 			// Nearest ancestor first, so each one is prepended.
@@ -137,12 +141,31 @@ final class ExportPolicy {
 				$ancestor = get_post( $ancestor_id );
 
 				if ( $ancestor instanceof \WP_Post ) {
-					array_unshift( $segments, sanitize_file_name( $ancestor->post_name ) );
+					array_unshift( $segments, self::slug_segment( $ancestor ) );
 				}
 			}
 		}
 
 		return implode( '/', $segments );
+	}
+
+	/**
+	 * One path segment for a post: its slug, or its ID when it has none.
+	 *
+	 * Drafts and pending posts have an empty post_name until published. An
+	 * empty segment would collapse `page//team.md` onto `page/team.md` and
+	 * collide with a top-level page of the same slug. WordPress rejects
+	 * numeric-only slugs for hierarchical types, so an ID cannot clash with
+	 * a real slug.
+	 *
+	 * @since  1.7.3
+	 * @param  \WP_Post $post The post.
+	 * @return string
+	 */
+	private static function slug_segment( \WP_Post $post ): string {
+		$slug = sanitize_file_name( $post->post_name );
+
+		return '' !== $slug ? $slug : (string) $post->ID;
 	}
 
 	/**

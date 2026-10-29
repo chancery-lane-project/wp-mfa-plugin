@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Jobs;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Short-lived mutual exclusion for a job tick.
  *

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
@@ -251,7 +255,7 @@ class Admin {
 	 *
 	 * @since  1.7.0
 	 */
-	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message' );
+	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message', 'pruned' );
 
 	/**
 	 * The job record, reduced to the fields the browser is allowed to see.
@@ -398,8 +402,8 @@ class Admin {
 	}
 
 	/**
-	 * Render the "settings changed — regenerate" warning when the regen
-	 * transient is set. Dismissible via core's `is-dismissible` JS, which
+	 * Render the "regenerate" warning when the regen transient is set, worded
+	 * for an upgrade when NeedsRegenTracker::flag_upgrade() set it. Dismissible via core's `is-dismissible` JS, which
 	 * only hides for the session; the notice returns on the next page load
 	 * until a full bulk regeneration of every flagged post type completes.
 	 *
@@ -413,10 +417,19 @@ class Admin {
 		}
 
 		$settings_url = admin_url( 'options-general.php?page=markdown-for-agents#generate-markdown-files' );
+		$upgrade      = (string) get_option( NeedsRegenTracker::UPGRADE_OPTION, '' );
+
+		$message = '' !== $upgrade
+			? sprintf(
+				/* translators: %s: plugin version number. */
+				__( 'Markdown for Agents was updated to %s. Regenerate all Markdown files: links, frontmatter and child page paths have changed. Regenerating also removes files left at old paths.', 'markdown-for-agents-and-statistics' ),
+				$upgrade
+			)
+			: __( 'Markdown for Agents: settings changed since the last bulk run. Existing Markdown files may be out of date until you regenerate.', 'markdown-for-agents-and-statistics' );
 
 		printf(
 			'<div class="notice notice-warning is-dismissible" data-mfa-notice="needs_regen"><p>%s <a href="%s">%s</a></p></div>',
-			esc_html__( 'Markdown for Agents: settings changed since the last bulk run. Existing Markdown files may be out of date until you regenerate.', 'markdown-for-agents-and-statistics' ),
+			esc_html( $message ),
 			esc_url( $settings_url ),
 			esc_html__( 'Regenerate now', 'markdown-for-agents-and-statistics' )
 		);

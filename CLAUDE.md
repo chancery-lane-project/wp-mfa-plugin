@@ -47,4 +47,5 @@ PHPUnit 9.6 unit tests only (`tests/Unit/`, mirrors `src/` structure). No WordPr
 - UK English spelling in comments and docs.
 - Version lives in three places: the plugin header and `MARKDOWN_FOR_AGENTS_VERSION` in `markdown-for-agents.php`, and the stable tag/changelog in `readme.txt`. Bump all together.
 - Public filters/actions are documented in `README.md` — update it when adding one.
+- When a release changes the paths, links or frontmatter of files already exported, raise `Migrator::REGEN_REQUIRED_VERSION` to that version. Upgrading sites then get the "regenerate" admin notice once.
 - The root `index.md` export declares `okf_version: "0.1"` (OKF spec pin, see `docs/plans/SPEC.md`). Review this pin against the current OKF spec on every major release of the plugin.

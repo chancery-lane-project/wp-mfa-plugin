@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Admin;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
@@ -316,6 +320,7 @@ class SettingsPage {
 
 		if ( empty( $pending ) ) {
 			delete_transient( NeedsRegenTracker::TRANSIENT );
+			delete_option( NeedsRegenTracker::UPGRADE_OPTION );
 			return;
 		}
 

@@ -7,6 +7,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Jobs;
 use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
+use Tclp\WpMarkdownForAgents\Generator\OrphanPruner;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
@@ -189,6 +190,95 @@ class JobRunnerTest extends TestCase {
         $this->assertSame( 2, $record['stages'][0]['error_count'] );
         $this->assertCount( 2, $record['errors'] );
         $this->assertSame( 'done', $record['status'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // Orphan pruning
+    // -----------------------------------------------------------------------
+
+    /** @return OrphanPruner&MockObject */
+    private function pruner( ?int $since = 1_799_999_000 ): OrphanPruner {
+        $pruner = $this->createMock( OrphanPruner::class );
+        $pruner->method( 'mark' )->willReturn( $since );
+
+        return $pruner;
+    }
+
+    private function pruning_runner( OrphanPruner $pruner ): JobRunner {
+        return new JobRunner( $this->job, $this->mutex, $this->factory, new NeedsRegenTracker(), $this->clock, null, $pruner );
+    }
+
+    public function test_prunes_every_post_type_after_the_last_post_type_stage(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ), $this->descriptor( 'post_type', 'page' ), $this->descriptor( 'taxonomy' ), $this->descriptor( 'bundle' ) ] );
+        $this->factory->method( 'make' )->willReturnCallback( fn() => new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $pruner = $this->pruner();
+        $pruner->expects( $this->once() )->method( 'mark' );
+        $pruned = [];
+        $pruner->method( 'prune' )->willReturnCallback(
+            function ( string $type, int $since ) use ( &$pruned ): int {
+                $pruned[] = [ $type, $since ];
+                return 2;
+            }
+        );
+
+        $this->pruning_runner( $pruner )->run_tick();
+
+        $this->assertSame( [ [ 'post', 1_799_999_000 ], [ 'page', 1_799_999_000 ] ], $pruned );
+        $this->assertSame( 4, $this->job->get()['pruned'] );
+    }
+
+    public function test_does_not_prune_when_a_post_type_stage_had_errors(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ), $this->descriptor( 'post_type', 'page' ) ] );
+        $errors = [ [ 'post_id' => 3, 'message' => 'write failed' ] ];
+        $this->factory->method( 'make' )->willReturnOnConsecutiveCalls(
+            new FakeStage( [ $this->page( 0, 3, true, $errors ) ], 1 ),
+            new FakeStage( [ $this->page( 1, 1, true ) ], 1 )
+        );
+
+        $pruner = $this->pruner();
+        $pruner->expects( $this->never() )->method( 'prune' );
+
+        $this->pruning_runner( $pruner )->run_tick();
+
+        $this->assertSame( 0, $this->job->get()['pruned'] );
+    }
+
+    public function test_does_not_prune_when_the_start_time_could_not_be_recorded(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+        $this->factory->method( 'make' )->willReturn( new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $pruner = $this->pruner( null );
+        $pruner->expects( $this->never() )->method( 'prune' );
+
+        $this->pruning_runner( $pruner )->run_tick();
+    }
+
+    public function test_taxonomy_only_job_does_not_prune(): void {
+        $this->given_job( [ $this->descriptor( 'taxonomy' ), $this->descriptor( 'bundle' ) ] );
+        $this->factory->method( 'make' )->willReturnCallback( fn() => new FakeStage( [ $this->page( 1, 1, true ) ], 1 ) );
+
+        $pruner = $this->pruner();
+        $pruner->expects( $this->never() )->method( 'mark' );
+        $pruner->expects( $this->never() )->method( 'prune' );
+
+        $this->pruning_runner( $pruner )->run_tick();
+    }
+
+    public function test_start_time_survives_across_ticks(): void {
+        $this->given_job( [ $this->descriptor( 'post_type', 'post' ) ] );
+        // 30s per batch fills the tick budget, so the stage spans two ticks.
+        $stage = new FakeStage( [ $this->page( 1, 1, false ), $this->page( 1, 2, true ) ], 2, $this->clock, 30 );
+        $this->factory->method( 'make' )->willReturn( $stage );
+
+        $pruner = $this->pruner();
+        $pruner->expects( $this->once() )->method( 'mark' );
+        $pruner->expects( $this->once() )->method( 'prune' )->with( 'post', 1_799_999_000 )->willReturn( 0 );
+
+        $runner = $this->pruning_runner( $pruner );
+        $runner->run_tick();
+        $this->assertSame( 'running', $this->job->get()['status'] );
+        $runner->run_tick();
     }
 
     public function test_a_held_mutex_makes_the_tick_a_no_op(): void {

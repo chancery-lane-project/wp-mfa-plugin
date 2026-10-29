@@ -179,6 +179,14 @@
 
         target.appendChild(list);
 
+        var pruned = parseInt(job.pruned, 10) || 0;
+
+        if (pruned > 0) {
+            var prunedNote = document.createElement('p');
+            prunedNote.textContent = 'Removed ' + pruned + ' old Markdown file' + (1 === pruned ? '' : 's') + ' that no longer match a post.';
+            target.appendChild(prunedNote);
+        }
+
         var errorCount = parseInt(job.error_count, 10) || 0;
 
         if (errorCount && job.errors && job.errors.length) {

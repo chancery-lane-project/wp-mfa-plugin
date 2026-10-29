@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Core;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
 /**
@@ -26,6 +31,22 @@ class Migrator {
 	 * @since 1.7.3
 	 */
 	public const UA_SEEN_OPTION_KEY = 'markdown_for_agents_ua_defaults_seen';
+
+	/**
+	 * Last release whose upgrade check has run (see maybe_flag_upgrade_regen()).
+	 *
+	 * @since 1.7.3
+	 */
+	public const REGEN_VERSION_OPTION_KEY = 'markdown_for_agents_regen_version';
+
+	/**
+	 * Most recent release that changed existing exports, so sites upgrading
+	 * from an earlier version must regenerate. Raise it in a release that
+	 * changes paths, links or frontmatter of files already on disk.
+	 *
+	 * @since 1.7.3
+	 */
+	private const REGEN_REQUIRED_VERSION = '1.7.3';
 
 	/**
 	 * The UA defaults shipped in 1.1.0, before the seen-list existed.
@@ -152,5 +173,38 @@ class Migrator {
 		}
 
 		update_option( self::UA_SEEN_OPTION_KEY, array_values( array_unique( array_merge( $seen, $defaults ) ) ) );
+	}
+
+	/**
+	 * Show the "regenerate" admin notice once after an upgrade that changed
+	 * existing exports.
+	 *
+	 * Sites with no exported files are not flagged: there is nothing out of
+	 * date, and a new install is told to generate by the setup steps.
+	 * Returns early, without writes, once the check has run for this release.
+	 *
+	 * @since  1.7.3
+	 */
+	public static function maybe_flag_upgrade_regen(): void {
+		$checked = (string) get_option( self::REGEN_VERSION_OPTION_KEY, '0' );
+
+		if ( version_compare( $checked, self::REGEN_REQUIRED_VERSION, '>=' ) ) {
+			return;
+		}
+
+		update_option( self::REGEN_VERSION_OPTION_KEY, self::REGEN_REQUIRED_VERSION );
+
+		$options = Options::get();
+		$types   = ExportPolicy::enabled_post_types( $options );
+		$base    = Options::get_export_base( $options );
+
+		foreach ( $types as $type ) {
+			$type_dir = $base . '/' . sanitize_file_name( (string) $type );
+
+			if ( is_dir( $type_dir ) && glob( $type_dir . '/*.md' ) ) {
+				( new NeedsRegenTracker() )->flag_upgrade( $types, self::REGEN_REQUIRED_VERSION );
+				return;
+			}
+		}
 	}
 }

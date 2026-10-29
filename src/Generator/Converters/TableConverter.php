@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator\Converters;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Converter\ConverterInterface;
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\ElementInterface;
 

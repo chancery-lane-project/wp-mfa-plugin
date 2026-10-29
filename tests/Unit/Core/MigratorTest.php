@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Core;
 
 use PHPUnit\Framework\TestCase;
 use Tclp\WpMarkdownForAgents\Core\Migrator;
+use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
@@ -231,5 +232,61 @@ class MigratorTest extends TestCase {
         Migrator::maybe_sync_ua_defaults();
 
         $this->assertSame( $after_first, $GLOBALS['_mock_options'] );
+    }
+
+    // -----------------------------------------------------------------------
+    // maybe_flag_upgrade_regen()
+    // -----------------------------------------------------------------------
+
+    private function with_exports( bool $has_files, callable $test ): void {
+        $uploads = sys_get_temp_dir() . '/wp-mfa-migrator-' . uniqid();
+        mkdir( $uploads . '/wp-mfa-exports/page', 0755, true );
+        if ( $has_files ) {
+            file_put_contents( $uploads . '/wp-mfa-exports/page/about.md', 'a' );
+        }
+        $GLOBALS['_mock_upload_dir']  = [ 'basedir' => $uploads, 'baseurl' => 'https://example.com/wp-content/uploads' ];
+        $GLOBALS['_mock_transients']  = [];
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ] = [ 'post_types' => [ 'post', 'page' ] ];
+
+        try {
+            $test();
+        } finally {
+            unset( $GLOBALS['_mock_upload_dir'] );
+            @unlink( $uploads . '/wp-mfa-exports/page/about.md' );
+            @rmdir( $uploads . '/wp-mfa-exports/page' );
+            @rmdir( $uploads . '/wp-mfa-exports' );
+            @rmdir( $uploads );
+        }
+    }
+
+    public function test_upgrade_from_before_1_7_3_with_exports_flags_regeneration(): void {
+        $this->with_exports( true, function (): void {
+            Migrator::maybe_flag_upgrade_regen();
+
+            $this->assertSame( [ 'post', 'page' ], get_transient( NeedsRegenTracker::TRANSIENT ) );
+            $this->assertSame( '1.7.3', get_option( NeedsRegenTracker::UPGRADE_OPTION ) );
+            $this->assertSame( '1.7.3', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
+        } );
+    }
+
+    public function test_site_without_exports_is_not_flagged(): void {
+        $this->with_exports( false, function (): void {
+            Migrator::maybe_flag_upgrade_regen();
+
+            $this->assertFalse( get_transient( NeedsRegenTracker::TRANSIENT ) );
+            $this->assertSame( '1.7.3', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
+        } );
+    }
+
+    public function test_flags_only_once(): void {
+        $this->with_exports( true, function (): void {
+            Migrator::maybe_flag_upgrade_regen();
+            ( new NeedsRegenTracker() )->clear( 'post' );
+            ( new NeedsRegenTracker() )->clear( 'page' );
+
+            Migrator::maybe_flag_upgrade_regen();
+
+            $this->assertFalse( get_transient( NeedsRegenTracker::TRANSIENT ) );
+        } );
     }
 }
