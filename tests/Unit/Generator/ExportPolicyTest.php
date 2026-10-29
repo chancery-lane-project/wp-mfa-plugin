@@ -111,6 +111,22 @@ class ExportPolicyTest extends TestCase {
         $this->assertSame('page/services/team.md', ExportPolicy::post_relative_path($b));
     }
 
+    public function test_unpublished_ancestor_without_slug_uses_its_id(): void {
+        // Drafts have an empty post_name until published.
+        $GLOBALS['_mock_post_objects'][5]    = new \WP_Post(['ID' => 5, 'post_type' => 'page', 'post_name' => '']);
+        $GLOBALS['_mock_post_ancestors'][42] = [5];
+
+        $post = $this->make_post(['post_type' => 'page', 'post_name' => 'team']);
+
+        $this->assertSame('page/5/team.md', ExportPolicy::post_relative_path($post));
+    }
+
+    public function test_post_without_slug_uses_its_id(): void {
+        $post = $this->make_post(['post_type' => 'page', 'post_name' => '']);
+
+        $this->assertSame('page/42.md', ExportPolicy::post_relative_path($post));
+    }
+
     public function test_top_level_page_path_is_unchanged(): void {
         $post = $this->make_post(['post_type' => 'page', 'post_name' => 'about']);
         $this->assertSame('page/about.md', ExportPolicy::post_relative_path($post));

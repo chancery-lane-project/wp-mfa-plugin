@@ -85,6 +85,39 @@ class CommandsTest extends TestCase {
         }
     }
 
+    public function test_delete_post_type_rejects_traversing_type(): void {
+        // Uploads is a sandbox directory, so '..' from the export base stays
+        // inside it. The canary sits where '..' would reach.
+        $uploads = sys_get_temp_dir() . '/wp-mfa-commands-sandbox-' . uniqid();
+        $base    = $uploads . '/exports';
+        mkdir( $base . '/page', 0755, true );
+        file_put_contents( $base . '/page/about.md', 'a' );
+        file_put_contents( $uploads . '/canary.md', 'c' );
+
+        $GLOBALS['_mock_upload_dir'] = [ 'basedir' => $uploads, 'baseurl' => 'https://example.com/wp-content/uploads' ];
+
+        try {
+            $commands = new Commands(
+                array_merge( Options::get_defaults(), [ 'export_dir' => 'exports' ] ),
+                $this->createMock( Generator::class )
+            );
+
+            foreach ( [ '..', 'page/..', '.' ] as $type ) {
+                $commands->delete( [], [ 'post-type' => $type ] );
+            }
+
+            $this->assertFileExists( $uploads . '/canary.md' );
+            $this->assertFileExists( $base . '/page/about.md' );
+        } finally {
+            unset( $GLOBALS['_mock_upload_dir'] );
+            @unlink( $uploads . '/canary.md' );
+            @unlink( $base . '/page/about.md' );
+            @rmdir( $base . '/page' );
+            @rmdir( $base );
+            @rmdir( $uploads );
+        }
+    }
+
     private function invoke_bundle_status_line( Commands $commands ): string {
         $method = new \ReflectionMethod( Commands::class, 'bundle_status_line' );
         return $method->invoke( $commands );

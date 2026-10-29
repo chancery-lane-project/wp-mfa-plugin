@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\CLI;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
@@ -691,6 +695,13 @@ class Commands {
 	 * @since  1.7.3 Recurses into subdirectories.
 	 */
 	private function delete_type( string $post_type ): void {
+		// Post type names are keys, so anything else (e.g. `..`) would point
+		// the recursive delete outside the type's own directory.
+		if ( '' === $post_type || sanitize_key( $post_type ) !== $post_type ) {
+			\WP_CLI::error( "Invalid post type: {$post_type}" );
+			return;
+		}
+
 		$export_base = \Tclp\WpMarkdownForAgents\Core\Options::get_export_base( $this->options );
 		$type_dir    = $export_base . '/' . $post_type;
 

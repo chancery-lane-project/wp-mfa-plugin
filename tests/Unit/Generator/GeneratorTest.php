@@ -425,6 +425,37 @@ class GeneratorTest extends TestCase {
         );
     }
 
+    public function test_on_post_updated_publishing_draft_parent_spares_top_level_namesake(): void {
+        // A draft parent has no slug until it is published.
+        $before = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_name' => '', 'post_status' => 'draft' ] );
+        $after  = $this->make_post( [ 'ID' => 5, 'post_type' => 'page', 'post_name' => 'about' ] );
+        $child  = $this->make_post( [ 'ID' => 6, 'post_type' => 'page', 'post_name' => 'team', 'post_parent' => 5 ] );
+
+        $GLOBALS['_mock_post_objects'][5]   = $after;
+        $GLOBALS['_mock_post_ancestors'][6] = [ 5 ];
+        $GLOBALS['_mock_get_pages'][5]      = [ $child ];
+
+        // A separate top-level page shares the child's slug.
+        $this->touch_export( 'page/team.md' );
+        $this->touch_export( 'page/5/team.md' );
+
+        $deleted = [];
+        $this->file_writer->method( 'delete' )->willReturnCallback(
+            function ( string $path ) use ( &$deleted ): bool {
+                $deleted[] = $path;
+                return true;
+            }
+        );
+        $this->file_writer->method( 'write' )->willReturn( true );
+        $this->stub_pipeline();
+
+        $this->generator->on_post_updated( 5, $after, $before );
+
+        $this->assertNotContains( $this->base_dir . '/page/team.md', $deleted );
+        $this->assertNotContains( $this->base_dir . '//team.md', $deleted );
+        $this->assertContains( $this->base_dir . '/page/5/team.md', $deleted );
+    }
+
     // -----------------------------------------------------------------------
     // on_save_post()
     // -----------------------------------------------------------------------
