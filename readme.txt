@@ -46,7 +46,7 @@ The Chancery Lane Project is a charity that helps organisations reduce emissions
 * **Topics section** — appends a `## Topics` section with linked taxonomy terms to the Markdown body
 * **Export preview** — preview generated Markdown inline in the post editor without writing to disk
 * **OKF directory indexes** — `index.md` listings at the export root and in every post-type and taxonomy directory (Open Knowledge Format), kept current automatically
-* **OKF-compliant frontmatter and links** — `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown file versions, always on
+* **OKF-compliant frontmatter and links** — `timestamp` and flat cross-taxonomy `tags` frontmatter keys, and internal links rewritten to point at the Markdown versions of pages (`?output_format=md`), always on
 * **Downloadable OKF bundle** — optional `.zip` archive of the export tree with relative internal links, `manifest.json`, and an ARD discovery catalog panel, kept fresh via bulk-generation rebuilds and a debounced WP-Cron schedule
 * **ARD catalog generation** — `ai-catalog.json` document for manual deployment to `/.well-known/`, discoverable by AI agent directories, shown automatically whenever the bundle toggle is on
 * WP-CLI commands: `generate`, `generate-taxonomies`, `generate-indexes`, `prune-stats`, `status`, `delete`, `bundle`
@@ -311,6 +311,10 @@ wp markdown-agents generate-taxonomies --dry-run
 * Fix: `wp markdown-agents delete --post-type` now removes files in subdirectories too.
 * Fix: Markdown responses no longer start with stray whitespace printed by a theme or another plugin (for example a tab after a closing `?>`), which stopped strict parsers from finding the front matter.
 * Fix: sites with saved settings now pick up AI User-Agent strings added to the defaults in later releases. Each new default is added once, so strings an admin removed stay removed. Mozilla-style bot User-Agents (e.g. bingbot, Applebot) are now labelled by their own name in the statistics instead of 'Mozilla'.
+* Fix: Markdown requests for category and tag archives are now counted in the statistics. The statistics page lists term archives alongside posts (for example "Category: News"). The database table gains an `object_type` column; the migration runs automatically on update. Term history starts from the update.
+* Fix: HTML in frontmatter values (for example ACF WYSIWYG fields, titles and excerpts) is converted to plain text, and HTML entities are decoded. Regenerate after updating to clean existing files.
+* Fix: internal links in exports now point at the target page's canonical URL with `?output_format=md` instead of the static `.md` file in uploads. Some web servers send those files as `application/octet-stream` or block them (403), so agents could not follow the links. Pagination links stay as HTML links. Regenerate after updating.
+* Fix: pagination links in exports generated from the block editor no longer point at `wp-admin/post.php` with a nonce. Content is now rendered as if requested at the post's permalink.
 * Feature: new `markdown_for_agents_post_relative_path` filter to change a post's export path. Unlike `markdown_for_agents_export_path`, it is honoured by manifests, index listings and link rewriting as well as generation and serving. The README has snippets for WPML and Polylang sites where translations share a slug.
 * Feature: new `markdown_for_agents_is_eligible` filter to stop otherwise eligible posts being exported.
 * Feature: a Reset button beside Filter on the statistics page, shown whenever a filter or non-default date range is applied. It returns to the default view: all pages, operators, agents and methods over the last 7 days.
