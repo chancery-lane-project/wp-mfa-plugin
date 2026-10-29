@@ -67,15 +67,17 @@ class Plugin {
 
 		$this->define_generator( $options );
 
-		// DB migration and UA-default sync — run on every load, both return
-		// early once up to date. Options were read above, so newly synced
-		// UA strings take effect from the next request.
+		// DB migration, UA-default sync and the upgrade regeneration check —
+		// run on every load, all return early once up to date. Options were
+		// read above, so newly synced UA strings take effect from the next
+		// request.
 		add_action(
 			'plugins_loaded',
 			static function (): void {
 				global $wpdb;
 				Migrator::maybe_migrate( $wpdb );
 				Migrator::maybe_sync_ua_defaults();
+				Migrator::maybe_flag_upgrade_regen();
 			}
 		);
 

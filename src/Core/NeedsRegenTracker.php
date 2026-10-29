@@ -35,6 +35,15 @@ class NeedsRegenTracker {
 	public const TRANSIENT = 'markdown_for_agents_needs_regen';
 
 	/**
+	 * Plugin version whose upgrade requires regeneration, while the notice
+	 * for it is pending. Changes the notice wording; cleared with the
+	 * transient.
+	 *
+	 * @since 1.7.3
+	 */
+	public const UPGRADE_OPTION = 'markdown_for_agents_regen_upgrade';
+
+	/**
 	 * Remove a post type from the pending list, deleting the transient
 	 * entirely once every flagged type has been regenerated.
 	 *
@@ -52,11 +61,32 @@ class NeedsRegenTracker {
 
 		if ( empty( $remaining ) ) {
 			delete_transient( self::TRANSIENT );
+			delete_option( self::UPGRADE_OPTION );
 			return;
 		}
 
 		if ( $remaining !== $pending ) {
 			set_transient( self::TRANSIENT, $remaining, 0 );
 		}
+	}
+
+	/**
+	 * Flag post types for regeneration because a plugin upgrade changed the
+	 * output format. Merges with any types already pending.
+	 *
+	 * @since  1.7.3
+	 * @param  string[] $post_types Post types to flag.
+	 * @param  string   $version    Plugin version that requires it.
+	 */
+	public function flag_upgrade( array $post_types, string $version ): void {
+		if ( empty( $post_types ) ) {
+			return;
+		}
+
+		$pending = get_transient( self::TRANSIENT );
+		$pending = is_array( $pending ) ? $pending : array();
+
+		set_transient( self::TRANSIENT, array_values( array_unique( array_merge( $pending, $post_types ) ) ), 0 );
+		update_option( self::UPGRADE_OPTION, $version );
 	}
 }

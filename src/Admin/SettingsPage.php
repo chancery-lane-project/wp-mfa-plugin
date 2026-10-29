@@ -320,6 +320,7 @@ class SettingsPage {
 
 		if ( empty( $pending ) ) {
 			delete_transient( NeedsRegenTracker::TRANSIENT );
+			delete_option( NeedsRegenTracker::UPGRADE_OPTION );
 			return;
 		}
 

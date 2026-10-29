@@ -435,4 +435,40 @@ class AdminAjaxTest extends TestCase {
         $this->assertStringContainsString( 'Settings', $links[0] );
         $this->assertStringContainsString( 'Deactivate', $links[1] );
     }
+
+    // -----------------------------------------------------------------------
+    // Regeneration notice
+    // -----------------------------------------------------------------------
+
+    private function notices_html(): string {
+        ob_start();
+        $this->admin->display_admin_notices();
+        return (string) ob_get_clean();
+    }
+
+    public function test_regen_notice_after_upgrade_names_the_version(): void {
+        $GLOBALS['_mock_transients']['markdown_for_agents_needs_regen'] = [ 'post' ];
+        $GLOBALS['_mock_options']['markdown_for_agents_regen_upgrade']  = '1.7.3';
+
+        try {
+            $html = $this->notices_html();
+        } finally {
+            unset( $GLOBALS['_mock_transients']['markdown_for_agents_needs_regen'], $GLOBALS['_mock_options']['markdown_for_agents_regen_upgrade'] );
+        }
+
+        $this->assertStringContainsString( 'updated to 1.7.3', $html );
+        $this->assertStringContainsString( 'Regenerate now', $html );
+    }
+
+    public function test_regen_notice_after_settings_change_keeps_its_wording(): void {
+        $GLOBALS['_mock_transients']['markdown_for_agents_needs_regen'] = [ 'post' ];
+
+        try {
+            $html = $this->notices_html();
+        } finally {
+            unset( $GLOBALS['_mock_transients']['markdown_for_agents_needs_regen'] );
+        }
+
+        $this->assertStringContainsString( 'settings changed since the last bulk run', $html );
+    }
 }
