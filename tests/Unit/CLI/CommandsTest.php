@@ -9,6 +9,7 @@ use Tclp\WpMarkdownForAgents\CLI\Commands;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\OrphanPruner;
 
 /**
  * Covers Commands::bundle_status_line() (pure, no \WP_CLI calls, driven
@@ -116,6 +117,26 @@ class CommandsTest extends TestCase {
             @rmdir( $base );
             @rmdir( $uploads );
         }
+    }
+
+    public function test_prune_orphans_prunes_each_type_only_when_nothing_failed(): void {
+        $commands = $this->make_commands( $this->createMock( BundleGenerator::class ) );
+        $method   = new \ReflectionMethod( Commands::class, 'prune_orphans' );
+
+        $pruner = $this->createMock( OrphanPruner::class );
+        $pruner->expects( $this->exactly( 2 ) )->method( 'prune' )
+            ->withConsecutive( [ 'post', 100 ], [ 'page', 100 ] )
+            ->willReturn( 1 );
+        $method->invoke( $commands, $pruner, [ 'post', 'page' ], 100, 0 );
+
+        $failing = $this->createMock( OrphanPruner::class );
+        $failing->expects( $this->never() )->method( 'prune' );
+        $method->invoke( $commands, $failing, [ 'post' ], 100, 1 );
+        $this->assertNotEmpty( get_mock_wp_cli_warnings() );
+
+        $unmarked = $this->createMock( OrphanPruner::class );
+        $unmarked->expects( $this->never() )->method( 'prune' );
+        $method->invoke( $commands, $unmarked, [ 'post' ], null, 0 );
     }
 
     private function invoke_bundle_status_line( Commands $commands ): string {

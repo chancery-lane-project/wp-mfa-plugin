@@ -102,6 +102,8 @@ class GenerationJob {
 			'message'            => '',
 			'attempt_started_at' => null,
 			'dead_attempts'      => 0,
+			'prune_since'        => null,
+			'pruned'             => 0,
 		);
 
 		$this->write( $record );
@@ -240,6 +242,11 @@ class GenerationJob {
 			// Resets to 0 the moment any tick completes a batch, so
 			// intermittent deaths do not accumulate into a false failure.
 			'dead_attempts'      => 0,
+			// Export filesystem time taken before the first post was written,
+			// and how many older files were deleted after the last post type
+			// stage (see JobRunner::prune_orphans()).
+			'prune_since'        => null,
+			'pruned'             => 0,
 		);
 	}
 }

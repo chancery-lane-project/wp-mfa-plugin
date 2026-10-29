@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
+use Tclp\WpMarkdownForAgents\Generator\OrphanPruner;
 
 /**
  * Runs bulk generation as a self-rescheduling chain of time-boxed cron ticks.
@@ -87,6 +88,7 @@ class JobRunner {
 		private readonly NeedsRegenTracker $needs_regen,
 		private readonly Clock $clock,
 		private readonly ?BundleGenerator $bundle_generator = null,
+		private readonly ?OrphanPruner $pruner = null,
 	) {}
 
 	/**
@@ -219,6 +221,12 @@ class JobRunner {
 			}
 
 			if ( null === $descriptor['total'] ) {
+				// Taken before the first post is written, so every file this
+				// job writes is at least as new as it.
+				if ( 'post_type' === $descriptor['type'] && null !== $this->pruner && null === $record['prune_since'] ) {
+					$record['prune_since'] = $this->pruner->mark();
+				}
+
 				try {
 					$descriptor['total'] = $stage->count_total();
 				} catch ( \Throwable $e ) {
@@ -264,6 +272,11 @@ class JobRunner {
 
 				if ( 'post_type' === $descriptor['type'] && ! empty( $descriptor['slug'] ) ) {
 					$this->needs_regen->clear( (string) $descriptor['slug'] );
+				}
+
+				$next_type = $record['stages'][ $index + 1 ]['type'] ?? '';
+				if ( 'post_type' === $descriptor['type'] && 'post_type' !== $next_type ) {
+					$record = $this->prune_orphans( $record );
 				}
 
 				// The cursor is scoped to one stage: carrying a post-ID or
@@ -320,6 +333,49 @@ class JobRunner {
 	 *
 	 * @since  1.7.0
 	 */
+	/**
+	 * After the last post type stage, delete files the job did not rewrite.
+	 *
+	 * Skipped when any post type stage reported an error: a post whose write
+	 * failed still has its previous file, and that file must stay.
+	 *
+	 * @since  1.7.3
+	 * @param  array<string, mixed> $record Job record.
+	 * @return array<string, mixed> The record with `pruned` set.
+	 */
+	private function prune_orphans( array $record ): array {
+		if ( null === $this->pruner || null === $record['prune_since'] ) {
+			return $record;
+		}
+
+		$post_type_stages = array_filter(
+			$record['stages'],
+			static fn( array $stage ): bool => 'post_type' === $stage['type']
+		);
+
+		foreach ( $post_type_stages as $stage ) {
+			if ( (int) $stage['error_count'] > 0 ) {
+				return $record;
+			}
+		}
+
+		$pruned = 0;
+		foreach ( $post_type_stages as $stage ) {
+			if ( 'done' === $stage['state'] && ! empty( $stage['slug'] ) ) {
+				$pruned += $this->pruner->prune( (string) $stage['slug'], (int) $record['prune_since'] );
+			}
+		}
+
+		if ( $pruned > 0 && null !== $this->bundle_generator ) {
+			// The bundle stage only rebuilds a stale bundle.
+			$this->bundle_generator->mark_stale_and_schedule();
+		}
+
+		$record['pruned'] = $pruned;
+
+		return $record;
+	}
+
 	private function has_fresh_pending_tick(): bool {
 		$next = wp_next_scheduled( self::TICK_HOOK );
 

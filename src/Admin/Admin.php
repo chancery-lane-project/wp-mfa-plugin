@@ -255,7 +255,7 @@ class Admin {
 	 *
 	 * @since  1.7.0
 	 */
-	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message' );
+	private const PUBLIC_JOB_FIELDS = array( 'status', 'stages', 'stage_index', 'errors', 'error_count', 'message', 'pruned' );
 
 	/**
 	 * The job record, reduced to the fields the browser is allowed to see.

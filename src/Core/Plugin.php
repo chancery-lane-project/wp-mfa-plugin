@@ -19,6 +19,7 @@ use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\FrontmatterBuilder;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
+use Tclp\WpMarkdownForAgents\Generator\OrphanPruner;
 use Tclp\WpMarkdownForAgents\Generator\InternalUrlResolver;
 use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
@@ -178,7 +179,8 @@ class Plugin {
 			$stage_factory,
 			new NeedsRegenTracker(),
 			$clock,
-			$bundle_generator
+			$bundle_generator,
+			new OrphanPruner( $options )
 		);
 
 		$this->generation_job = $generation_job;
