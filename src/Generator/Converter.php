@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Generator;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Environment;
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\HtmlConverter;
 use Tclp\WpMarkdownForAgents\Generator\Converters\CodeBlockConverter;

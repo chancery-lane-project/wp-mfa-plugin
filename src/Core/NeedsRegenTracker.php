@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Core;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Owns the `markdown_for_agents_needs_regen` transient that drives the
  * "settings changed, regenerate" admin notice.

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tclp\WpMarkdownForAgents\Core;
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\TickMutex;
