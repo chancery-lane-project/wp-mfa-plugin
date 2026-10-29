@@ -431,7 +431,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Upgrade Notice ==
 
 = 1.7.3 =
-Child pages now export under their parents' slugs (page/about/team.md), so pages sharing a slug under different parents no longer serve each other's Markdown. If your site has child pages, run Generate everything after upgrading. Run wp markdown-agents delete --all --yes first to remove the old flat files.
+You must regenerate all Markdown files after upgrading (Settings → Generate everything, or wp markdown-agents generate). Links, frontmatter and child page paths have changed. To remove old child page files, run wp markdown-agents delete --all --yes first.
 
 = 1.4.4 =
 Fixes a cache-poisoning issue where full-page caches (e.g. LiteSpeed) could serve the Markdown variant to regular browsers. Recommended upgrade if you run any reverse-proxy or page cache. Purge your cache after upgrading.
