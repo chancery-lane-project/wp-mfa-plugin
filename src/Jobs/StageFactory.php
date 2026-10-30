@@ -11,6 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 
 /**
@@ -34,6 +35,7 @@ class StageFactory {
 	 * @param  Generator                $generator          Post Markdown writer.
 	 * @param  TaxonomyArchiveGenerator $taxonomy_generator Term archive writer.
 	 * @param  BundleGenerator|null     $bundle_generator   Optional bundle builder.
+	 * @param  IndexGenerator|null      $index_generator    Optional index listing builder.
 	 */
 	public function __construct(
 		private readonly \wpdb $wpdb,
@@ -41,6 +43,7 @@ class StageFactory {
 		private readonly Generator $generator,
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly ?BundleGenerator $bundle_generator = null,
+		private readonly ?IndexGenerator $index_generator = null,
 	) {}
 
 	/**
@@ -79,7 +82,9 @@ class StageFactory {
 			return array();
 		}
 
-		// Every scope ends in exactly one bundle rebuild, never more.
+		// Every scope ends in one index rebuild, then exactly one bundle
+		// rebuild, never more. Indexes come first so the bundle zips them.
+		$stages[] = $this->descriptor( 'index' );
 		$stages[] = $this->descriptor( 'bundle' );
 
 		return $stages;
@@ -102,6 +107,10 @@ class StageFactory {
 
 		if ( 'bundle' === $type ) {
 			return new BundleStage( $this->generator, $this->bundle_generator );
+		}
+
+		if ( 'index' === $type ) {
+			return null !== $this->index_generator ? new IndexStage( $this->index_generator ) : null;
 		}
 
 		if ( 'post_type' === $type ) {
