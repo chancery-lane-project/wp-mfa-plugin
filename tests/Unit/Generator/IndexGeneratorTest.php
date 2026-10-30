@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tclp\WpMarkdownForAgents\Generator\FileWriter;
 use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Generator\IndexGenerator
@@ -43,6 +44,7 @@ class IndexGeneratorTest extends TestCase {
         $GLOBALS['_mock_post_ancestors']     = [];
         $GLOBALS['_mock_hierarchical_types'] = [ 'page' ];
         unset( $GLOBALS['_mock_apply_filters'] );
+        unset( $GLOBALS['_mock_options'][ GenerationJob::OPTION ] );
 
         // Real FileWriter — the tests assert against files on disk.
         $this->file_writer = new FileWriter( $this->base_dir );
@@ -337,7 +339,7 @@ class IndexGeneratorTest extends TestCase {
     // Cache hygiene
     // -----------------------------------------------------------------------
 
-    public function test_generate_for_post_type_cleans_post_cache_and_skips_meta_cache_priming(): void {
+    public function test_generate_for_post_type_cleans_post_cache_and_primes_meta_cache(): void {
         $GLOBALS['_mock_cleaned_post_caches'] = [];
         $GLOBALS['_mock_posts']               = [
             $this->make_post( [ 'ID' => 5, 'post_title' => 'Alpha' ] ),
@@ -347,7 +349,8 @@ class IndexGeneratorTest extends TestCase {
         $this->generator->generate_for_post_type( 'post' );
 
         $this->assertSame( [ 5, 6 ], $GLOBALS['_mock_cleaned_post_caches'] );
-        $this->assertFalse( $GLOBALS['_mock_get_posts_args']['update_post_meta_cache'] ?? null );
+        // One meta query per batch, not one per post's exclusion check.
+        $this->assertTrue( $GLOBALS['_mock_get_posts_args']['update_post_meta_cache'] ?? null );
     }
 
     // -----------------------------------------------------------------------
@@ -514,6 +517,33 @@ class IndexGeneratorTest extends TestCase {
 
         $this->assertFileExists( $this->base_dir . '/page/index.md' );
         $this->assertDirectoryDoesNotExist( $this->base_dir . '/about' );
+    }
+
+    public function test_flush_dirty_skips_and_forgets_scopes_while_a_job_is_running(): void {
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ] = [ 'status' => 'running', 'last_tick_at' => time() ];
+
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+        $this->assertFileDoesNotExist( $this->base_dir . '/index.md' );
+
+        // The job's index stage owns the rebuild, so nothing is owed afterwards.
+        unset( $GLOBALS['_mock_options'][ GenerationJob::OPTION ] );
+        $this->generator->flush_dirty();
+
+        $this->assertFileDoesNotExist( $this->base_dir . '/post/index.md' );
+    }
+
+    public function test_flush_dirty_runs_when_the_running_job_is_stale(): void {
+        $GLOBALS['_mock_options'][ GenerationJob::OPTION ] = [ 'status' => 'running', 'last_tick_at' => time() - GenerationJob::STALE_AFTER ];
+
+        $post = $this->make_post( [ 'post_type' => 'post' ] );
+        $this->generator->on_file_generated( $this->base_dir . '/post/a.md', $post );
+        $this->generator->flush_dirty();
+
+        $this->assertFileExists( $this->base_dir . '/post/index.md' );
     }
 
     public function test_flush_dirty_is_idempotent(): void {

@@ -8,6 +8,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
+
 /**
  * Generates OKF `index.md` directory listings.
  *
@@ -362,10 +364,21 @@ class IndexGenerator {
 	 * taxonomies) are regenerated before the taxonomy root, which is
 	 * regenerated before the bundle root, so parents reflect their children.
 	 *
+	 * Skipped while a bulk generation job is running: each listing is rebuilt
+	 * from every published post of its type, so flushing at the end of every
+	 * job tick would repeat that whole-site work once per tick. The job's
+	 * index stage rebuilds every listing once, after the last batch.
+	 *
 	 * @since  1.6.0
+	 * @since  1.7.4 Skipped while a bulk generation job is running.
 	 */
 	public function flush_dirty(): void {
 		if ( array() === $this->dirty ) {
+			return;
+		}
+
+		if ( GenerationJob::is_running() ) {
+			$this->dirty = array();
 			return;
 		}
 
@@ -448,9 +461,10 @@ class IndexGenerator {
 					'orderby'                => 'title',
 					'order'                  => 'ASC',
 					'no_found_rows'          => true,
-					// Only get_post_meta() for the exclusion flag is read per post below,
-					// so priming the full meta cache would be wasted work.
-					'update_post_meta_cache' => false,
+					// ExportPolicy::is_eligible() reads the exclusion flag for every
+					// post. Priming loads meta for the whole batch in one query
+					// instead of one query per post; clean_post_cache() evicts it again.
+					'update_post_meta_cache' => true,
 				)
 			);
 
