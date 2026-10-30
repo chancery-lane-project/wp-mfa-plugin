@@ -339,7 +339,7 @@ class IndexGeneratorTest extends TestCase {
     // Cache hygiene
     // -----------------------------------------------------------------------
 
-    public function test_generate_for_post_type_cleans_post_cache_and_primes_meta_cache(): void {
+    public function test_generate_for_post_type_cleans_post_cache_and_skips_meta_cache_priming(): void {
         $GLOBALS['_mock_cleaned_post_caches'] = [];
         $GLOBALS['_mock_posts']               = [
             $this->make_post( [ 'ID' => 5, 'post_title' => 'Alpha' ] ),
@@ -349,8 +349,7 @@ class IndexGeneratorTest extends TestCase {
         $this->generator->generate_for_post_type( 'post' );
 
         $this->assertSame( [ 5, 6 ], $GLOBALS['_mock_cleaned_post_caches'] );
-        // One meta query per batch, not one per post's exclusion check.
-        $this->assertTrue( $GLOBALS['_mock_get_posts_args']['update_post_meta_cache'] ?? null );
+        $this->assertFalse( $GLOBALS['_mock_get_posts_args']['update_post_meta_cache'] ?? null );
     }
 
     // -----------------------------------------------------------------------

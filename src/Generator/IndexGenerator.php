@@ -461,10 +461,9 @@ class IndexGenerator {
 					'orderby'                => 'title',
 					'order'                  => 'ASC',
 					'no_found_rows'          => true,
-					// ExportPolicy::is_eligible() reads the exclusion flag for every
-					// post. Priming loads meta for the whole batch in one query
-					// instead of one query per post; clean_post_cache() evicts it again.
-					'update_post_meta_cache' => true,
+					// Only get_post_meta() for the exclusion flag is read per post below,
+					// so priming the full meta cache would be wasted work.
+					'update_post_meta_cache' => false,
 				)
 			);
 

@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.7.4
+Stable tag: 1.7.3
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -304,8 +304,8 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= 1.7.4 =
-* Fix: bulk generation is lighter on large sites. The `index.md` listings were rebuilt from every published post at the end of every background tick, so each tick got slower as the site grew. They are now rebuilt once, after the last batch. Building a listing also uses one database query per 100 posts instead of one per post.
+= Unreleased =
+* Fix: bulk generation is lighter on large sites. The `index.md` listings were rebuilt from every published post at the end of every background tick, so each tick got slower as the site grew. They are now rebuilt once, after the last batch.
 * New: the `markdown_for_agents_tick_interval` filter sets the pause between background ticks (default 1 second), so a small server can be given time to serve other requests while a job runs.
 
 = 1.7.3 =
@@ -435,9 +435,6 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
-
-= 1.7.4 =
-Makes bulk regeneration faster and lighter on large sites. No regeneration needed for this update.
 
 = 1.7.3 =
 You must regenerate all Markdown files after upgrading: go to Settings → Markdown for Agents and click Generate everything. Links, frontmatter and child page paths have changed. Regenerating also removes files left at old paths.
