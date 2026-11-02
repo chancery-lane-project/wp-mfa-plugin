@@ -114,6 +114,18 @@ if (!function_exists('remove_filter')) {
     }
 }
 
+if (!function_exists('has_filter')) {
+    /** Returns the priority of the first matching registration, or false. */
+    function has_filter(string $hook, callable|array|false $callback = false): bool|int {
+        foreach ($GLOBALS['_mock_filters'][$hook] ?? [] as $registered) {
+            if (false === $callback || $registered['callback'] === $callback) {
+                return false === $callback ? true : $registered['priority'];
+            }
+        }
+        return false;
+    }
+}
+
 if (!function_exists('apply_filters')) {
     function apply_filters(string $hook, mixed $value, mixed ...$args): mixed {
         // Per-test override: $GLOBALS['_mock_apply_filters']['hook'] = fn($val, ...$args) => $modified
