@@ -88,6 +88,9 @@
         if ('taxonomy' === stage.type) {
             return 'Taxonomy archives';
         }
+        if ('index' === stage.type) {
+            return 'Index files';
+        }
         if ('bundle' === stage.type) {
             return 'Export bundle';
         }

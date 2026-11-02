@@ -174,7 +174,7 @@ class Plugin {
 
 		$clock          = new SystemClock();
 		$generation_job = new GenerationJob( $clock );
-		$stage_factory  = new StageFactory( $wpdb, $options, $generator, $taxonomy_generator, $bundle_generator );
+		$stage_factory  = new StageFactory( $wpdb, $options, $generator, $taxonomy_generator, $bundle_generator, $index_generator );
 		$job_runner     = new JobRunner(
 			$generation_job,
 			new TickMutex( $clock ),

@@ -66,6 +66,29 @@ class JobRunnerSchedulingTest extends TestCase {
         $this->assertCount( 1, $GLOBALS['_mock_scheduled_events'] );
     }
 
+    /** @dataProvider tick_intervals */
+    public function test_the_pause_before_the_next_tick_is_filterable_and_capped( int $filtered, int $expected ): void {
+        $this->given_unfinished_job();
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_tick_interval'] = static fn() => $filtered;
+
+        try {
+            $this->runner()->run_tick();
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_tick_interval'] );
+        }
+
+        $this->assertSame( 1_000_060 + $expected, wp_next_scheduled( JobRunner::TICK_HOOK ) );
+    }
+
+    /** @return array<string, array{int, int}> */
+    public function tick_intervals(): array {
+        return [
+            'raised'        => [ 20, 20 ],
+            'capped'        => [ 100_000, JobRunner::MAX_INTERVAL ],
+            'at least one'  => [ 0, 1 ],
+        ];
+    }
+
     public function test_no_duplicate_tick_is_scheduled_when_one_is_pending(): void {
         $this->given_unfinished_job();
         wp_schedule_single_event( 1_000_500, JobRunner::TICK_HOOK );

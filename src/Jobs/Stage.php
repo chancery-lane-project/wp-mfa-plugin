@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * WordPress option between ticks. That shape is:
  *
  *     array{
- *         type: 'post_type'|'taxonomy'|'bundle',
+ *         type: 'post_type'|'taxonomy'|'index'|'bundle',
  *         slug?: string,          // post_type stages only
  *         total: int|null,        // null until count_total() has run once
  *         processed: int,

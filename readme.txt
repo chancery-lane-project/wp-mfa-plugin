@@ -304,6 +304,10 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
+= Unreleased =
+* Fix: bulk generation is lighter on large sites. The `index.md` listings were rebuilt from every published post at the end of every background tick, so each tick got slower as the site grew. They are now rebuilt once, after the last batch.
+* New: the `markdown_for_agents_tick_interval` filter sets the pause between background ticks (default 1 second), so a small server can be given time to serve other requests while a job runs.
+
 = 1.7.3 =
 * Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, regenerate (Settings → Generate everything, or `wp markdown-agents generate`) so child pages get their new files. Regenerating also removes the old flat files.
 * Fix: renaming or moving a post deletes its Markdown file at the old path, and renaming or moving a parent page regenerates its child pages at their new paths (when auto-generate is on).

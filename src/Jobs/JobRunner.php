@@ -48,6 +48,9 @@ class JobRunner {
 	 */
 	public const MAX_DEAD_ATTEMPTS = 3;
 
+	/** Longest pause between ticks the interval filter may set. */
+	public const MAX_INTERVAL = 300;
+
 	/** Seconds without a tick before an admin request may nudge the chain. */
 	private const NUDGE_AFTER = 60;
 
@@ -443,6 +446,30 @@ class JobRunner {
 	}
 
 	/**
+	 * Seconds from the end of one tick to the next.
+	 *
+	 * Capped well below GenerationJob::STALE_AFTER, so a job waiting out its
+	 * interval is never mistaken for a dead one.
+	 *
+	 * @since  1.7.4
+	 */
+	private function interval(): int {
+		/**
+		 * Filter the pause, in seconds, between bulk-generation ticks.
+		 *
+		 * Each tick works for up to its budget (see
+		 * markdown_for_agents_tick_budget) and the next starts after this
+		 * pause. Raise it on a server where a running job slows the site down.
+		 *
+		 * @since  1.7.4
+		 * @param  int $interval Seconds. Default 1, capped at MAX_INTERVAL.
+		 */
+		$interval = (int) apply_filters( 'markdown_for_agents_tick_interval', 1 );
+
+		return min( self::MAX_INTERVAL, max( 1, $interval ) );
+	}
+
+	/**
 	 * Same-process fallback for a chain whose scheduled event has gone missing.
 	 *
 	 * Hooked to `admin_init` on every admin request, deliberately not only the
@@ -528,7 +555,7 @@ class JobRunner {
 
 		$this->clear_overdue_tick();
 
-		if ( wp_schedule_single_event( $this->clock->now() + 1, self::TICK_HOOK ) ) {
+		if ( wp_schedule_single_event( $this->clock->now() + $this->interval(), self::TICK_HOOK ) ) {
 			if ( 0 !== (int) $record['schedule_failures'] ) {
 				$record['schedule_failures'] = 0;
 				$this->job->save( $record, $job_token );

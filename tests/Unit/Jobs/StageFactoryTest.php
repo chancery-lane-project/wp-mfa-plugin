@@ -8,8 +8,10 @@ use PHPUnit\Framework\TestCase;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Generator\BundleGenerator;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Generator\IndexGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Jobs\BundleStage;
+use Tclp\WpMarkdownForAgents\Jobs\IndexStage;
 use Tclp\WpMarkdownForAgents\Jobs\PostTypeStage;
 use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
 use Tclp\WpMarkdownForAgents\Jobs\TaxonomyStage;
@@ -29,7 +31,8 @@ class StageFactoryTest extends TestCase {
             $options,
             $this->createMock( Generator::class ),
             $this->createMock( TaxonomyArchiveGenerator::class ),
-            $this->createMock( BundleGenerator::class )
+            $this->createMock( BundleGenerator::class ),
+            $this->createMock( IndexGenerator::class )
         );
     }
 
@@ -41,20 +44,20 @@ class StageFactoryTest extends TestCase {
         );
     }
 
-    public function test_all_scope_is_every_post_type_then_taxonomy_then_bundle(): void {
+    public function test_all_scope_is_every_post_type_then_taxonomy_then_index_then_bundle(): void {
         $stages = $this->factory->build_stage_list( 'all' );
 
-        $this->assertSame( [ 'post_type:post', 'post_type:page', 'taxonomy', 'bundle' ], $this->shape( $stages ) );
+        $this->assertSame( [ 'post_type:post', 'post_type:page', 'taxonomy', 'index', 'bundle' ], $this->shape( $stages ) );
     }
 
-    public function test_single_post_type_scope_is_that_type_then_bundle(): void {
+    public function test_single_post_type_scope_is_that_type_then_index_then_bundle(): void {
         $stages = $this->factory->build_stage_list( 'post_type:page' );
 
-        $this->assertSame( [ 'post_type:page', 'bundle' ], $this->shape( $stages ) );
+        $this->assertSame( [ 'post_type:page', 'index', 'bundle' ], $this->shape( $stages ) );
     }
 
-    public function test_taxonomy_scope_is_taxonomy_then_bundle(): void {
-        $this->assertSame( [ 'taxonomy', 'bundle' ], $this->shape( $this->factory->build_stage_list( 'taxonomy' ) ) );
+    public function test_taxonomy_scope_is_taxonomy_then_index_then_bundle(): void {
+        $this->assertSame( [ 'taxonomy', 'index', 'bundle' ], $this->shape( $this->factory->build_stage_list( 'taxonomy' ) ) );
     }
 
     public function test_every_scope_ends_in_exactly_one_bundle_stage(): void {
@@ -86,6 +89,18 @@ class StageFactoryTest extends TestCase {
         $this->assertInstanceOf( PostTypeStage::class, $this->factory->make( [ 'type' => 'post_type', 'slug' => 'post' ] ) );
         $this->assertInstanceOf( TaxonomyStage::class, $this->factory->make( [ 'type' => 'taxonomy' ] ) );
         $this->assertInstanceOf( BundleStage::class, $this->factory->make( [ 'type' => 'bundle' ] ) );
+        $this->assertInstanceOf( IndexStage::class, $this->factory->make( [ 'type' => 'index' ] ) );
+    }
+
+    public function test_index_stage_is_unavailable_without_an_index_generator(): void {
+        $factory = new StageFactory(
+            new \wpdb(),
+            array_merge( Options::get_defaults(), [ 'post_types' => [ 'post' ] ] ),
+            $this->createMock( Generator::class ),
+            $this->createMock( TaxonomyArchiveGenerator::class )
+        );
+
+        $this->assertNull( $factory->make( [ 'type' => 'index' ] ) );
     }
 
     public function test_make_returns_null_for_an_unusable_descriptor(): void {
