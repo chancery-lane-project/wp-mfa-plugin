@@ -12,7 +12,6 @@ use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
-use Tclp\WpMarkdownForAgents\Homepage\AgentHomepage;
 
 /**
  * Registers and renders the plugin settings page.
@@ -78,12 +77,10 @@ class SettingsPage {
 	 * @since  1.0.0
 	 * @param  array<string, mixed> $options     Current plugin options.
 	 * @param  ArdCatalog|null      $ard_catalog Optional ARD catalog builder for the discovery panel.
-	 * @param  Generator|null       $generator   Optional; resolves the agent homepage's export path for the missing-file warning.
 	 */
 	public function __construct(
 		private array $options,
-		private readonly ?ArdCatalog $ard_catalog = null,
-		private readonly ?Generator $generator = null
+		private readonly ?ArdCatalog $ard_catalog = null
 	) {}
 
 	/**
@@ -142,7 +139,6 @@ class SettingsPage {
 			$general
 		);
 
-		add_settings_field( 'markdown_for_agents_agent_homepage', __( 'Agent homepage', 'markdown-for-agents-and-statistics' ), array( $this, 'field_agent_homepage' ), $general, 'markdown_for_agents_discovery' );
 		add_settings_field( 'markdown_for_agents_bundle_enabled', __( 'Build downloadable bundle (.zip + manifest)', 'markdown-for-agents-and-statistics' ), array( $this, 'field_bundle_enabled' ), $general, 'markdown_for_agents_discovery' );
 
 		// The Field Configuration tab is rendered manually (see render_fields_tab)
@@ -223,7 +219,6 @@ class SettingsPage {
 		$clean['relative_image_paths']    = ! empty( $input['relative_image_paths'] );
 		$clean['include_taxonomy_topics'] = ! empty( $input['include_taxonomy_topics'] );
 		$clean['bundle_enabled']          = ! empty( $input['bundle_enabled'] );
-		$clean['agent_homepage_id']       = $this->sanitize_agent_homepage_id( $input['agent_homepage_id'] ?? 0 );
 
 		// Export dir: validate it's a simple directory name, no path traversal.
 		$export_dir          = sanitize_file_name( (string) ( $input['export_dir'] ?? $defaults['export_dir'] ) );
@@ -241,27 +236,6 @@ class SettingsPage {
 			(array) ( $clean['post_type_configs'] ?? array() ),
 			array_flip( $clean['post_types'] )
 		);
-	}
-
-	/**
-	 * Sanitise the agent homepage choice: an existing page's ID, or 0.
-	 *
-	 * Unpublished or excluded pages are kept, so the choice survives while
-	 * the page is drafted; the field shows a warning until it can be served.
-	 *
-	 * @since  1.8.0
-	 * @param  mixed $raw Submitted value.
-	 * @return int
-	 */
-	private function sanitize_agent_homepage_id( mixed $raw ): int {
-		$id = is_scalar( $raw ) ? absint( $raw ) : 0;
-		if ( $id < 1 ) {
-			return 0;
-		}
-
-		$post = get_post( $id );
-
-		return $post instanceof \WP_Post && 'page' === $post->post_type ? $id : 0;
 	}
 
 	/**
@@ -586,51 +560,6 @@ class SettingsPage {
 	 */
 	public function section_discovery_intro(): void {
 		echo '<p>' . esc_html__( 'Exported Markdown files are always OKF-compliant (flat tags, timestamp, and internal links pointing at the Markdown file versions). Enable the toggle below for a downloadable bundle of the whole export tree, complete with a manifest and an ARD discovery catalog.', 'markdown-for-agents-and-statistics' ) . '</p>';
-	}
-
-	/**
-	 * Render the agent homepage page picker and any serving warnings.
-	 *
-	 * @since  1.8.0
-	 */
-	public function field_agent_homepage(): void {
-		$saved = (int) ( $this->options['agent_homepage_id'] ?? 0 );
-
-		echo wp_dropdown_pages( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core markup, escaped by wp_dropdown_pages().
-			array(
-				'name'              => Options::OPTION_KEY . '[agent_homepage_id]',
-				'id'                => 'markdown_for_agents_agent_homepage_id',
-				'selected'          => $saved,
-				'show_option_none'  => esc_html__( '— None —', 'markdown-for-agents-and-statistics' ),
-				'option_none_value' => '0',
-				'post_status'       => array( 'publish', 'draft', 'pending', 'private' ),
-				'echo'              => 0,
-			)
-		);
-		?>
-		<p class="description">
-			<?php esc_html_e( 'An ordinary page, such as /for-agents/, that introduces the site to AI agents. Markdown requests for the front page are answered with this page, the front page links to it as its Markdown version, and the root index.md lists it under "Start here". Leave as None to keep the current behaviour.', 'markdown-for-agents-and-statistics' ); ?>
-		</p>
-		<?php
-		$effective = AgentHomepage::id( $this->options );
-
-		if ( $effective !== $saved ) {
-			$title = $effective > 0 ? get_the_title( $effective ) : __( 'None', 'markdown-for-agents-and-statistics' );
-			echo '<p class="description"><strong>' . esc_html(
-				sprintf(
-					/* translators: %s: the page title, or "None". */
-					__( 'The markdown_for_agents_agent_homepage filter overrides this choice. The page in use is: %s', 'markdown-for-agents-and-statistics' ),
-					$title
-				)
-			) . '</strong></p>';
-		}
-
-		$post     = $effective > 0 ? get_post( $effective ) : null;
-		$filepath = ( $post instanceof \WP_Post && null !== $this->generator ) ? $this->generator->get_export_path( $post ) : null;
-
-		foreach ( AgentHomepage::problems( $this->options, $filepath ) as $problem ) {
-			echo '<p class="description" style="color:#b32d2e;"><span class="dashicons dashicons-warning" aria-hidden="true"></span> ' . esc_html( $problem ) . '</p>';
-		}
 	}
 
 	/**

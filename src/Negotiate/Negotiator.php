@@ -10,7 +10,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
-use Tclp\WpMarkdownForAgents\Homepage\AgentHomepage;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
@@ -73,14 +72,14 @@ class Negotiator {
 			$access_method = 'ua';
 		}
 
-		// The agent homepage is checked before the singular branch: a static
-		// front page also matches is_singular( 'page' ) and would otherwise
-		// serve its own file. When the homepage cannot be served, the request
-		// carries on as if none were set.
+		// A post chosen for the front page is checked before the singular
+		// branch: a static front page also matches is_singular( 'page' ) and
+		// would otherwise serve its own file. When the chosen post cannot be
+		// served, the request carries on as if none were chosen.
 		if ( is_front_page() ) {
-			$homepage = $this->servable_agent_homepage();
-			if ( null !== $homepage ) {
-				$this->serve_post( $homepage, $ua, $method, $access_method );
+			$front = $this->servable_front_page_post();
+			if ( null !== $front ) {
+				$this->serve_post( $front, $ua, $method, $access_method );
 			}
 		}
 
@@ -141,11 +140,11 @@ class Negotiator {
 		 * Only fires when the request has already been identified as a Markdown
 		 * request (Accept header, query param, or known UA). Return false to
 		 * prevent serving for this post without affecting others. On the front
-		 * page it receives the agent homepage.
+		 * page it may receive the post chosen by `markdown_for_agents_front_page_post`.
 		 *
 		 * @since 1.1.0
 		 * @param bool     $enabled Whether serving is enabled. Default true.
-		 * @param \WP_Post $post    The queried post, or the agent homepage.
+		 * @param \WP_Post $post    The queried post, or the post chosen for the front page.
 		 */
 		if ( ! apply_filters( 'markdown_for_agents_serve_enabled', true, $post ) ) {
 			return;
@@ -267,9 +266,9 @@ class Negotiator {
 	 */
 	private function get_markdown_alternate_url(): ?string {
 		if ( is_front_page() ) {
-			$homepage = $this->servable_agent_homepage();
-			if ( null !== $homepage && file_exists( $this->generator->get_export_path( $homepage ) ) ) {
-				return add_query_arg( 'output_format', 'md', get_permalink( $homepage->ID ) );
+			$front = $this->servable_front_page_post();
+			if ( null !== $front && file_exists( $this->generator->get_export_path( $front ) ) ) {
+				return add_query_arg( 'output_format', 'md', get_permalink( $front->ID ) );
 			}
 		}
 
@@ -329,28 +328,43 @@ class Negotiator {
 	}
 
 	/**
-	 * Return the agent homepage when it may be served as Markdown, or null.
+	 * Return the post another plugin chose to answer the front page, when it
+	 * may be served as Markdown, or null.
 	 *
-	 * Applies the same rules as a direct request for the page: a servable
-	 * post type, published, not password-protected and not excluded.
+	 * The chosen post passes the same checks as a direct request for it: a
+	 * servable post type, published, not password-protected and not excluded.
+	 * Serving then also needs its export file inside the export directory, so
+	 * a filter can pick a post but never an arbitrary file.
 	 *
 	 * @since  1.8.0
 	 * @return \WP_Post|null
 	 */
-	private function servable_agent_homepage(): ?\WP_Post {
-		$id = AgentHomepage::id( $this->options );
-		if ( $id < 1 ) {
+	private function servable_front_page_post(): ?\WP_Post {
+		/**
+		 * Filter the post whose Markdown answers requests for the front page.
+		 *
+		 * Lets a plugin such as an agent homepage serve a page written for
+		 * agents at `/`, instead of the front page's own export (or nothing,
+		 * when the front page is the blog index). The front page's
+		 * `<link rel="alternate">` tag and `Link` header then point at that
+		 * post's `?output_format=md` URL. Return null to keep the default.
+		 *
+		 * @since 1.8.0
+		 * @param \WP_Post|int|null $post The post or its ID. Default null.
+		 */
+		$chosen = apply_filters( 'markdown_for_agents_front_page_post', null );
+
+		if ( is_int( $chosen ) ) {
+			$chosen = $chosen > 0 ? get_post( $chosen ) : null;
+		}
+
+		if ( ! $chosen instanceof \WP_Post
+			|| ! in_array( $chosen->post_type, $this->servable_post_types(), true )
+			|| ! $this->is_servable_post( $chosen ) ) {
 			return null;
 		}
 
-		$post = get_post( $id );
-		if ( ! $post instanceof \WP_Post
-			|| ! in_array( $post->post_type, $this->servable_post_types(), true )
-			|| ! $this->is_servable_post( $post ) ) {
-			return null;
-		}
-
-		return $post;
+		return $chosen;
 	}
 
 	/**

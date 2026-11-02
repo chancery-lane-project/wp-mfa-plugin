@@ -126,42 +126,6 @@ class IndexGeneratorTest extends TestCase {
         $this->assertSame( $expected, $content );
     }
 
-    public function test_generate_root_lists_agent_homepage_under_start_here(): void {
-        $this->touch_md( 'page', 'for-agents.md' );
-        $GLOBALS['_mock_post_objects'][42] = new \WP_Post( [
-            'ID'           => 42,
-            'post_type'    => 'page',
-            'post_name'    => 'for-agents',
-            'post_title'   => 'For AI agents',
-            'post_excerpt' => "Free climate clauses,\nguides and a glossary.",
-        ] );
-
-        $this->make_generator( [ 'agent_homepage_id' => 42 ] )->generate_root();
-
-        $this->assertSame(
-            "---\nokf_version: \"0.1\"\n---\n\n"
-            . "# Start here\n\n"
-            . "* [For AI agents](page/for-agents.md) - Free climate clauses, guides and a glossary.\n\n"
-            . "# Content\n\n"
-            . "* [page](page/) - 1 document\n",
-            file_get_contents( $this->base_dir . '/index.md' )
-        );
-    }
-
-    public function test_generate_root_omits_start_here_when_homepage_file_missing_or_ineligible(): void {
-        $this->touch_md( 'post', 'a.md' );
-        $GLOBALS['_mock_post_objects'][42] = new \WP_Post( [ 'ID' => 42, 'post_type' => 'page', 'post_name' => 'for-agents' ] );
-
-        $this->make_generator( [ 'agent_homepage_id' => 42 ] )->generate_root();
-        $this->assertStringNotContainsString( 'Start here', file_get_contents( $this->base_dir . '/index.md' ) );
-
-        $this->touch_md( 'page', 'for-agents.md' );
-        $GLOBALS['_mock_post_objects'][42]->post_status = 'draft';
-
-        $this->make_generator( [ 'agent_homepage_id' => 42 ] )->generate_root();
-        $this->assertStringNotContainsString( 'Start here', file_get_contents( $this->base_dir . '/index.md' ) );
-    }
-
     public function test_generate_root_counts_child_pages_in_subdirectories(): void {
         $this->touch_md( 'page', 'about.md' );
         $this->touch_md( 'page', 'index.md' );

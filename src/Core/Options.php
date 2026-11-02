@@ -44,7 +44,6 @@ class Options {
 			'relative_image_paths'      => false,
 			'include_taxonomy_topics'   => false,
 			'bundle_enabled'            => false,
-			'agent_homepage_id'         => 0,
 			'post_type_configs'         => array(),
 			'delete_files_on_uninstall' => false,
 			'ua_force_enabled'          => true,
