@@ -98,7 +98,10 @@ class Generator {
 		}
 
 		$frontmatter = $this->frontmatter_builder->build( $post );
-		$html        = $this->render_as_permalink_request( $post, fn(): string => $this->get_post_content( $post ) );
+		$html        = $this->render_as_permalink_request(
+			$post,
+			fn(): string => $this->without_autoembed( $post, fn(): string => $this->get_post_content( $post ) )
+		);
 		$html        = $this->content_filter->filter( $html );
 		$markdown    = $this->converter->convert( $html, $post );
 
@@ -689,6 +692,65 @@ class Generator {
 
 		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WP filter, not plugin-owned.
 		return apply_filters( 'the_content', $html );
+	}
+
+	/**
+	 * Run a render callback with core's oEmbed auto-discovery switched off.
+	 *
+	 * WP_Embed::autoembed() turns a URL on its own line (including every
+	 * block-editor embed) into the provider's HTML. During export that is
+	 * expensive and the output is thrown away. Generation renders without a
+	 * global $post, so WP_Embed misses the post-meta cache the front end built
+	 * and makes a live HTTP request per embed (a loopback request for the
+	 * site's own URLs). The result is usually an <iframe>, which the converter
+	 * strips to nothing. Left alone, the URL survives as text in the Markdown.
+	 *
+	 * Only autoembed is removed. Explicit [embed] shortcodes, do_blocks() and
+	 * every other the_content callback run as before. The callback is restored
+	 * at its original priority even if rendering throws. Re-adding places it
+	 * last among that priority's callbacks, which matters only if another
+	 * callback at priority 8 is added mid-export.
+	 *
+	 * @since  1.7.4
+	 * @param  \WP_Post          $post   The post being rendered.
+	 * @param  \Closure():string $render The render callback.
+	 * @return string
+	 */
+	private function without_autoembed( \WP_Post $post, \Closure $render ): string {
+		$wp_embed = $GLOBALS['wp_embed'] ?? null;
+
+		if ( ! is_object( $wp_embed ) ) {
+			return $render();
+		}
+
+		$callback = array( $wp_embed, 'autoembed' );
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Core WP filter, not plugin-owned.
+		$priority = has_filter( 'the_content', $callback );
+
+		/**
+		 * Filter whether oEmbed auto-discovery runs while generating Markdown.
+		 *
+		 * Off by default: it makes an HTTP request per uncached embed, and the
+		 * iframes most providers return convert to nothing. Return true to
+		 * keep it, for example where tweet or post embeds carry text you want
+		 * exported.
+		 *
+		 * @since  1.7.4
+		 * @param  bool     $autoembed Default false.
+		 * @param  \WP_Post $post      The post being rendered.
+		 */
+		if ( false === $priority || apply_filters( 'markdown_for_agents_autoembed', false, $post ) ) {
+			return $render();
+		}
+
+		remove_filter( 'the_content', $callback, (int) $priority );
+
+		try {
+			return $render();
+		} finally {
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- Restoring a core callback.
+			add_filter( 'the_content', $callback, (int) $priority );
+		}
 	}
 
 	/**

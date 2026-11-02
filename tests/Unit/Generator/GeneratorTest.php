@@ -830,6 +830,99 @@ class GeneratorTest extends TestCase {
         }
     }
 
+    /** Registers a stand-in WP_Embed's autoembed on the_content at core's priority 8. */
+    private function register_mock_autoembed(): array {
+        $GLOBALS['wp_embed'] = new class {
+            public function autoembed( string $content ): string {
+                return $content;
+            }
+        };
+        $callback = [ $GLOBALS['wp_embed'], 'autoembed' ];
+        add_filter( 'the_content', $callback, 8 );
+
+        return $callback;
+    }
+
+    private function reset_mock_autoembed(): void {
+        reset_mock_hooks();
+        unset(
+            $GLOBALS['wp_embed'],
+            $GLOBALS['_mock_apply_filters']['the_content'],
+            $GLOBALS['_mock_apply_filters']['markdown_for_agents_autoembed']
+        );
+    }
+
+    public function test_get_post_markdown_removes_autoembed_while_rendering_and_restores_it(): void {
+        $callback = $this->register_mock_autoembed();
+        $during   = null;
+        $GLOBALS['_mock_apply_filters']['the_content'] = function ( $value ) use ( $callback, &$during ) {
+            $during = has_filter( 'the_content', $callback );
+            return $value;
+        };
+
+        try {
+            $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+            $this->generator->get_post_markdown( $post );
+
+            $this->assertFalse( $during, 'autoembed must not run during export rendering.' );
+            $this->assertSame( 8, has_filter( 'the_content', $callback ), 'autoembed must be restored at its original priority.' );
+        } finally {
+            $this->reset_mock_autoembed();
+        }
+    }
+
+    public function test_get_post_markdown_restores_autoembed_when_rendering_throws(): void {
+        $callback = $this->register_mock_autoembed();
+        $GLOBALS['_mock_apply_filters']['the_content'] = function () {
+            throw new \RuntimeException( 'render failed' );
+        };
+
+        try {
+            $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+            $this->generator->get_post_markdown( $post );
+            $this->fail( 'Expected the render exception to propagate.' );
+        } catch ( \RuntimeException $e ) {
+            $this->assertSame( 8, has_filter( 'the_content', $callback ) );
+        } finally {
+            $this->reset_mock_autoembed();
+        }
+    }
+
+    public function test_get_post_markdown_keeps_autoembed_when_filter_opts_in(): void {
+        $callback = $this->register_mock_autoembed();
+        $during   = null;
+        $seen_post = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_autoembed'] = function ( $value, $post ) use ( &$seen_post ) {
+            $seen_post = $post;
+            return true;
+        };
+        $GLOBALS['_mock_apply_filters']['the_content'] = function ( $value ) use ( $callback, &$during ) {
+            $during = has_filter( 'the_content', $callback );
+            return $value;
+        };
+
+        try {
+            $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+            $this->generator->get_post_markdown( $post );
+
+            $this->assertSame( 8, $during );
+            $this->assertSame( $post, $seen_post, 'The filter receives the post being rendered.' );
+            $this->assertCount( 1, get_mock_filters()['the_content'], 'autoembed must not be registered twice.' );
+        } finally {
+            $this->reset_mock_autoembed();
+        }
+    }
+
+    public function test_get_post_markdown_renders_without_a_global_wp_embed(): void {
+        unset( $GLOBALS['wp_embed'] );
+        $this->converter->method( 'convert' )->willReturn( 'Body' );
+        $this->yaml_formatter->method( 'format' )->willReturn( "---\n---\n" );
+
+        $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'publish'] );
+
+        $this->assertStringContainsString( 'Body', (string) $this->generator->get_post_markdown( $post ) );
+    }
+
     public function test_get_post_markdown_returns_null_for_ineligible_post(): void {
         $post = $this->make_post( ['post_type' => 'post', 'post_status' => 'draft'] );
 
