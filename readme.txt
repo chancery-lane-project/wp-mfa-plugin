@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.7.3
+Stable tag: 1.7.4
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -304,10 +304,10 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= Unreleased =
+= 1.7.4 =
 * Fix: bulk generation is lighter on large sites. The `index.md` listings were rebuilt from every published post at the end of every background tick, so each tick got slower as the site grew. They are now rebuilt once, after the last batch.
-* New: the `markdown_for_agents_tick_interval` filter sets the pause between background ticks (default 1 second), so a small server can be given time to serve other requests while a job runs.
 * Fix: generation no longer fetches embeds. WordPress turned every embed URL (YouTube, Vimeo, block-editor embeds and so on) into the provider's HTML. Because generation runs outside a page view, it missed the embed cache the site already had, so each embed meant a fresh HTTP request, including requests from the site to itself. The `<iframe>` that came back was then converted to nothing. The embed URL is now kept as a plain link in the Markdown. Sites with many embeds generate much faster and put less load on the server while a job runs. The `markdown_for_agents_autoembed` filter turns the old behaviour back on.
+* Feature: new `markdown_for_agents_tick_interval` filter to set the pause between background ticks (default 1 second), so a small server can be given time to serve other requests while a job runs.
 
 = 1.7.3 =
 * Fix: child pages with the same slug under different parents (for example `/about/team/` and `/services/team/`) no longer overwrite each other's Markdown file. Child pages of hierarchical post types are now exported under their ancestors' slugs (`page/about/team.md`); top-level pages and non-hierarchical types keep their paths. After updating, regenerate (Settings → Generate everything, or `wp markdown-agents generate`) so child pages get their new files. Regenerating also removes the old flat files.
@@ -436,6 +436,9 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.7.4 =
+Makes bulk generation faster and lighter on large sites, and stops generation fetching embeds. You do not need to regenerate. Regenerate only if you want embed URLs to appear as links in files that already exist.
 
 = 1.7.3 =
 You must regenerate all Markdown files after upgrading: go to Settings → Markdown for Agents and click Generate everything. Links, frontmatter and child page paths have changed. Regenerating also removes files left at old paths.
