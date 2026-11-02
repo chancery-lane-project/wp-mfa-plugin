@@ -22,6 +22,7 @@ A WordPress plugin for [The Chancery Lane Project](https://chancerylane.uk) that
 
 - **Content negotiation** - serves Markdown on `Accept: text/markdown`, `?output_format=md`, or known AI User-Agent strings
 - **Taxonomy archive support** - category, tag, and custom taxonomy archives served as Markdown post listings
+- **Agent homepage** - pick an ordinary page (such as `/for-agents/`) to answer Markdown requests for the front page, and a core Latest Posts block on it is kept current in the export
 - **Auto-generation** - files regenerated on post save; taxonomy archives regenerated when any post in the term changes
 - **Bulk generation** - generate all files from the admin settings page as a background WP-Cron job (start it and close the tab; the page polls for progress) or synchronously via WP-CLI
 - **Per-post-type field configuration** - choose which meta/ACF fields appear in frontmatter or body
@@ -75,6 +76,7 @@ Navigate to **Settings → Markdown for Agents**.
 | Auto-generate | Regenerate files automatically on post save |
 | User-Agent detection | Force Markdown serving for specific AI User-Agent strings |
 | Field configuration | Per-post-type frontmatter and content field mappings |
+| Agent homepage | A page that introduces the site to agents, served for Markdown requests to the front page. See [Agent homepage](#agent-homepage) (default: none) |
 | Build downloadable bundle | Maintains a `.zip` of the export tree with relative internal links, generates `manifest.json`, and displays an ARD discovery catalog panel (`ai-catalog.json`, for manual deployment to `/.well-known/`) (off by default; no other toggle required) |
 
 Bulk generation (the "Generate everything" / per-post-type / taxonomy buttons) runs in the background via WP-Cron, so it needs WP-Cron working on the site. If `DISABLE_WP_CRON` is set and a system cron calls `wp-cron.php` instead, that cron must run as the same user as the web server, or the files it writes will fail permission checks.
@@ -84,6 +86,31 @@ When every post generates without error, a bulk run (and a full `wp markdown-age
 If WP-Cron is not working, a run sits at `running` with little or no progress rather than failing outright, since there is no page load to trigger the next batch. Check whether `DISABLE_WP_CRON` is set with no system cron behind it, and whether a firewall or HTTP auth blocks the loopback request WordPress makes to its own `wp-cron.php`.
 
 There is no cancel button, but deactivating the plugin stops a run in progress: it clears the job record and unschedules its background events. Reactivating leaves already-generated files untouched. This is blunt — it also stops Markdown serving while deactivated.
+
+## Agent homepage
+
+A Markdown request for the front page normally returns the front page's own export, which is mostly layout on many themes, or nothing when the front page is the blog index. Pick an **Agent homepage** under **Settings → Markdown for Agents → Agent discovery** to answer it with an ordinary page written for agents instead, for example `/for-agents/` describing what the site holds, its terms of use and how to reach the Markdown versions.
+
+- **Serving:** Markdown requests for `/` (by `Accept: text/markdown`, `?output_format=md` or a known AI User-Agent) are answered with the chosen page's `.md` file. It is checked before the singular branch, so it also takes precedence over a static front page. Hits are counted under the chosen page in the statistics, together with direct requests for it.
+- **Discovery:** on the front page, the `<link rel="alternate" type="text/markdown">` tag and the `Link` header point at the chosen page's `?output_format=md` URL. That URL does not depend on content negotiation, which matters on hosts whose edge cache ignores `Accept` when choosing a cached variant of the homepage.
+- **Root `index.md`:** the page is listed first, under a `# Start here` heading, with its excerpt as the description. The root index is rebuilt when the setting changes, if an export already exists.
+- **Fallback:** when the chosen page cannot be served (unpublished, password-protected, excluded, of a post type that is not served, or with no `.md` file yet), front page requests behave as if no agent homepage were set. The settings page shows a warning for each of these.
+- **Filter:** `markdown_for_agents_agent_homepage` sets or overrides the choice in code. The page itself is visible to people as well, so the site does not serve agents content that visitors cannot see.
+
+### Keeping a news list current
+
+Export files are static, so a hand-written news list goes out of date as soon as something new is published. Use WordPress's own **Latest Posts** block on the agent homepage instead, with **Display post date** on. In the export each post becomes a dated list item:
+
+```markdown
+- [Climate literacy is a core legal competency](https://example.org/news/…/?output_format=md) (October 19, 2026)
+- [The future of legal knowledge is inside the tools lawyers use](https://example.org/news/…/?output_format=md) (October 16, 2026)
+```
+
+The date uses the site's date format. Core puts it straight after the title with no space, so the export, and only the export, wraps it in brackets after a space. Add a normal link to the news archive below the block if you want one.
+
+- **Keeping it current:** with auto-generate on, the agent homepage's `.md` is regenerated when a post is published (including a scheduled post going live), unpublished, trashed or deleted, or has its title, date, slug or password changed. Changes are collected and the page is regenerated once, at the end of the request. Edits to a post's body alone do not trigger it. The block is found inside groups and columns too.
+- **Other pages:** to keep other pages that use the block current, add their IDs with `markdown_for_agents_refresh_pages`.
+- **Limitations:** a block inside a synced pattern is not detected. Changing a post's categories alone does not refresh a category-filtered list until the next change that does. Query Loop blocks are not watched.
 
 ---
 
@@ -304,6 +331,8 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_export_path` | `(string $path, WP_Post $post)` | Legacy: change a post's absolute export path. Only generation and serving honour it; prefer `markdown_for_agents_post_relative_path` |
 | `markdown_for_agents_serve_post_types` | `(array $types)` | Modify the list of serveable post types |
 | `markdown_for_agents_serve_taxonomies` | `(bool $enabled)` | Enable/disable serving for taxonomy archives |
+| `markdown_for_agents_agent_homepage` | `(int $post_id)` | Set or override the page used as the agent homepage. Return 0 to turn it off |
+| `markdown_for_agents_refresh_pages` | `(int[] $page_ids)` | Pages whose export is regenerated when a post listed by their core Latest Posts block changes. Default: the agent homepage |
 | `markdown_for_agents_frontmatter` | `(array $fm, WP_Post $post)` | Modify frontmatter before serialisation |
 | `markdown_for_agents_taxonomy_frontmatter` | `(array $fm, WP_Term $term)` | Modify taxonomy archive frontmatter |
 | `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |

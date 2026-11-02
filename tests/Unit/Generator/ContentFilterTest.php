@@ -6,6 +6,7 @@ namespace Tclp\WpMarkdownForAgents\Tests\Unit\Generator;
 
 use PHPUnit\Framework\TestCase;
 use Tclp\WpMarkdownForAgents\Generator\ContentFilter;
+use Tclp\WpMarkdownForAgents\Generator\Converter;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Generator\ContentFilter
@@ -99,5 +100,40 @@ class ContentFilterTest extends TestCase {
         $input  = '<styled-box>Content</styled-box>';
         $output = $this->filter->filter( $input );
         $this->assertStringContainsString( '<styled-box>Content</styled-box>', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // Core Latest Posts dates
+    // -----------------------------------------------------------------------
+
+    private const LATEST_POSTS = '<ul class="wp-block-latest-posts__list has-dates wp-block-latest-posts">'
+        . '<li><a class="wp-block-latest-posts__post-title" href="https://example.org/news/a/">Climate literacy</a>'
+        . '<time datetime="2026-10-19T09:00:00+00:00" class="wp-block-latest-posts__post-date">October 19, 2026</time></li>'
+        . '<li><a class="wp-block-latest-posts__post-title" href="https://example.org/news/b/">The future of legal knowledge</a>'
+        . '<time datetime="2026-10-16T09:00:00+00:00" class="wp-block-latest-posts__post-date">October 16, 2026</time></li></ul>';
+
+    public function test_separates_latest_posts_dates_from_titles(): void {
+        $output = $this->filter->filter( self::LATEST_POSTS );
+
+        $this->assertStringContainsString(
+            '</a> <time datetime="2026-10-19T09:00:00+00:00" class="wp-block-latest-posts__post-date">(October 19, 2026)</time>',
+            $output
+        );
+    }
+
+    public function test_latest_posts_converts_to_dated_markdown_list(): void {
+        $markdown = ( new Converter() )->convert( $this->filter->filter( self::LATEST_POSTS ), new \WP_Post( [ 'ID' => 1 ] ) );
+
+        $this->assertSame(
+            "- [Climate literacy](https://example.org/news/a/) (October 19, 2026)\n"
+            . "- [The future of legal knowledge](https://example.org/news/b/) (October 16, 2026)",
+            trim( $markdown )
+        );
+    }
+
+    public function test_leaves_other_time_elements_alone(): void {
+        $input = '<p>Posted <time datetime="2026-10-19" class="entry-date">October 19, 2026</time></p>';
+
+        $this->assertSame( $input, $this->filter->filter( $input ) );
     }
 }

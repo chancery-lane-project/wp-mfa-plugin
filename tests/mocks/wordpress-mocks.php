@@ -1354,6 +1354,32 @@ if (!function_exists('get_term_link')) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Agent homepage stubs
+// ---------------------------------------------------------------------------
+
+$GLOBALS['_mock_is_front_page'] = false;
+
+if (!function_exists('is_front_page')) {
+    function is_front_page(): bool {
+        return $GLOBALS['_mock_is_front_page'] ?? false;
+    }
+}
+
+if (!function_exists('has_block')) {
+    function has_block(string $block_name, int|string|\WP_Post|null $post = null): bool {
+        $content = $post instanceof \WP_Post ? $post->post_content : (string) $post;
+        return str_contains($content, '<!-- wp:' . preg_replace('#^core/#', '', $block_name));
+    }
+}
+
+if (!function_exists('wp_dropdown_pages')) {
+    function wp_dropdown_pages(array|string $args = ''): string {
+        $GLOBALS['_mock_dropdown_pages_args'] = $args;
+        return '<select name="' . ($args['name'] ?? 'page_id') . '"></select>';
+    }
+}
+
 if (!function_exists('wp_count_posts')) {
     function wp_count_posts(string $type = 'post', string $perm = ''): object {
         return (object) ($GLOBALS['_mock_post_counts'][$type] ?? ['publish' => 0]);

@@ -8,6 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use Tclp\WpMarkdownForAgents\Homepage\AgentHomepage;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 
 /**
@@ -257,7 +258,14 @@ class IndexGenerator {
 			);
 		}
 
-		$sections = array( 'Content' => $lines );
+		$sections   = array();
+		$start_here = $this->build_start_here_entry();
+
+		if ( null !== $start_here ) {
+			$sections['Start here'] = array( $start_here );
+		}
+
+		$sections['Content'] = $lines;
 
 		if ( is_dir( $this->base . '/taxonomy' ) ) {
 			$sections['Taxonomies'] = array(
@@ -268,6 +276,33 @@ class IndexGenerator {
 		$content = "---\nokf_version: \"0.1\"\n---\n\n" . $this->build_body( $sections );
 
 		return $this->write( 'index.md', $content );
+	}
+
+	/**
+	 * Build the root index's entry for the agent homepage.
+	 *
+	 * Null when no agent homepage is set, it is not eligible for export, or
+	 * its file has not been written yet.
+	 *
+	 * @since  1.8.0
+	 * @return string|null
+	 */
+	private function build_start_here_entry(): ?string {
+		$post = AgentHomepage::post( $this->options );
+		if ( null === $post ) {
+			return null;
+		}
+
+		$target = ExportPolicy::post_relative_path( $post );
+		if ( ! file_exists( $this->base . '/' . $target ) ) {
+			return null;
+		}
+
+		return $this->build_entry(
+			wp_strip_all_tags( $post->post_title ),
+			$target,
+			$this->collapse_description( $post->post_excerpt )
+		);
 	}
 
 	/**

@@ -29,10 +29,11 @@ class SettingsPageTest extends TestCase {
         $this->generator = $this->createMock( Generator::class );
     }
 
-    private function make_page( array $options = [], ?ArdCatalog $ard_catalog = null ): SettingsPage {
+    private function make_page( array $options = [], ?ArdCatalog $ard_catalog = null, ?Generator $generator = null ): SettingsPage {
         return new SettingsPage(
             array_merge( Options::get_defaults(), $options ),
-            $ard_catalog
+            $ard_catalog,
+            $generator
         );
     }
 
@@ -337,5 +338,75 @@ class SettingsPageTest extends TestCase {
         $output = ob_get_clean();
 
         $this->assertStringNotContainsString( '<textarea', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // Agent homepage
+    // -----------------------------------------------------------------------
+
+    public function test_register_adds_agent_homepage_field_to_discovery_section(): void {
+        $this->make_page()->register();
+        $this->assertContains( 'markdown_for_agents_agent_homepage', $GLOBALS['_mock_settings_fields']['markdown-for-agents-general'] ?? [] );
+    }
+
+    public function test_sanitize_keeps_existing_page_and_rejects_others(): void {
+        $GLOBALS['_mock_post_objects'] = [
+            42 => new \WP_Post( [ 'ID' => 42, 'post_type' => 'page', 'post_status' => 'draft' ] ),
+            7  => new \WP_Post( [ 'ID' => 7, 'post_type' => 'post' ] ),
+        ];
+
+        $page = $this->make_page();
+        $base = [ '_active_tab' => 'general', 'post_types' => [ 'post', 'page' ] ];
+
+        $this->assertSame( 42, $page->sanitize_options( $base + [ 'agent_homepage_id' => '42' ] )['agent_homepage_id'] );
+        $this->assertSame( 0, $page->sanitize_options( $base + [ 'agent_homepage_id' => '7' ] )['agent_homepage_id'] );
+        $this->assertSame( 0, $page->sanitize_options( $base + [ 'agent_homepage_id' => '999' ] )['agent_homepage_id'] );
+        $this->assertSame( 0, $page->sanitize_options( $base + [ 'agent_homepage_id' => [ 'x' ] ] )['agent_homepage_id'] );
+        $this->assertSame( 0, $page->sanitize_options( $base )['agent_homepage_id'] );
+
+        $GLOBALS['_mock_post_objects'] = [];
+    }
+
+    public function test_agent_homepage_change_alone_does_not_flag_regeneration(): void {
+        $GLOBALS['_mock_post_objects'] = [ 42 => new \WP_Post( [ 'ID' => 42, 'post_type' => 'page' ] ) ];
+
+        $this->make_page()->sanitize_options( [ '_active_tab' => 'general', 'post_types' => [ 'post', 'page' ], 'include_taxonomies' => '1', 'agent_homepage_id' => 42 ] );
+
+        $this->assertArrayNotHasKey( \Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker::TRANSIENT, $GLOBALS['_mock_transients'] );
+        $GLOBALS['_mock_post_objects'] = [];
+    }
+
+    public function test_field_agent_homepage_renders_picker_with_saved_value(): void {
+        ob_start();
+        $this->make_page( [ 'agent_homepage_id' => 42 ] )->field_agent_homepage();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString( 'name="' . Options::OPTION_KEY . '[agent_homepage_id]"', $html );
+        $this->assertSame( 42, $GLOBALS['_mock_dropdown_pages_args']['selected'] );
+        $this->assertSame( '0', $GLOBALS['_mock_dropdown_pages_args']['option_none_value'] );
+    }
+
+    public function test_field_agent_homepage_warns_when_file_missing(): void {
+        $GLOBALS['_mock_post_objects'] = [ 42 => new \WP_Post( [ 'ID' => 42, 'post_type' => 'page' ] ) ];
+        $this->generator->method( 'get_export_path' )->willReturn( '/nonexistent/for-agents.md' );
+
+        ob_start();
+        $this->make_page( [ 'agent_homepage_id' => 42 ], null, $this->generator )->field_agent_homepage();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString( 'not been generated', $html );
+        $GLOBALS['_mock_post_objects'] = [];
+    }
+
+    public function test_field_agent_homepage_notes_filter_override(): void {
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_homepage'] = static fn( int $id ): int => 0;
+
+        ob_start();
+        $this->make_page( [ 'agent_homepage_id' => 42 ] )->field_agent_homepage();
+        $html = ob_get_clean();
+
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_homepage'] );
+        $this->assertStringContainsString( 'filter overrides this choice', $html );
+        $this->assertStringNotContainsString( 'dashicons-warning', $html );
     }
 }

@@ -23,8 +23,9 @@ class ContentFilter {
 	 * Filter HTML content ready for Markdown conversion.
 	 *
 	 * Strips WordPress Gutenberg block editor comments and <style>/<script>
-	 * blocks (tag and contents) from the HTML. Other HTML (tags, attributes,
-	 * inline styles) is left for the HtmlConverter to process.
+	 * blocks (tag and contents) from the HTML, and separates the dates in
+	 * core Latest Posts lists from their titles. Other HTML (tags,
+	 * attributes, inline styles) is left for the HtmlConverter to process.
 	 *
 	 * @since  1.0.0
 	 * @param  string $html Raw HTML from WordPress.
@@ -47,6 +48,16 @@ class ContentFilter {
 		// runs with strip_tags enabled, which removes the wrapper but keeps the
 		// inner CSS/JS as bare text — so these must be removed before conversion.
 		$html = preg_replace( '#<(style|script)\b[^>]*>.*?</\1>#is', '', $html ) ?? $html;
+
+		// Core's Latest Posts block puts the date straight after the title link
+		// with no text between them, which converts to `[Title](url)October 19,
+		// 2026`. Wrap the date in brackets after a space. Only this block's own
+		// date element is touched.
+		$html = preg_replace(
+			'#(<time\b[^>]*\bclass="[^"]*\bwp-block-latest-posts__post-date\b[^"]*"[^>]*>)(.*?)(</time>)#is',
+			' $1($2)$3',
+			$html
+		) ?? $html;
 
 		return $html;
 	}

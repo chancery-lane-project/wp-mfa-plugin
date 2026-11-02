@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
+use Tclp\WpMarkdownForAgents\Homepage\AgentHomepage;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 
@@ -72,35 +73,24 @@ class Negotiator {
 			$access_method = 'ua';
 		}
 
+		// The agent homepage is checked before the singular branch: a static
+		// front page also matches is_singular( 'page' ) and would otherwise
+		// serve its own file. When the homepage cannot be served, the request
+		// carries on as if none were set.
+		if ( is_front_page() ) {
+			$homepage = $this->servable_agent_homepage();
+			if ( null !== $homepage ) {
+				$this->serve_post( $homepage, $ua, $method, $access_method );
+			}
+		}
+
 		if ( $this->is_eligible_singular() ) {
 			$post = $this->queried_servable_post();
 			if ( null === $post ) {
 				return;
 			}
 
-			/**
-			 * Whether to serve Markdown for this specific post.
-			 *
-			 * Only fires when the request has already been identified as a Markdown
-			 * request (Accept header, query param, or known UA). Return false to
-			 * prevent serving for this post without affecting others.
-			 *
-			 * @since 1.1.0
-			 * @param bool     $enabled Whether serving is enabled. Default true.
-			 * @param \WP_Post $post    The queried post.
-			 */
-			if ( ! apply_filters( 'markdown_for_agents_serve_enabled', true, $post ) ) {
-				return;
-			}
-
-			$filepath = $this->generator->get_export_path( $post );
-
-			if ( ! file_exists( $filepath ) || ! $this->is_safe_filepath( $filepath ) ) {
-				return;
-			}
-
-			$this->log_access( $post->ID, StatsRepository::OBJECT_POST, $ua, $method, $access_method );
-			$this->send_markdown_file( $filepath, $access_method );
+			$this->serve_post( $post, $ua, $method, $access_method );
 			return;
 		}
 
@@ -129,6 +119,46 @@ class Negotiator {
 			$this->log_access( $term->term_id, StatsRepository::OBJECT_TERM, $ua, $method, $access_method );
 			$this->send_markdown_file( $filepath, $access_method );
 		}
+	}
+
+	/**
+	 * Stream a post's Markdown file, if it may be served, and exit.
+	 *
+	 * Returns without output when the `markdown_for_agents_serve_enabled`
+	 * filter declines the post or its file is missing or outside the export
+	 * directory, so the caller can fall through to the HTML response.
+	 *
+	 * @since  1.8.0
+	 * @param  \WP_Post $post          A post that passed is_servable_post().
+	 * @param  string   $ua            Sanitised User-Agent header.
+	 * @param  string   $method        HTTP request method.
+	 * @param  string   $access_method 'ua', 'accept-header' or 'query-param'.
+	 */
+	private function serve_post( \WP_Post $post, string $ua, string $method, string $access_method ): void {
+		/**
+		 * Whether to serve Markdown for this specific post.
+		 *
+		 * Only fires when the request has already been identified as a Markdown
+		 * request (Accept header, query param, or known UA). Return false to
+		 * prevent serving for this post without affecting others. On the front
+		 * page it receives the agent homepage.
+		 *
+		 * @since 1.1.0
+		 * @param bool     $enabled Whether serving is enabled. Default true.
+		 * @param \WP_Post $post    The queried post, or the agent homepage.
+		 */
+		if ( ! apply_filters( 'markdown_for_agents_serve_enabled', true, $post ) ) {
+			return;
+		}
+
+		$filepath = $this->generator->get_export_path( $post );
+
+		if ( ! file_exists( $filepath ) || ! $this->is_safe_filepath( $filepath ) ) {
+			return;
+		}
+
+		$this->log_access( $post->ID, StatsRepository::OBJECT_POST, $ua, $method, $access_method );
+		$this->send_markdown_file( $filepath, $access_method );
 	}
 
 	/**
@@ -236,6 +266,13 @@ class Negotiator {
 	 * @return string|null Unescaped URL, or null when no alternate exists.
 	 */
 	private function get_markdown_alternate_url(): ?string {
+		if ( is_front_page() ) {
+			$homepage = $this->servable_agent_homepage();
+			if ( null !== $homepage && file_exists( $this->generator->get_export_path( $homepage ) ) ) {
+				return add_query_arg( 'output_format', 'md', get_permalink( $homepage->ID ) );
+			}
+		}
+
 		if ( $this->is_eligible_singular() ) {
 			$post = $this->queried_servable_post();
 			if ( null === $post ) {
@@ -284,19 +321,51 @@ class Negotiator {
 	 */
 	private function queried_servable_post(): ?\WP_Post {
 		$post = get_queried_object();
-		if ( ! $post instanceof \WP_Post ) {
-			return null;
-		}
-
-		if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
-			return null;
-		}
-
-		if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+		if ( ! $post instanceof \WP_Post || ! $this->is_servable_post( $post ) ) {
 			return null;
 		}
 
 		return $post;
+	}
+
+	/**
+	 * Return the agent homepage when it may be served as Markdown, or null.
+	 *
+	 * Applies the same rules as a direct request for the page: a servable
+	 * post type, published, not password-protected and not excluded.
+	 *
+	 * @since  1.8.0
+	 * @return \WP_Post|null
+	 */
+	private function servable_agent_homepage(): ?\WP_Post {
+		$id = AgentHomepage::id( $this->options );
+		if ( $id < 1 ) {
+			return null;
+		}
+
+		$post = get_post( $id );
+		if ( ! $post instanceof \WP_Post
+			|| ! in_array( $post->post_type, $this->servable_post_types(), true )
+			|| ! $this->is_servable_post( $post ) ) {
+			return null;
+		}
+
+		return $post;
+	}
+
+	/**
+	 * Check a post is published, not password-protected and not excluded.
+	 *
+	 * @since  1.8.0
+	 * @param  \WP_Post $post The post.
+	 * @return bool
+	 */
+	private function is_servable_post( \WP_Post $post ): bool {
+		if ( 'publish' !== $post->post_status || '' !== $post->post_password ) {
+			return false;
+		}
+
+		return ! get_post_meta( $post->ID, '_markdown_for_agents_excluded', true );
 	}
 
 	/**
@@ -306,6 +375,16 @@ class Negotiator {
 	 * @return bool
 	 */
 	private function is_eligible_singular(): bool {
+		return is_singular( $this->servable_post_types() );
+	}
+
+	/**
+	 * Return the post types whose posts may be served as Markdown.
+	 *
+	 * @since  1.8.0
+	 * @return string[]
+	 */
+	private function servable_post_types(): array {
 		$post_types = (array) ( $this->options['post_types'] ?? array() );
 
 		/**
@@ -314,9 +393,7 @@ class Negotiator {
 		 * @since 1.1.0
 		 * @param string[] $post_types Post type slugs from plugin settings.
 		 */
-		$post_types = (array) apply_filters( 'markdown_for_agents_serve_post_types', $post_types );
-
-		return is_singular( $post_types );
+		return (array) apply_filters( 'markdown_for_agents_serve_post_types', $post_types );
 	}
 
 	/**

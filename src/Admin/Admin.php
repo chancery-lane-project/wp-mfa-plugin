@@ -48,7 +48,7 @@ class Admin {
 		private readonly ?StageFactory $stage_factory = null,
 		private readonly Clock $clock = new SystemClock(),
 	) {
-		$this->settings_page = new SettingsPage( $options, $ard_catalog );
+		$this->settings_page = new SettingsPage( $options, $ard_catalog, $generator );
 		$this->meta_box      = new MetaBox( $options, $generator );
 		$this->needs_regen   = new NeedsRegenTracker();
 	}

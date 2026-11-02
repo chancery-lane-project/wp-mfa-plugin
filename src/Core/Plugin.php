@@ -25,6 +25,7 @@ use Tclp\WpMarkdownForAgents\Generator\LinkRewriter;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyCollector;
 use Tclp\WpMarkdownForAgents\Generator\YamlFormatter;
+use Tclp\WpMarkdownForAgents\Homepage\HomepageRefresher;
 use Tclp\WpMarkdownForAgents\Jobs\Clock;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
@@ -154,6 +155,8 @@ class Plugin {
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_deleted', $index_generator, 'on_taxonomy_file_deleted', 10, 2 );
 		$this->loader->add_action( 'shutdown', $index_generator, 'flush_dirty' );
 
+		$this->define_agent_homepage_hooks( $options, $generator );
+
 		$bundle_generator       = new BundleGenerator( $options );
 		$this->bundle_generator = $bundle_generator;
 
@@ -206,6 +209,52 @@ class Plugin {
 		);
 
 		$this->job_runner = $job_runner;
+	}
+
+	/**
+	 * Wire the refresh of pages that list the latest posts, and the root
+	 * index rebuild when the agent homepage setting changes.
+	 *
+	 * @since  1.8.0
+	 * @param  array<string, mixed> $options
+	 * @param  Generator            $generator
+	 */
+	private function define_agent_homepage_hooks( array $options, Generator $generator ): void {
+		if ( ! empty( $options['auto_generate'] ) ) {
+			$refresher = new HomepageRefresher( $options, $generator );
+			$this->loader->add_action( 'transition_post_status', $refresher, 'on_transition_post_status', 20, 3 );
+			$this->loader->add_action( 'post_updated', $refresher, 'on_post_updated', 20, 3 );
+			$this->loader->add_action( 'after_delete_post', $refresher, 'on_after_delete_post', 20, 2 );
+			// Priority 5 runs before IndexGenerator::flush_dirty at 10, so the
+			// index listings are rebuilt after the refreshed file is written.
+			$this->loader->add_action( 'shutdown', $refresher, 'flush', 5 );
+		}
+
+		// The root index lists the agent homepage under "Start here". Rebuild it
+		// with the newly saved options when the choice changes. Only an existing
+		// export is updated; nothing is created on a site that has not generated.
+		add_action(
+			'update_option_' . Options::OPTION_KEY,
+			static function ( mixed $old_value, mixed $value ): void {
+				$old_id = is_array( $old_value ) ? (int) ( $old_value['agent_homepage_id'] ?? 0 ) : 0;
+				$new_id = is_array( $value ) ? (int) ( $value['agent_homepage_id'] ?? 0 ) : 0;
+
+				if ( $old_id === $new_id ) {
+					return;
+				}
+
+				$saved = array_merge( Options::get_defaults(), (array) $value );
+				$base  = Options::get_export_base( $saved );
+
+				if ( ! file_exists( $base . '/index.md' ) ) {
+					return;
+				}
+
+				( new IndexGenerator( $saved, new FileWriter( $base ) ) )->generate_root();
+			},
+			10,
+			2
+		);
 	}
 
 	/**

@@ -46,6 +46,9 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_sent_headers']   = [];
         $GLOBALS['_mock_ob_buffers']     = [];
         $GLOBALS['_mock_post_meta']      = [];
+        $GLOBALS['_mock_is_front_page']  = false;
+        $GLOBALS['_mock_post_objects']   = [];
+        $GLOBALS['_mock_permalinks']     = [];
         $_SERVER['HTTP_ACCEPT']          = '';
         $_SERVER['REQUEST_METHOD']       = 'GET';
     }
@@ -57,6 +60,14 @@ class NegotiatorTest extends TestCase {
         unset( $_SERVER['REQUEST_METHOD'] );
         unset( $_GET['output_format'] );
         unset( $GLOBALS['_mock_is_tax'] );
+        $GLOBALS['_mock_is_front_page'] = false;
+        $GLOBALS['_mock_post_objects']  = [];
+        $GLOBALS['_mock_permalinks']    = [];
+        unset( $GLOBALS['_mock_readfile_path'] );
+        unset(
+            $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_enabled'],
+            $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_homepage']
+        );
     }
 
     private function make_negotiator( array $options = [] ): Negotiator {
@@ -1160,6 +1171,176 @@ class NegotiatorTest extends TestCase {
         $this->assertStringContainsString( 'rel="alternate"', $output );
         $this->assertStringContainsString( 'type="text/markdown"', $output );
         $this->assertStringContainsString( 'output_format=md', $output );
+    }
+
+    // -----------------------------------------------------------------------
+    // Agent homepage on the front page
+    // -----------------------------------------------------------------------
+
+    private const HOMEPAGE_ID = 42;
+
+    /**
+     * Set up a front page request with an agent homepage (ID 42) and,
+     * optionally, a static front page (ID 1) with its own .md file.
+     *
+     * @return array{front: string, homepage: string} The two file paths.
+     */
+    private function setup_front_page( bool $static_front_page = true, array $homepage_props = [] ): array {
+        $front_file    = $this->tmp_dir . '/front.md';
+        $homepage_file = $this->tmp_dir . '/for-agents.md';
+        file_put_contents( $front_file, '# Front' );
+        file_put_contents( $homepage_file, '# For agents' );
+
+        $homepage = new \WP_Post( array_merge( [
+            'ID'        => self::HOMEPAGE_ID,
+            'post_type' => 'page',
+            'post_name' => 'for-agents',
+        ], $homepage_props ) );
+        $GLOBALS['_mock_post_objects'][ self::HOMEPAGE_ID ] = $homepage;
+        $GLOBALS['_mock_permalinks'][ self::HOMEPAGE_ID ]   = 'https://example.com/for-agents/';
+        $GLOBALS['_mock_permalinks'][1]                     = 'https://example.com/';
+
+        $GLOBALS['_mock_is_front_page'] = true;
+        if ( $static_front_page ) {
+            $GLOBALS['_mock_is_singular']    = true;
+            $GLOBALS['_mock_queried_object'] = new \WP_Post( [ 'ID' => 1, 'post_type' => 'page', 'post_name' => 'home' ] );
+        }
+
+        $this->generator->method( 'get_export_path' )->willReturnCallback(
+            static fn( \WP_Post|int $p ): string => ( ( $p instanceof \WP_Post ? $p->ID : $p ) === self::HOMEPAGE_ID ) ? $homepage_file : $front_file
+        );
+
+        return [ 'front' => $front_file, 'homepage' => $homepage_file ];
+    }
+
+    private function serve( array $options = [] ): ?string {
+        try {
+            $this->make_negotiator( $options )->maybe_serve_markdown();
+        } catch ( \RuntimeException $e ) {
+            // readfile() mock throws to stand in for exit.
+        }
+        return $GLOBALS['_mock_readfile_path'] ?? null;
+    }
+
+    public function test_front_page_serves_agent_homepage_instead_of_static_front_page(): void {
+        $files = $this->setup_front_page();
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+
+        $this->logger->expects( $this->once() )
+            ->method( 'log_access' )
+            ->with( self::HOMEPAGE_ID, '', 'accept-header', StatsRepository::OBJECT_POST );
+
+        $this->assertSame( $files['homepage'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function test_front_page_serves_agent_homepage_when_front_page_is_blog_index(): void {
+        $files = $this->setup_front_page( false );
+        $_GET['output_format'] = 'md';
+
+        $this->assertSame( $files['homepage'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function test_front_page_serves_its_own_file_when_no_agent_homepage_set(): void {
+        $files = $this->setup_front_page();
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+
+        $this->assertSame( $files['front'], $this->serve() );
+    }
+
+    public function test_blog_index_front_page_serves_nothing_when_no_agent_homepage_set(): void {
+        $this->setup_front_page( false );
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $this->assertNull( $this->serve() );
+    }
+
+    /**
+     * @dataProvider unservable_homepage_provider
+     */
+    public function test_front_page_falls_back_when_agent_homepage_cannot_be_served( array $props, bool $excluded ): void {
+        $files = $this->setup_front_page( true, $props );
+        if ( $excluded ) {
+            $GLOBALS['_mock_post_meta'][ self::HOMEPAGE_ID ]['_markdown_for_agents_excluded'] = '1';
+        }
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+
+        $this->assertSame( $files['front'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function unservable_homepage_provider(): array {
+        return [
+            'draft'              => [ [ 'post_status' => 'draft' ], false ],
+            'password-protected' => [ [ 'post_password' => 'secret' ], false ],
+            'excluded'           => [ [], true ],
+            'post type not served' => [ [ 'post_type' => 'event' ], false ],
+        ];
+    }
+
+    public function test_front_page_falls_back_when_agent_homepage_file_is_missing(): void {
+        $files = $this->setup_front_page();
+        unlink( $files['homepage'] );
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+
+        $this->assertSame( $files['front'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function test_front_page_falls_back_when_serve_enabled_declines_agent_homepage(): void {
+        $files = $this->setup_front_page();
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_enabled'] =
+            static fn( bool $val, \WP_Post $p ): bool => self::HOMEPAGE_ID !== $p->ID;
+
+        $this->assertSame( $files['front'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function test_agent_homepage_filter_sets_homepage_in_code(): void {
+        $files = $this->setup_front_page();
+        $_SERVER['HTTP_ACCEPT'] = 'text/markdown';
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_agent_homepage'] = static fn( int $id ): int => self::HOMEPAGE_ID;
+
+        $this->assertSame( $files['homepage'], $this->serve() );
+    }
+
+    public function test_agent_homepage_not_served_on_other_pages(): void {
+        $files = $this->setup_front_page();
+        $GLOBALS['_mock_is_front_page'] = false;
+        $_SERVER['HTTP_ACCEPT']         = 'text/markdown';
+
+        $this->assertSame( $files['front'], $this->serve( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] ) );
+    }
+
+    public function test_front_page_link_header_points_at_agent_homepage(): void {
+        $this->setup_front_page();
+
+        $this->make_negotiator( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] )->output_html_headers();
+
+        $this->assertContains(
+            'Link: <https://example.com/for-agents/?output_format=md>; rel="alternate"; type="text/markdown"',
+            $GLOBALS['_mock_sent_headers']
+        );
+    }
+
+    public function test_front_page_link_tag_points_at_agent_homepage_on_blog_index(): void {
+        $this->setup_front_page( false );
+
+        ob_start();
+        $this->make_negotiator( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] )->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'https://example.com/for-agents/?output_format=md', $output );
+    }
+
+    public function test_front_page_link_tag_falls_back_to_own_file_when_homepage_file_missing(): void {
+        $files = $this->setup_front_page();
+        unlink( $files['homepage'] );
+
+        ob_start();
+        $this->make_negotiator( [ 'agent_homepage_id' => self::HOMEPAGE_ID ] )->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'https://example.com/?output_format=md', $output );
     }
 
     // -----------------------------------------------------------------------
