@@ -1366,6 +1366,14 @@ if (!function_exists('is_front_page')) {
     }
 }
 
+$GLOBALS['_mock_is_paged'] = false;
+
+if (!function_exists('is_paged')) {
+    function is_paged(): bool {
+        return $GLOBALS['_mock_is_paged'] ?? false;
+    }
+}
+
 if (!function_exists('wp_count_posts')) {
     function wp_count_posts(string $type = 'post', string $perm = ''): object {
         return (object) ($GLOBALS['_mock_post_counts'][$type] ?? ['publish' => 0]);

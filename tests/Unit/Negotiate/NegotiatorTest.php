@@ -47,6 +47,7 @@ class NegotiatorTest extends TestCase {
         $GLOBALS['_mock_ob_buffers']     = [];
         $GLOBALS['_mock_post_meta']      = [];
         $GLOBALS['_mock_is_front_page']  = false;
+        $GLOBALS['_mock_is_paged']       = false;
         $GLOBALS['_mock_post_objects']   = [];
         $GLOBALS['_mock_permalinks']     = [];
         $_SERVER['HTTP_ACCEPT']          = '';
@@ -61,6 +62,7 @@ class NegotiatorTest extends TestCase {
         unset( $_GET['output_format'] );
         unset( $GLOBALS['_mock_is_tax'] );
         $GLOBALS['_mock_is_front_page'] = false;
+        $GLOBALS['_mock_is_paged']      = false;
         $GLOBALS['_mock_post_objects']  = [];
         $GLOBALS['_mock_permalinks']    = [];
         unset( $GLOBALS['_mock_readfile_path'] );
@@ -1323,6 +1325,35 @@ class NegotiatorTest extends TestCase {
         $_SERVER['HTTP_ACCEPT']         = 'text/markdown';
 
         $this->assertSame( $files['front'], $this->serve() );
+    }
+
+    // is_front_page() is also true on /page/2/ of a blog-index front page and
+    // on a paginated static front page. Those are not the front door.
+    public function test_chosen_post_not_served_on_paged_blog_index(): void {
+        $this->setup_front_page( false );
+        $GLOBALS['_mock_is_paged'] = true;
+        $_SERVER['HTTP_ACCEPT']    = 'text/markdown';
+
+        $this->logger->expects( $this->never() )->method( 'log_access' );
+
+        $this->assertNull( $this->serve() );
+    }
+
+    public function test_paged_static_front_page_serves_its_own_file(): void {
+        $files = $this->setup_front_page();
+        $GLOBALS['_mock_is_paged'] = true;
+        $_SERVER['HTTP_ACCEPT']    = 'text/markdown';
+
+        $this->assertSame( $files['front'], $this->serve() );
+    }
+
+    public function test_paged_front_page_link_header_does_not_point_at_chosen_post(): void {
+        $this->setup_front_page( false );
+        $GLOBALS['_mock_is_paged'] = true;
+
+        $this->make_negotiator()->output_html_headers();
+
+        $this->assertStringNotContainsString( 'for-agents', implode( "\n", $GLOBALS['_mock_sent_headers'] ) );
     }
 
     public function test_front_page_link_header_points_at_chosen_post(): void {

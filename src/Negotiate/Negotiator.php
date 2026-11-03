@@ -76,8 +76,10 @@ class Negotiator {
 		// A post chosen for the front page is checked before the singular
 		// branch: a static front page also matches is_singular( 'page' ) and
 		// would otherwise serve its own file. When the chosen post cannot be
-		// served, the request carries on as if none were chosen.
-		if ( is_front_page() ) {
+		// served, the request carries on as if none were chosen. Paged views
+		// (/page/2/) also count as the front page in WordPress, but are not
+		// the front door, so they keep their usual behaviour.
+		if ( is_front_page() && ! is_paged() ) {
 			$front = $this->servable_front_page_post();
 			if ( null !== $front ) {
 				$this->serve_post( $front, $ua, $method, $access_method );
@@ -327,7 +329,7 @@ class Negotiator {
 	 * @return string|null Unescaped URL, or null when no alternate exists.
 	 */
 	private function get_markdown_alternate_url(): ?string {
-		if ( is_front_page() ) {
+		if ( is_front_page() && ! is_paged() ) {
 			$front = $this->servable_front_page_post();
 			if ( null !== $front && file_exists( $this->generator->get_export_path( $front ) ) ) {
 				return add_query_arg( 'output_format', 'md', get_permalink( $front->ID ) );

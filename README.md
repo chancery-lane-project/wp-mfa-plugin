@@ -93,7 +93,7 @@ A Markdown request for the front page normally returns the front page's own expo
 add_filter( 'markdown_for_agents_front_page_post', fn() => 42 ); // a post ID or WP_Post
 ```
 
-- **Serving:** Markdown requests for `/` (by `Accept: text/markdown`, `?output_format=md` or a known AI User-Agent) are answered with the chosen post's `.md` file. This is checked before the singular branch, so it also takes precedence over a static front page. Hits are counted under the chosen post in the statistics.
+- **Serving:** Markdown requests for `/` (by `Accept: text/markdown`, `?output_format=md` or a known AI User-Agent) are answered with the chosen post's `.md` file. This is checked before the singular branch, so it also takes precedence over a static front page. Paginated views such as `/page/2/` are not affected. Hits are counted under the chosen post in the statistics.
 - **Discovery:** on the front page, the `<link rel="alternate" type="text/markdown">` tag and the `Link` header point at the chosen post's `?output_format=md` URL. That URL does not depend on content negotiation, which matters on hosts whose edge cache ignores `Accept` when choosing a cached variant of the homepage.
 - **Checks:** the chosen post must be of a served post type, published, not password-protected and not excluded, and its `.md` file must exist inside the export directory. Otherwise the front page behaves as if nothing were chosen. A filter can choose a post, never an arbitrary file.
 
