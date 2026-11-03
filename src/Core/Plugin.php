@@ -36,6 +36,7 @@ use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsPage;
 use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
+use Tclp\WpMarkdownForAgents\Stats\StatsRetention;
 
 /**
  * Main plugin orchestrator.
@@ -82,6 +83,7 @@ class Plugin {
 		);
 
 		$this->define_negotiate_hooks( $options );
+		$this->define_stats_retention();
 		$this->define_admin_hooks( $options );
 		$this->define_cli_commands( $options );
 	}
@@ -206,6 +208,25 @@ class Plugin {
 		);
 
 		$this->job_runner = $job_runner;
+	}
+
+	/**
+	 * Schedule and run the daily access-stats clean-up.
+	 *
+	 * Registered on every request type (cron runs outside the negotiate
+	 * hooks), but the repository is only built when the event fires.
+	 *
+	 * @since  1.8.0
+	 */
+	private function define_stats_retention(): void {
+		add_action( 'init', array( StatsRetention::class, 'schedule' ) );
+		add_action(
+			StatsRetention::HOOK,
+			static function (): void {
+				global $wpdb;
+				( new StatsRetention( new StatsRepository( $wpdb ) ) )->run();
+			}
+		);
 	}
 
 	/**

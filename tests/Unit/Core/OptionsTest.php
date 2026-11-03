@@ -74,6 +74,10 @@ class OptionsTest extends TestCase {
         $this->assertContains( 'PerplexityBot', $strings );
     }
 
+    public function test_defaults_keep_stats_for_a_year(): void {
+        $this->assertSame( 365, Options::get_defaults()['stats_retention_days'] );
+    }
+
     public function test_defaults_include_bundle_disabled(): void {
         $defaults = Options::get_defaults();
 

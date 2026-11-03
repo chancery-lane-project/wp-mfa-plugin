@@ -26,6 +26,14 @@ use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
 class Negotiator {
 
 	/**
+	 * The alternate URL for this request, once resolved. The `Link` header and
+	 * the `<link>` tag both need it; resolving it touches the filesystem.
+	 *
+	 * @var array{0: ?string}|null
+	 */
+	private ?array $alternate_url = null;
+
+	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed>    $options           Plugin options.
 	 * @param  Generator               $generator         Generator instance (provides get_export_path).
@@ -233,9 +241,22 @@ class Negotiator {
 	 * `.md` file exists on disk.
 	 *
 	 * @since  1.6.1
+	 * @since  1.8.0 Resolved once per request.
 	 * @return string|null Unescaped URL, or null when no alternate exists.
 	 */
 	private function get_markdown_alternate_url(): ?string {
+		$this->alternate_url ??= array( $this->resolve_markdown_alternate_url() );
+
+		return $this->alternate_url[0];
+	}
+
+	/**
+	 * Work out the alternate URL. Call get_markdown_alternate_url() instead.
+	 *
+	 * @since  1.8.0
+	 * @return string|null Unescaped URL, or null when no alternate exists.
+	 */
+	private function resolve_markdown_alternate_url(): ?string {
 		if ( $this->is_eligible_singular() ) {
 			$post = $this->queried_servable_post();
 			if ( null === $post ) {

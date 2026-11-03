@@ -846,6 +846,42 @@ class NegotiatorTest extends TestCase {
         $this->assertContains( 'Vary: Accept', $GLOBALS['_mock_sent_headers'] );
     }
 
+    public function test_alternate_url_is_resolved_once_per_request(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $GLOBALS['_mock_permalink']      = 'https://example.com/test-post/';
+
+        $this->generator->expects( $this->once() )->method( 'get_export_path' )->willReturn( $md_file );
+
+        $neg = $this->make_negotiator();
+        $neg->output_html_headers();
+        ob_start();
+        $neg->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( 'output_format=md', $output );
+        $this->assertNotEmpty( preg_grep( '/^Link: /', $GLOBALS['_mock_sent_headers'] ) );
+    }
+
+    public function test_missing_alternate_is_also_resolved_once(): void {
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+
+        $this->generator->expects( $this->once() )->method( 'get_export_path' )->willReturn( '/nonexistent/path/post.md' );
+
+        $neg = $this->make_negotiator();
+        $neg->output_html_headers();
+        ob_start();
+        $neg->output_link_tag();
+        $output = ob_get_clean();
+
+        $this->assertSame( '', $output );
+        $this->assertSame( [], $GLOBALS['_mock_sent_headers'] );
+    }
+
     public function test_html_headers_not_sent_when_md_file_missing(): void {
         $post = $this->make_post();
         $GLOBALS['_mock_is_singular']    = true;

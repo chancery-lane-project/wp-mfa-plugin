@@ -304,6 +304,10 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
+= Unreleased =
+* Feature: access statistics are now cleaned up automatically. Daily totals older than the period set under Settings → Agent Detection → Statistics are deleted once a day by WP-Cron. The default is 365 days, so no existing site loses data on update (statistics started in March 2026). Choose 30, 90 or 180 days, or keep everything. `wp markdown-agents prune-stats` still works for one-off clean-ups.
+* Performance: on HTML pages, the Markdown alternate for the `Link` header and the `<link rel="alternate">` tag is now worked out once per request instead of twice.
+
 = 1.7.4 =
 * Fix: bulk generation is lighter on large sites. The `index.md` listings were rebuilt from every published post at the end of every background tick, so each tick got slower as the site grew. They are now rebuilt once, after the last batch.
 * Fix: generation no longer fetches embeds. WordPress turned every embed URL (YouTube, Vimeo, block-editor embeds and so on) into the provider's HTML. Because generation runs outside a page view, it missed the embed cache the site already had, so each embed meant a fresh HTTP request, including requests from the site to itself. The `<iframe>` that came back was then converted to nothing. The embed URL is now kept as a plain link in the Markdown. Sites with many embeds generate much faster and put less load on the server while a job runs. The `markdown_for_agents_autoembed` filter turns the old behaviour back on.
