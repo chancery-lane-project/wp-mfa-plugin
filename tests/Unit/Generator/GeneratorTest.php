@@ -213,6 +213,68 @@ class GeneratorTest extends TestCase {
         $this->assertTrue( $result );
     }
 
+    // -----------------------------------------------------------------------
+    // markdown_for_agents_regenerate_post action
+    // -----------------------------------------------------------------------
+
+    public function test_regenerate_post_action_writes_an_eligible_post(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_objects'][ $post->ID ] = $post;
+        $this->frontmatter_builder->method( 'build' )->willReturn( [] );
+        $this->content_filter->method( 'filter' )->willReturn( '' );
+        $this->converter->method( 'convert' )->willReturn( '' );
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+
+        $this->file_writer->expects( $this->once() )->method( 'write' )->willReturn( true );
+
+        $this->generator->on_regenerate_post_action( $post->ID );
+    }
+
+    public function test_regenerate_post_action_accepts_a_numeric_string(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_objects'][ $post->ID ] = $post;
+        $this->yaml_formatter->method( 'format' )->willReturn( '' );
+
+        $this->file_writer->expects( $this->once() )->method( 'write' )->willReturn( true );
+
+        $this->generator->on_regenerate_post_action( (string) $post->ID );
+    }
+
+    /**
+     * @dataProvider regenerate_skip_provider
+     */
+    public function test_regenerate_post_action_skips_missing_or_ineligible_posts( int $id, array $props ): void {
+        if ( array() !== $props ) {
+            $post = $this->make_post( $props );
+            $GLOBALS['_mock_post_objects'][ $post->ID ] = $post;
+            $id = $post->ID;
+        }
+
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $this->generator->on_regenerate_post_action( $id );
+    }
+
+    public function regenerate_skip_provider(): array {
+        return [
+            'zero'          => [ 0, [] ],
+            'missing post'  => [ 999, [] ],
+            'draft'         => [ 0, [ 'post_status' => 'draft' ] ],
+            'password'      => [ 0, [ 'post_password' => 'secret' ] ],
+            'type not used' => [ 0, [ 'post_type' => 'product' ] ],
+        ];
+    }
+
+    public function test_regenerate_post_action_swallows_render_errors(): void {
+        $post = $this->make_post();
+        $GLOBALS['_mock_post_objects'][ $post->ID ] = $post;
+        $this->frontmatter_builder->method( 'build' )->willThrowException( new \RuntimeException( 'boom' ) );
+
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $this->generator->on_regenerate_post_action( $post->ID );
+    }
+
     public function test_generate_post_skips_non_configured_post_type(): void {
         $post = $this->make_post( [ 'post_type' => 'product' ] );
 

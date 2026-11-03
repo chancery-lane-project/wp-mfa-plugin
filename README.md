@@ -327,6 +327,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_serve_post_types` | `(array $types)` | Modify the list of serveable post types |
 | `markdown_for_agents_serve_taxonomies` | `(bool $enabled)` | Enable/disable serving for taxonomy archives |
 | `markdown_for_agents_front_page_post` | `(WP_Post\|int\|null $post)` | Choose the post whose Markdown answers requests for the front page. Default null keeps the front page's own export. See [Front page for agents](#front-page-for-agents) |
+| `markdown_for_agents_post_markdown_status` | `(mixed $status, WP_Post $post)` | Read-only: ask whether a post's Markdown can be served, for admin screens in other plugins. MFA returns `['servable' => bool, 'file' => bool, 'url' => ?string, 'problems' => string[]]`. Problem codes: `post_type` (not a served type), `not_published`, `password`, `excluded`, and `no_file` (only when nothing else is wrong). `url` is the `?output_format=md` URL when servable. Call it as `apply_filters( 'markdown_for_agents_post_markdown_status', null, $post )`; null means MFA did not answer |
 | `markdown_for_agents_frontmatter` | `(array $fm, WP_Post $post)` | Modify frontmatter before serialisation |
 | `markdown_for_agents_taxonomy_frontmatter` | `(array $fm, WP_Term $term)` | Modify taxonomy archive frontmatter |
 | `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
@@ -379,6 +380,7 @@ Run a full regeneration after adding either filter.
 | `markdown_for_agents_file_deleted` | Fired after a `.md` file is deleted |
 | `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
 | `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
+| `markdown_for_agents_regenerate_post` | `(int $post_id)` — call it, with `do_action()`, to regenerate one post's `.md` file now, for example after something its content lists has changed. Missing posts and posts not eligible for export are skipped. Runs whether or not auto-generate is on, so check the `auto_generate` option first if your refresh should follow it |
 | `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Root-relative links are reported in absolute form. Hook to audit export coverage |
 
 ---

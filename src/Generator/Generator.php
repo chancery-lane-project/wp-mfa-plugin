@@ -121,6 +121,35 @@ class Generator {
 	}
 
 	/**
+	 * Hook callback for the public `markdown_for_agents_regenerate_post` action.
+	 *
+	 * Lets other plugins regenerate one post's export without reaching into
+	 * this class, for example to refresh a page whose content lists other
+	 * posts. Posts that are missing or not eligible for export are skipped.
+	 * Errors are swallowed (and logged under WP_DEBUG) so a failed render
+	 * cannot break the request that triggered it.
+	 *
+	 * @since  1.8.0
+	 * @param  int|string $post_id The post ID.
+	 */
+	public function on_regenerate_post_action( int|string $post_id ): void {
+		$post = (int) $post_id > 0 ? get_post( (int) $post_id ) : null;
+
+		if ( ! $post instanceof \WP_Post || ! $this->is_eligible( $post ) ) {
+			return;
+		}
+
+		try {
+			$this->generate_post( $post );
+		} catch ( \Throwable $e ) {
+			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
+				error_log( 'WP Markdown for Agents: regenerating post ' . $post->ID . ' failed: ' . $e->getMessage() );
+			}
+		}
+	}
+
+	/**
 	 * Generate Markdown files for all published posts of a given post type.
 	 *
 	 * Processes in batches of 100 to avoid memory exhaustion on large sites.

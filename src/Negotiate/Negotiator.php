@@ -161,6 +161,62 @@ class Negotiator {
 	}
 
 	/**
+	 * Filter callback for `markdown_for_agents_post_markdown_status`.
+	 *
+	 * Reports whether a post's Markdown can be served, using the same checks
+	 * as serving, so admin screens in other plugins can explain why a post
+	 * would not be served without reaching into this plugin's internals.
+	 * The per-request `markdown_for_agents_serve_enabled` filter is not
+	 * consulted, since it may depend on the request.
+	 *
+	 * Problem codes, in this order: `post_type` (not a served post type),
+	 * `not_published`, `password`, `excluded`, `no_file` (no export file yet,
+	 * only reported when nothing else is wrong).
+	 *
+	 * @since  1.8.0
+	 * @param  mixed    $status Value from earlier callbacks. Ignored.
+	 * @param  \WP_Post $post   The post to check.
+	 * @return mixed Unchanged $status when $post is not a post, otherwise
+	 *               array{servable: bool, file: bool, url: ?string, problems: string[]}.
+	 */
+	public function post_markdown_status( mixed $status, mixed $post = null ): mixed {
+		if ( ! $post instanceof \WP_Post ) {
+			return $status;
+		}
+
+		$problems = array();
+
+		if ( ! in_array( $post->post_type, $this->servable_post_types(), true ) ) {
+			$problems[] = 'post_type';
+		}
+		if ( 'publish' !== $post->post_status ) {
+			$problems[] = 'not_published';
+		}
+		if ( '' !== $post->post_password ) {
+			$problems[] = 'password';
+		}
+		if ( get_post_meta( $post->ID, '_markdown_for_agents_excluded', true ) ) {
+			$problems[] = 'excluded';
+		}
+
+		$filepath = $this->generator->get_export_path( $post );
+		$file     = file_exists( $filepath ) && $this->is_safe_filepath( $filepath );
+
+		if ( array() === $problems && ! $file ) {
+			$problems[] = 'no_file';
+		}
+
+		$servable = array() === $problems;
+
+		return array(
+			'servable' => $servable,
+			'file'     => $file,
+			'url'      => $servable ? add_query_arg( 'output_format', 'md', (string) get_permalink( $post->ID ) ) : null,
+			'problems' => $problems,
+		);
+	}
+
+	/**
 	 * Record a served Markdown request in the access stats.
 	 *
 	 * Counts GET selections only, not HEAD probes or other HTTP methods.

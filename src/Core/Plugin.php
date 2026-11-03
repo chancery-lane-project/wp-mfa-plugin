@@ -148,6 +148,11 @@ class Plugin {
 		$index_generator = new IndexGenerator( $options, $this->file_writer );
 		$this->index_generator = $index_generator;
 
+		// Public entry point for other plugins: regenerate one post's export.
+		// Registered unconditionally, like the deletion hooks above: callers
+		// decide whether auto-generate applies to them.
+		$this->loader->add_action( 'markdown_for_agents_regenerate_post', $generator, 'on_regenerate_post_action', 10, 1 );
+
 		$this->loader->add_action( 'markdown_for_agents_file_generated', $index_generator, 'on_file_generated', 10, 2 );
 		$this->loader->add_action( 'markdown_for_agents_file_deleted', $index_generator, 'on_file_deleted', 10, 2 );
 		$this->loader->add_action( 'markdown_for_agents_taxonomy_file_generated', $index_generator, 'on_taxonomy_file_generated', 10, 2 );
@@ -209,21 +214,26 @@ class Plugin {
 	}
 
 	/**
-	 * Wire content negotiation hooks (skip on AJAX and REST).
+	 * Wire content negotiation hooks. Serving is skipped on AJAX and REST.
 	 *
 	 * @since  1.0.0
 	 * @param  array<string, mixed> $options
 	 */
 	private function define_negotiate_hooks( array $options ): void {
-		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
-			return;
-		}
-
 		global $wpdb;
 		$agent_detector = new AgentDetector( $options );
 		$stats_repo     = new StatsRepository( $wpdb );
 		$access_logger  = new AccessLogger( $stats_repo );
 		$negotiator     = new Negotiator( $options, $this->generator, $this->taxonomy_generator, $agent_detector, $access_logger );
+
+		// Read-only status for other plugins' admin screens. Registered before
+		// the AJAX/REST guard so it also answers in those requests.
+		$this->loader->add_filter( 'markdown_for_agents_post_markdown_status', $negotiator, 'post_markdown_status', 10, 2 );
+
+		if ( wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return;
+		}
+
 		$this->loader->add_action( 'template_redirect', $negotiator, 'maybe_serve_markdown', 1 );
 		// Priority 2 runs directly after maybe_serve_markdown, which exits when
 		// it serves Markdown — so these headers only ever reach HTML responses.

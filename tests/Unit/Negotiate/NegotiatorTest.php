@@ -1358,6 +1358,63 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // markdown_for_agents_post_markdown_status
+    // -----------------------------------------------------------------------
+
+    public function test_status_reports_a_servable_post_with_its_markdown_url(): void {
+        $files = $this->setup_front_page();
+
+        $status = $this->make_negotiator()->post_markdown_status( null, $GLOBALS['_mock_post_objects'][ self::CHOSEN_ID ] );
+
+        $this->assertSame( [
+            'servable' => true,
+            'file'     => true,
+            'url'      => 'https://example.com/for-agents/?output_format=md',
+            'problems' => [],
+        ], $status );
+    }
+
+    public function test_status_reports_a_missing_file(): void {
+        $files = $this->setup_front_page();
+        unlink( $files['chosen'] );
+
+        $status = $this->make_negotiator()->post_markdown_status( null, $GLOBALS['_mock_post_objects'][ self::CHOSEN_ID ] );
+
+        $this->assertFalse( $status['servable'] );
+        $this->assertFalse( $status['file'] );
+        $this->assertNull( $status['url'] );
+        $this->assertSame( [ 'no_file' ], $status['problems'] );
+    }
+
+    public function test_status_lists_every_problem_and_skips_no_file_when_others_apply(): void {
+        $files = $this->setup_front_page( true, [ 'post_type' => 'event', 'post_status' => 'draft', 'post_password' => 'secret' ] );
+        unlink( $files['chosen'] );
+        $GLOBALS['_mock_post_meta'][ self::CHOSEN_ID ]['_markdown_for_agents_excluded'] = '1';
+
+        $status = $this->make_negotiator()->post_markdown_status( null, $GLOBALS['_mock_post_objects'][ self::CHOSEN_ID ] );
+
+        $this->assertFalse( $status['servable'] );
+        $this->assertSame( [ 'post_type', 'not_published', 'password', 'excluded' ], $status['problems'] );
+    }
+
+    public function test_status_honours_serve_post_types_filter(): void {
+        $this->setup_front_page();
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] = static fn( array $types ): array => [ 'post' ];
+
+        try {
+            $status = $this->make_negotiator()->post_markdown_status( null, $GLOBALS['_mock_post_objects'][ self::CHOSEN_ID ] );
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_serve_post_types'] );
+        }
+
+        $this->assertSame( [ 'post_type' ], $status['problems'] );
+    }
+
+    public function test_status_passes_through_when_not_given_a_post(): void {
+        $this->assertSame( 'unchanged', $this->make_negotiator()->post_markdown_status( 'unchanged', 42 ) );
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
