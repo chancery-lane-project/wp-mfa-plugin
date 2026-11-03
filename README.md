@@ -203,6 +203,16 @@ Posts in this archive: 23
 - [Post Title Two](https://example.com/post-title-two/)
 ```
 
+### Latest Posts dates
+
+Core's **Latest Posts** block puts each post's date straight after its title with no space between them. In the export, and only there, the date is wrapped in brackets after a space, so a list with **Display post date** on exports as:
+
+```markdown
+- [Climate literacy is a core legal competency](https://example.org/news/…/?output_format=md) (October 19, 2026)
+```
+
+The date uses the site's date format. The export is static, so the list is as current as the page's last regeneration.
+
 ---
 
 ## OKF (Open Knowledge Format)
