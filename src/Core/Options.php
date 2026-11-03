@@ -46,6 +46,7 @@ class Options {
 			'bundle_enabled'            => false,
 			'post_type_configs'         => array(),
 			'delete_files_on_uninstall' => false,
+			'stats_retention_days'      => 365,
 			'ua_force_enabled'          => true,
 
 			/*

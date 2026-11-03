@@ -9,6 +9,7 @@ use Tclp\WpMarkdownForAgents\Core\Deactivator;
 use Tclp\WpMarkdownForAgents\Jobs\GenerationJob;
 use Tclp\WpMarkdownForAgents\Jobs\JobRunner;
 use Tclp\WpMarkdownForAgents\Jobs\TickMutex;
+use Tclp\WpMarkdownForAgents\Stats\StatsRetention;
 
 /**
  * @covers \Tclp\WpMarkdownForAgents\Core\Deactivator
@@ -32,6 +33,14 @@ class DeactivatorTest extends TestCase {
         $this->assertFalse( get_option( TickMutex::OPTION ) );
         $this->assertFalse( wp_next_scheduled( JobRunner::TICK_HOOK ) );
         $this->assertFalse( wp_next_scheduled( JobRunner::WATCHDOG_HOOK ) );
+    }
+
+    public function test_deactivation_clears_the_stats_retention_event(): void {
+        StatsRetention::schedule();
+
+        Deactivator::deactivate();
+
+        $this->assertFalse( wp_next_scheduled( StatsRetention::HOOK ) );
     }
 
     public function test_deactivation_is_safe_with_no_job_state(): void {

@@ -40,6 +40,7 @@ delete_option( 'markdown_for_agents_job' );
 delete_option( 'markdown_for_agents_job_tick_lock' );
 wp_clear_scheduled_hook( 'markdown_for_agents_process_batch' );
 wp_clear_scheduled_hook( 'markdown_for_agents_job_watchdog' );
+wp_clear_scheduled_hook( 'markdown_for_agents_prune_stats' );
 
 // Drop the access-stats table.
 global $wpdb;

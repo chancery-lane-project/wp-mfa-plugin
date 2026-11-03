@@ -108,6 +108,43 @@ class SettingsPageTest extends TestCase {
         $this->assertContains( 'markdown_for_agents_ua_agent_strings', $fields );
     }
 
+    public function test_register_adds_stats_retention_field_on_agents_tab(): void {
+        $this->make_page()->register();
+        $this->assertContains( 'markdown_for_agents_stats', $GLOBALS['_mock_settings_sections']['markdown-for-agents-agents'] ?? [] );
+        $this->assertContains( 'markdown_for_agents_stats_retention_days', $GLOBALS['_mock_settings_fields']['markdown-for-agents-agents'] ?? [] );
+    }
+
+    public function test_sanitize_agents_tab_saves_a_retention_choice(): void {
+        $result = $this->make_page()->sanitize_options( [ '_active_tab' => 'agents', 'stats_retention_days' => '90' ] );
+        $this->assertSame( 90, $result['stats_retention_days'] );
+
+        $result = $this->make_page()->sanitize_options( [ '_active_tab' => 'agents', 'stats_retention_days' => '0' ] );
+        $this->assertSame( 0, $result['stats_retention_days'] );
+    }
+
+    public function test_sanitize_rejects_an_unlisted_retention_period(): void {
+        $result = $this->make_page()->sanitize_options( [ '_active_tab' => 'agents', 'stats_retention_days' => '7' ] );
+        $this->assertSame( 365, $result['stats_retention_days'] );
+    }
+
+    public function test_sanitize_keeps_saved_retention_when_the_field_is_absent(): void {
+        $this->seed_stored( [ 'stats_retention_days' => 30 ] );
+
+        $result = $this->make_page()->sanitize_options( [ 'ua_agent_strings' => "GPTBot\n" ] );
+
+        $this->assertSame( 30, $result['stats_retention_days'] );
+    }
+
+    public function test_field_stats_retention_days_marks_the_saved_choice(): void {
+        ob_start();
+        $this->make_page( [ 'stats_retention_days' => 90 ] )->field_stats_retention_days();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString( 'name="markdown_for_agents_options[stats_retention_days]"', $html );
+        $this->assertMatchesRegularExpression( '/value="90"\s+selected/', $html );
+        $this->assertStringContainsString( 'value="0"', $html );
+    }
+
     public function test_sanitize_ua_force_enabled_cast_to_bool(): void {
         $result = $this->make_page()->sanitize_options( [ 'ua_force_enabled' => '1' ] );
         $this->assertTrue( $result['ua_force_enabled'] );

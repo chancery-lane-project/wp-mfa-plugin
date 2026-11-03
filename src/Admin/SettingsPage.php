@@ -12,6 +12,7 @@ use Tclp\WpMarkdownForAgents\Core\NeedsRegenTracker;
 use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Discovery\ArdCatalog;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
+use Tclp\WpMarkdownForAgents\Stats\StatsRetention;
 
 /**
  * Registers and renders the plugin settings page.
@@ -156,6 +157,15 @@ class SettingsPage {
 
 		add_settings_field( 'markdown_for_agents_ua_force_enabled', __( 'Enable UA detection', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_force_enabled' ), $agents, 'markdown_for_agents_ua_detection' );
 		add_settings_field( 'markdown_for_agents_ua_agent_strings', __( 'Agent user-agent strings', 'markdown-for-agents-and-statistics' ), array( $this, 'field_ua_agent_strings' ), $agents, 'markdown_for_agents_ua_detection' );
+
+		add_settings_section(
+			'markdown_for_agents_stats',
+			__( 'Statistics', 'markdown-for-agents-and-statistics' ),
+			'__return_false',
+			$agents
+		);
+
+		add_settings_field( 'markdown_for_agents_stats_retention_days', __( 'Keep access statistics for', 'markdown-for-agents-and-statistics' ), array( $this, 'field_stats_retention_days' ), $agents, 'markdown_for_agents_stats' );
 	}
 
 	/**
@@ -284,6 +294,11 @@ class SettingsPage {
 		$ua_raw   = is_array( $ua_input ) ? implode( "\n", $ua_input ) : (string) $ua_input;
 		$ua_lines                  = array_filter( array_map( 'trim', explode( "\n", $ua_raw ) ) );
 		$clean['ua_agent_strings'] = array_values( $ua_lines );
+
+		// Absent from a programmatic save: keep what is stored.
+		if ( array_key_exists( 'stats_retention_days', $input ) ) {
+			$clean['stats_retention_days'] = StatsRetention::sanitize( $input['stats_retention_days'] );
+		}
 	}
 
 	/**
@@ -677,5 +692,21 @@ class SettingsPage {
 	public function field_ua_agent_strings(): void {
 		echo '<textarea name="' . esc_attr( Options::OPTION_KEY ) . '[ua_agent_strings]" rows="8" class="large-text">' . esc_textarea( implode( "\n", (array) ( $this->options['ua_agent_strings'] ?? array() ) ) ) . '</textarea>';
 		echo '<p class="description">' . esc_html__( 'One User-Agent substring per line. Matching is case-insensitive. Edit to add or remove agents.', 'markdown-for-agents-and-statistics' ) . '</p>';
+	}
+
+	/** @since 1.8.0 */
+	public function field_stats_retention_days(): void {
+		$current = StatsRetention::sanitize( $this->options['stats_retention_days'] ?? StatsRetention::DEFAULT_DAYS );
+
+		echo '<select name="' . esc_attr( Options::OPTION_KEY ) . '[stats_retention_days]">';
+		foreach ( StatsRetention::CHOICES as $days ) {
+			$label = 0 === $days
+				? __( 'Keep everything', 'markdown-for-agents-and-statistics' )
+				/* translators: %d: number of days. */
+				: sprintf( _n( '%d day', '%d days', $days, 'markdown-for-agents-and-statistics' ), $days );
+			echo '<option value="' . esc_attr( (string) $days ) . '" ' . selected( $current, $days, false ) . '>' . esc_html( $label ) . '</option>';
+		}
+		echo '</select>';
+		echo '<p class="description">' . esc_html__( 'Daily totals older than this are deleted once a day. Each row is a page, agent and day; no IP addresses are stored.', 'markdown-for-agents-and-statistics' ) . '</p>';
 	}
 }
