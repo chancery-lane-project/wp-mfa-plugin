@@ -180,6 +180,9 @@ class AgentDetector {
 				'Instapaper',
 				'Nava/',
 				'Retool/',
+				// Seen in access logs, Nov 2026.
+				'Geminibot',
+				'Google-NotebookLM',
 			),
 			'search'    => array(
 				// Baseline.
@@ -196,6 +199,9 @@ class AgentDetector {
 				'KernelSearchBot',
 				'ShapBot',
 				'alphalens-bot',
+				// Seen in access logs, Nov 2026.
+				'meta-webindexer',
+				'LinkupBot',
 			),
 			'training'  => array(
 				// Baseline.
@@ -313,7 +319,7 @@ class AgentDetector {
 			),
 			'google'       => array(
 				'label'  => 'Google',
-				'agents' => array( 'Gemini-User', 'Google-Agent', 'Google-Extended', 'GoogleOther', 'CloudVertexBot' ),
+				'agents' => array( 'Gemini-User', 'Google-Agent', 'Google-Extended', 'GoogleOther', 'CloudVertexBot', 'Geminibot', 'Google-NotebookLM' ),
 			),
 			'perplexity'   => array(
 				'label'  => 'Perplexity',
@@ -321,7 +327,7 @@ class AgentDetector {
 			),
 			'meta'         => array(
 				'label'  => 'Meta',
-				'agents' => array( 'meta-externalfetcher', 'meta-externalagent' ),
+				'agents' => array( 'meta-externalfetcher', 'meta-externalagent', 'meta-webindexer' ),
 			),
 			'amazon'       => array(
 				'label'  => 'Amazon',
@@ -378,6 +384,10 @@ class AgentDetector {
 			'atlassian'    => array(
 				'label'  => 'Atlassian',
 				'agents' => array( 'atlassian-bot' ),
+			),
+			'linkup'       => array(
+				'label'  => 'Linkup',
+				'agents' => array( 'LinkupBot' ),
 			),
 		);
 
