@@ -8,6 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use Tclp\WpMarkdownForAgents\Generator\ExportPolicy;
 use Tclp\WpMarkdownForAgents\Generator\Generator;
 use Tclp\WpMarkdownForAgents\Generator\TaxonomyArchiveGenerator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
@@ -173,11 +174,15 @@ class Negotiator {
 	 * `not_published`, `password`, `excluded`, `no_file` (no export file yet,
 	 * only reported when nothing else is wrong).
 	 *
+	 * `url` and `path` are only set when the post is servable. `path` is the
+	 * export file's path relative to the export base, e.g. `page/about.md`,
+	 * the form the bundle's index files link with.
+	 *
 	 * @since  1.8.0
 	 * @param  mixed    $status Value from earlier callbacks. Ignored.
 	 * @param  \WP_Post $post   The post to check.
 	 * @return mixed Unchanged $status when $post is not a post, otherwise
-	 *               array{servable: bool, file: bool, url: ?string, problems: string[]}.
+	 *               array{servable: bool, file: bool, url: ?string, path: ?string, problems: string[]}.
 	 */
 	public function post_markdown_status( mixed $status, mixed $post = null ): mixed {
 		if ( ! $post instanceof \WP_Post ) {
@@ -212,6 +217,7 @@ class Negotiator {
 			'servable' => $servable,
 			'file'     => $file,
 			'url'      => $servable ? add_query_arg( 'output_format', 'md', (string) get_permalink( $post->ID ) ) : null,
+			'path'     => $servable ? ExportPolicy::post_relative_path( $post ) : null,
 			'problems' => $problems,
 		);
 	}

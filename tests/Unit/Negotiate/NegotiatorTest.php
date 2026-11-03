@@ -1361,7 +1361,7 @@ class NegotiatorTest extends TestCase {
     // markdown_for_agents_post_markdown_status
     // -----------------------------------------------------------------------
 
-    public function test_status_reports_a_servable_post_with_its_markdown_url(): void {
+    public function test_status_reports_a_servable_post_with_its_markdown_url_and_path(): void {
         $files = $this->setup_front_page();
 
         $status = $this->make_negotiator()->post_markdown_status( null, $GLOBALS['_mock_post_objects'][ self::CHOSEN_ID ] );
@@ -1370,6 +1370,7 @@ class NegotiatorTest extends TestCase {
             'servable' => true,
             'file'     => true,
             'url'      => 'https://example.com/for-agents/?output_format=md',
+            'path'     => 'page/for-agents.md',
             'problems' => [],
         ], $status );
     }
@@ -1383,6 +1384,7 @@ class NegotiatorTest extends TestCase {
         $this->assertFalse( $status['servable'] );
         $this->assertFalse( $status['file'] );
         $this->assertNull( $status['url'] );
+        $this->assertNull( $status['path'] );
         $this->assertSame( [ 'no_file' ], $status['problems'] );
     }
 
