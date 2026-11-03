@@ -142,6 +142,41 @@ class AgentDetectorTest extends TestCase {
         $this->assertSame( 'search', $this->make_detector()->categorise_agent( 'OAI-SearchBot' ) );
     }
 
+    /**
+     * Full User-Agents seen in WCCF access logs, 29 Oct – 3 Nov 2026. Neither
+     * was on the list, so the requests were invisible to every stats screen.
+     */
+    public function test_categorise_agent_maps_ai_search_indexers_from_full_ua(): void {
+        $detector = $this->make_detector();
+
+        $this->assertSame( 'search', $detector->categorise_agent( 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))' ) );
+        $this->assertSame( 'search', $detector->categorise_agent( 'LinkupBot/1.0 (LinkupBot for web indexing; https://linkup.so/bot; bot@linkup.so)' ) );
+        $this->assertSame( 'meta', $detector->get_operator( 'meta-webindexer' ) );
+        $this->assertSame( 'linkup', $detector->get_operator( 'LinkupBot' ) );
+        $this->assertSame( 'Linkup', $detector->get_operator_label( 'linkup' ) );
+    }
+
+    /**
+     * Same logs. Geminibot came in short topic-led bursts, followed Markdown
+     * links and swapped HTTP clients mid-burst: an agent working a task, not
+     * a crawler. NotebookLM fetched single pages as sources were added.
+     */
+    public function test_categorise_agent_maps_google_user_triggered_fetchers_from_full_ua(): void {
+        $detector = $this->make_detector();
+
+        foreach ( [
+            'Mozilla/5.0 Geminibot',
+            'curl/7.81.0 Geminibot',
+            'python-requests/2.34.2 Geminibot',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Geminibot',
+            'Google-NotebookLM',
+        ] as $ua ) {
+            $this->assertSame( 'on-demand', $detector->categorise_agent( $ua ), $ua );
+        }
+        $this->assertSame( 'google', $detector->get_operator( 'Geminibot' ) );
+        $this->assertSame( 'google', $detector->get_operator( 'Google-NotebookLM' ) );
+    }
+
     public function test_categorise_agent_returns_on_demand_for_human_triggered(): void {
         $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'ChatGPT-User' ) );
         $this->assertSame( 'on-demand', $this->make_detector()->categorise_agent( 'Claude-User' ) );
