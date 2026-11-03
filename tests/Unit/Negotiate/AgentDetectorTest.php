@@ -143,7 +143,7 @@ class AgentDetectorTest extends TestCase {
     }
 
     /**
-     * Full User-Agents seen in WCCF access logs, 29 Oct – 3 Nov 2026. Neither
+     * Full User-Agents seen in a site's access logs, 29 Oct – 3 Nov 2026. Neither
      * was on the list, so the requests were invisible to every stats screen.
      */
     public function test_categorise_agent_maps_ai_search_indexers_from_full_ua(): void {
