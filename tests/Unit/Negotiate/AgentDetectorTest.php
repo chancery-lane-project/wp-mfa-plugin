@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tclp\WpMarkdownForAgents\Tests\Unit\Negotiate;
 
 use PHPUnit\Framework\TestCase;
+use Tclp\WpMarkdownForAgents\Core\Options;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
 
 /**
@@ -175,6 +176,21 @@ class AgentDetectorTest extends TestCase {
         }
         $this->assertSame( 'google', $detector->get_operator( 'Geminibot' ) );
         $this->assertSame( 'google', $detector->get_operator( 'Google-NotebookLM' ) );
+    }
+
+    /**
+     * Anthropic-hosted browsers (Claude Duet and similar) send a real Chrome
+     * User-Agent with a Claude-Agent token. Counted as a person's agent, but
+     * not served Markdown: it is a browser working through the page.
+     */
+    public function test_claude_agent_is_categorised_but_not_served(): void {
+        $ua       = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-Agent/1.0) Chrome/154.0.0.0 Safari/537.36';
+        $detector = $this->make_detector( [ 'ua_agent_strings' => Options::get_defaults()['ua_agent_strings'] ] );
+
+        $this->assertSame( 'on-demand', $detector->categorise_agent( $ua ) );
+        $this->assertSame( 'Claude-Agent', $detector->normalise_ua( $ua ) );
+        $this->assertSame( 'anthropic', $detector->get_operator( 'Claude-Agent' ) );
+        $this->assertNull( $detector->get_matched_agent( $ua ) );
     }
 
     public function test_categorise_agent_returns_on_demand_for_human_triggered(): void {
