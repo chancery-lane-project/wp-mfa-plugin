@@ -183,6 +183,10 @@ class AgentDetector {
 				// Seen in access logs, Nov 2026.
 				'Geminibot',
 				'Google-NotebookLM',
+				// Anthropic-hosted browser acting for a user. A real browser, so on
+				// the categories only: never the serving list, or the agent would
+				// get Markdown where it needs a page it can click through.
+				'Claude-Agent',
 			),
 			'search'    => array(
 				// Baseline.
@@ -315,7 +319,7 @@ class AgentDetector {
 			),
 			'anthropic'    => array(
 				'label'  => 'Anthropic',
-				'agents' => array( 'Claude-User', 'Claude-Web', 'Claude-SearchBot', 'ClaudeBot', 'anthropic-ai' ),
+				'agents' => array( 'Claude-User', 'Claude-Web', 'Claude-SearchBot', 'ClaudeBot', 'anthropic-ai', 'Claude-Agent' ),
 			),
 			'google'       => array(
 				'label'  => 'Google',
