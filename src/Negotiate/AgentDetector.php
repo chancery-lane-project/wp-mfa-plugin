@@ -206,6 +206,11 @@ class AgentDetector {
 				// Seen in access logs, Nov 2026.
 				'meta-webindexer',
 				'LinkupBot',
+				// Seen in access logs, 3–11 Nov 2026. RiverBot (river.ai) read
+				// robots.txt and swept the tag and topic archives: indexing, not
+				// fetching for a person. Categorised from that behaviour.
+				'RiverBot',
+				'ibou-search',
 			),
 			'training'  => array(
 				// Baseline.

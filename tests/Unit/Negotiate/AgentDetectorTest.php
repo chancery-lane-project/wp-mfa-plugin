@@ -158,6 +158,21 @@ class AgentDetectorTest extends TestCase {
     }
 
     /**
+     * Full User-Agents seen in a site's access logs, 3–11 Nov 2026. Both name
+     * themselves, but neither was on the list, so they were counted nowhere.
+     */
+    public function test_categorise_agent_maps_riverbot_and_ibou_search(): void {
+        $detector = $this->make_detector();
+        $river    = 'RiverBot/1.0 (+https://river.ai/bot)';
+        $ibou     = 'Mozilla/5.0 (compatible; ibou-search/2.0; +https://ibou.com/crawlers.html)';
+
+        $this->assertSame( 'search', $detector->categorise_agent( $river ) );
+        $this->assertSame( 'search', $detector->categorise_agent( $ibou ) );
+        $this->assertSame( 'RiverBot', $detector->normalise_ua( $river ) );
+        $this->assertSame( 'ibou-search', $detector->normalise_ua( $ibou ) );
+    }
+
+    /**
      * Same logs. Geminibot came in short topic-led bursts, followed Markdown
      * links and swapped HTTP clients mid-burst: an agent working a task, not
      * a crawler. NotebookLM fetched single pages as sources were added.
