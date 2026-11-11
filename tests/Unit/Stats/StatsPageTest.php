@@ -223,6 +223,28 @@ class StatsPageTest extends TestCase {
         $this->assertStringContainsString( '(unknown)', $output );
     }
 
+    public function test_render_page_names_the_mozilla_fallback_label(): void {
+        $this->repository->method( 'get_distinct_agents' )->willReturn( [] );
+        $this->repository->method( 'get_posts_with_stats' )->willReturn( [] );
+        $this->repository->method( 'get_stats' )->willReturn( [
+            (object) [
+                'post_id'       => 1,
+                'agent'         => 'Mozilla',
+                'access_method' => 'query-param',
+                'access_date'   => '2026-11-05',
+                'count'         => 4,
+            ],
+        ] );
+        $this->repository->method( 'get_total_count' )->willReturn( 1 );
+
+        ob_start();
+        $this->page->render_page();
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString( '<td>Unidentified (browser-like)</td>', $output );
+        $this->assertStringNotContainsString( '<td>Mozilla</td>', $output );
+    }
+
     public function test_render_page_displays_unknown_in_summary_for_empty_agent(): void {
         $_GET['date_from'] = '2026-03-01';
 

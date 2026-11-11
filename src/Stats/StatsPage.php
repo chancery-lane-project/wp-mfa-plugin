@@ -676,7 +676,7 @@ class StatsPage {
 						<?php else : ?>
 							<?php foreach ( $summary as $row ) : ?>
 								<tr>
-									<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
+									<td><?php echo esc_html( $this->agent_label( (string) $row->agent ) ); ?></td>
 									<td><?php echo esc_html( $row->access_method ); ?></td>
 									<td class="num"><?php echo esc_html( number_format_i18n( (int) $row->total ) ); ?></td>
 									<td class="num"><?php echo esc_html( (string) $row->unique_posts ); ?></td>
@@ -714,7 +714,7 @@ class StatsPage {
 						<?php foreach ( $rows as $row ) : ?>
 							<tr>
 								<td><?php echo esc_html( $this->object_label( DashboardSummary::object_key( (string) ( $row->object_type ?? StatsRepository::OBJECT_POST ), (int) $row->post_id ) ) ); ?></td>
-								<td><?php echo esc_html( '' !== $row->agent ? $row->agent : '(unknown)' ); ?></td>
+								<td><?php echo esc_html( $this->agent_label( (string) $row->agent ) ); ?></td>
 								<td><?php echo esc_html( $row->access_method ); ?></td>
 								<td><?php echo esc_html( $row->access_date ); ?></td>
 								<td class="num"><?php echo esc_html( (string) $row->count ); ?></td>
@@ -1070,12 +1070,19 @@ class StatsPage {
 	/**
 	 * Display label for a stored agent label.
 	 *
+	 * 'Mozilla' is what normalise_ua() stores for a browser-style User-Agent
+	 * that names no bot, for example a script asking for ?output_format=md
+	 * while posing as Chrome. Shown as such, it reads like a real agent.
+	 *
 	 * @since  1.7.2
 	 * @param  string $agent
 	 * @return string
 	 */
 	private function agent_label( string $agent ): string {
-		return '' !== $agent ? $agent : __( '(unknown)', 'markdown-for-agents-and-statistics' );
+		if ( '' === $agent ) {
+			return __( '(unknown)', 'markdown-for-agents-and-statistics' );
+		}
+		return 0 === strcasecmp( $agent, 'Mozilla' ) ? __( 'Unidentified (browser-like)', 'markdown-for-agents-and-statistics' ) : $agent;
 	}
 
 	/**
