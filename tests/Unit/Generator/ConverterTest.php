@@ -198,4 +198,73 @@ class ConverterTest extends TestCase {
 
         $this->assertStringContainsString( 'plain preformatted', $output );
     }
+
+    // --- Link text stays inline ---
+
+    public function test_card_link_wrapping_block_markup_stays_one_link(): void {
+        // Card markup from a real theme: the whole card is one link.
+        $html = <<<'HTML'
+<a class="card" href="https://example.com/post/">
+	<div class="card__banner">
+		<img src="card.png" alt="" loading="lazy" />
+		<span class="card__badge">Code</span>
+	</div>
+	<div class="card__content">
+		<ul class="card__tags" role="list">
+			<li>#code</li>
+			<li>#ai</li>
+		</ul>
+		<h3 class="card__heading">
+			All this used to be xsl:fields		</h3>
+		<p class="card__excerpt">Chrome removes XSLT on 17 November.</p>
+		<div class="card__footer">
+			<p class="card__meta">Nov 2026 · 4 min read</p>
+			<span aria-hidden="true">Read →</span>
+		</div>
+	</div>
+</a>
+HTML;
+
+        $output = trim( $this->converter->convert( $html ) );
+
+        $this->assertSame(
+            '[![](card.png) Code \#code \#ai All this used to be xsl:fields Chrome removes XSLT on 17 November. Nov 2026 · 4 min read Read →](https://example.com/post/)',
+            $output
+        );
+    }
+
+    public function test_link_text_whitespace_is_collapsed_and_trimmed(): void {
+        $html = '<ol><li><a href="https://example.com/part-3/"> <img src="part-3.jpg" alt="">   Part 03 · 15 min   Human in the Loop   → </a></li></ol>';
+
+        $output = $this->converter->convert( $html );
+
+        $this->assertStringContainsString(
+            '1. [![](part-3.jpg) Part 03 · 15 min Human in the Loop →](https://example.com/part-3/)',
+            $output
+        );
+    }
+
+    public function test_link_with_title_attribute_is_flattened(): void {
+        $output = $this->converter->convert(
+            '<a href="https://example.com/" title="Example"><h2>Heading</h2><p>Summary</p></a>'
+        );
+
+        $this->assertStringContainsString( '[Heading Summary](https://example.com/ "Example")', $output );
+    }
+
+    public function test_link_text_keeps_escaped_marker_characters(): void {
+        $output = $this->converter->convert(
+            '<a href="https://example.com/"><p>2024. A year</p><p>- not a list</p><p># not a heading</p></a>'
+        );
+
+        $this->assertStringContainsString( '2024\. A year', $output );
+        $this->assertStringContainsString( '\- not a list', $output );
+        $this->assertStringContainsString( '\# not a heading', $output );
+    }
+
+    public function test_link_without_href_is_left_alone(): void {
+        $output = $this->converter->convert( '<a><h2>Heading</h2><p>Summary</p></a>' );
+
+        $this->assertStringContainsString( '## Heading', $output );
+    }
 }
