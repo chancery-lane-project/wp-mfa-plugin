@@ -55,12 +55,52 @@ class ConverterTest extends TestCase {
         $this->assertStringNotContainsString( '&amp;', $output );
     }
 
-    public function test_fix_image_spacing_adds_newline_after_image(): void {
+    public function test_image_followed_by_text_stays_inline(): void {
         $output = $this->converter->convert(
             '<p><img src="photo.jpg" alt="Photo">Some caption text</p>'
         );
-        // The image markdown should be followed by a blank line before the text.
-        $this->assertMatchesRegularExpression( '/!\[.*\]\(.*\)\n\n\S/', $output );
+        $this->assertSame( '![Photo](photo.jpg)Some caption text', trim( $output ) );
+    }
+
+    /**
+     * @see https://github.com/chancery-lane-project/wp-mfa-plugin/issues/55
+     */
+    public function test_linked_image_is_not_split(): void {
+        $output = $this->converter->convert(
+            '<p><a href="https://example.com"><img src="logo.png" alt="Logo"></a></p>'
+        );
+        $this->assertSame( '[![Logo](logo.png)](https://example.com)', trim( $output ) );
+    }
+
+    /**
+     * @see https://github.com/chancery-lane-project/wp-mfa-plugin/issues/55
+     */
+    public function test_image_followed_by_punctuation_is_not_split(): void {
+        $output = $this->converter->convert(
+            '<p>See <img src="chart.png" alt="Chart">. Next sentence.</p>'
+        );
+        $this->assertSame( 'See ![Chart](chart.png). Next sentence.', trim( $output ) );
+    }
+
+    /**
+     * @see https://github.com/chancery-lane-project/wp-mfa-plugin/issues/55
+     */
+    public function test_image_syntax_in_inline_code_is_unchanged(): void {
+        $output = $this->converter->convert(
+            '<p>Agents hit <code>![alt](src)</code> and nothing more.</p>'
+        );
+        $this->assertSame( 'Agents hit `![alt](src)` and nothing more.', trim( $output ) );
+    }
+
+    /**
+     * @see https://github.com/chancery-lane-project/wp-mfa-plugin/issues/55
+     */
+    public function test_image_syntax_in_code_block_is_unchanged(): void {
+        $output = $this->converter->convert(
+            '<pre><code class="language-md">![alt](src).</code></pre>'
+        );
+        $this->assertStringContainsString( "\n![alt](src).\n", $output );
+        $this->assertStringNotContainsString( "![alt](src)\n\n", $output );
     }
 
     public function test_empty_string_returns_empty(): void {

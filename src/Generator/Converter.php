@@ -17,7 +17,7 @@ use Tclp\WpMarkdownForAgents\Generator\Converters\TableConverter;
  * Converts HTML to Markdown.
  *
  * Wraps league/html-to-markdown v5.x with custom converters
- * (TableConverter, CodeBlockConverter) and WordPress-specific post-processing.
+ * (TableConverter, CodeBlockConverter) and HTML entity clean-up.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator
@@ -79,9 +79,8 @@ class Converter {
 	 *
 	 * 1. `markdown_for_agents_pre_convert` filter on the HTML
 	 * 2. HTML → Markdown via HtmlConverter
-	 * 3. Image spacing fix (ensures blank line after inline images)
-	 * 4. `html_entity_decode()` to clean up leftover entities
-	 * 5. `markdown_for_agents_post_convert` filter on the Markdown
+	 * 3. `html_entity_decode()` to clean up leftover entities
+	 * 4. `markdown_for_agents_post_convert` filter on the Markdown
 	 *
 	 * @since  1.0.0
 	 * @param  string        $html The HTML content.
@@ -104,8 +103,6 @@ class Converter {
 
 		$markdown = $this->html_converter->convert( $html );
 
-		$markdown = $this->fix_image_spacing( $markdown );
-
 		$markdown = html_entity_decode( $markdown, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
 		/**
@@ -118,20 +115,5 @@ class Converter {
 		$markdown = apply_filters( 'markdown_for_agents_post_convert', $markdown, $post );
 
 		return $markdown;
-	}
-
-	/**
-	 * Ensure images are followed by a blank line so text does not run on.
-	 *
-	 * @since  1.0.0
-	 * @param  string $content Markdown content.
-	 * @return string
-	 */
-	private function fix_image_spacing( string $content ): string {
-		return preg_replace(
-			'/(\!\[.*?\]\([^\)]+\))(?!\n\n)(\S)/m',
-			"$1\n\n$2",
-			$content
-		) ?? $content;
 	}
 }
