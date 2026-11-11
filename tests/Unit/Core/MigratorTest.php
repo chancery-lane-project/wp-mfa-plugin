@@ -173,6 +173,44 @@ class MigratorTest extends TestCase {
         $this->assertNotContains( 'Bytespider', $this->saved_ua_strings() );
     }
 
+    public function test_sync_restores_every_default_to_an_emptied_list(): void {
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ] = [ 'ua_agent_strings' => [] ];
+
+        Migrator::maybe_sync_ua_defaults();
+
+        $this->assertSame( $this->default_ua_strings(), $this->saved_ua_strings() );
+    }
+
+    public function test_sync_restores_baseline_strings_to_a_list_with_none_of_them(): void {
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ] = [ 'ua_agent_strings' => [ 'MyCustomBot', 'OAI-SearchBot' ] ];
+
+        Migrator::maybe_sync_ua_defaults();
+
+        $saved = $this->saved_ua_strings();
+        $this->assertSame( [ 'MyCustomBot', 'OAI-SearchBot' ], array_slice( $saved, 0, 2 ) );
+        foreach ( self::BASELINE as $string ) {
+            $this->assertContains( $string, $saved );
+        }
+    }
+
+    public function test_sync_treats_a_lowercase_baseline_string_as_kept(): void {
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ] = [ 'ua_agent_strings' => [ 'gptbot' ] ];
+
+        Migrator::maybe_sync_ua_defaults();
+
+        $this->assertNotContains( 'ClaudeBot', $this->saved_ua_strings() );
+    }
+
+    public function test_sync_does_not_restore_baseline_strings_once_seen(): void {
+        $without_baseline = array_values( array_diff( $this->default_ua_strings(), self::BASELINE ) );
+        $GLOBALS['_mock_options'][ Migrator::UA_SEEN_OPTION_KEY ] = $this->default_ua_strings();
+        $GLOBALS['_mock_options'][ Options::OPTION_KEY ]          = [ 'ua_agent_strings' => $without_baseline ];
+
+        Migrator::maybe_sync_ua_defaults();
+
+        $this->assertSame( $without_baseline, $this->saved_ua_strings() );
+    }
+
     public function test_sync_does_not_restore_a_removed_string_already_seen(): void {
         $GLOBALS['_mock_options'][ Migrator::UA_SEEN_OPTION_KEY ] = $this->default_ua_strings();
         $GLOBALS['_mock_options'][ Options::OPTION_KEY ]          = [

@@ -54,8 +54,12 @@ class Migrator {
 	 * A site with no seen-list is assumed to have been offered these, so a
 	 * baseline string the admin removed is not restored. Strings added later
 	 * cannot be told apart from never-received ones, and are offered once.
+	 * The assumption needs at least one baseline string still in the saved
+	 * list: a list with none of them was emptied rather than pruned, so they
+	 * are offered again.
 	 *
 	 * @since 1.7.3
+	 * @since 1.8.0 Not assumed offered when the saved list holds none of them.
 	 */
 	private const BASELINE_UA_AGENT_STRINGS = array(
 		'GPTBot',
@@ -143,21 +147,30 @@ class Migrator {
 	 * Returns early, without writes, once every default has been offered.
 	 *
 	 * @since  1.7.3
+	 * @since  1.8.0 Restores the baseline strings to a list that holds none of them.
 	 */
 	public static function maybe_sync_ua_defaults(): void {
 		$defaults = (array) Options::get_defaults()['ua_agent_strings'];
 		$seen     = get_option( self::UA_SEEN_OPTION_KEY, null );
 		$recorded = is_array( $seen );
-		$seen     = $recorded ? $seen : self::BASELINE_UA_AGENT_STRINGS;
-		$unseen   = array_diff( $defaults, $seen );
 
-		if ( $recorded && array() === $unseen ) {
+		if ( $recorded && array() === array_diff( $defaults, $seen ) ) {
 			return;
 		}
 
-		$saved = get_option( Options::OPTION_KEY, array() );
-		if ( is_array( $saved ) && isset( $saved['ua_agent_strings'] ) && is_array( $saved['ua_agent_strings'] ) ) {
-			$have  = array_map( 'strtolower', $saved['ua_agent_strings'] );
+		$saved    = get_option( Options::OPTION_KEY, array() );
+		$has_list = is_array( $saved ) && isset( $saved['ua_agent_strings'] ) && is_array( $saved['ua_agent_strings'] );
+		$have     = $has_list ? array_map( 'strtolower', $saved['ua_agent_strings'] ) : array();
+
+		if ( ! $recorded ) {
+			$baseline = array_map( 'strtolower', self::BASELINE_UA_AGENT_STRINGS );
+			$pruned   = array() !== array_intersect( $baseline, $have );
+			$seen     = ( $pruned || ! $has_list ) ? self::BASELINE_UA_AGENT_STRINGS : array();
+		}
+
+		$unseen = array_diff( $defaults, $seen );
+
+		if ( $has_list ) {
 			$added = false;
 
 			foreach ( $unseen as $string ) {
