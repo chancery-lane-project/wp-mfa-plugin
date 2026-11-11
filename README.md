@@ -367,6 +367,7 @@ Run a full regeneration after adding either filter.
 | `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
 | `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
 | `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Root-relative links are reported in absolute form. Hook to audit export coverage |
+| `markdown_for_agents_stats_sections` | `(array $range)` — fired on the Agent Stats screen after the summary tables and before the daily records, so a companion plugin can add its own sections for the same dates. `$range` is `['start' => ?string, 'end' => ?string, 'label' => string]`: `Y-m-d` dates in UTC, `null` for an open bound (both `null` for All time), and the range as the screen shows it. The page, agent, operator and access method filters are not passed. Output is printed as-is, so escape it. Only users with `manage_options` see the screen |
 
 ---
 
