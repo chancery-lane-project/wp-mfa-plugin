@@ -968,6 +968,57 @@ class StatsPageTest extends TestCase {
         $this->assertDoesNotMatchRegularExpression( '/Most requested page.*?href="[^"]*post_search[^"]*post_id=7/s', $output );
     }
 
+    public function test_stats_sections_action_gets_the_default_range(): void {
+        $GLOBALS['_mock_fired_actions'] = [];
+        $this->stub_dashboard_repository();
+
+        $this->render();
+
+        $today = gmdate( 'Y-m-d' );
+        $start = gmdate( 'Y-m-d', strtotime( '-6 days' ) );
+        $this->assertSame(
+            [ [ [ 'start' => $start, 'end' => $today, 'label' => gmdate( 'j M Y', strtotime( $start ) ) . ' – ' . gmdate( 'j M Y' ) ] ] ],
+            get_mock_fired_actions( 'markdown_for_agents_stats_sections' )
+        );
+    }
+
+    public function test_stats_sections_action_passes_an_open_bound_as_null(): void {
+        $GLOBALS['_mock_fired_actions'] = [];
+        $_GET['date_from'] = '2026-11-04';
+        $this->stub_dashboard_repository();
+        $this->repository->method( 'get_agent_summary' )->willReturn( [] );
+
+        $this->render();
+
+        $this->assertSame(
+            [ [ [ 'start' => '2026-11-04', 'end' => null, 'label' => 'From 4 Nov 2026' ] ] ],
+            get_mock_fired_actions( 'markdown_for_agents_stats_sections' )
+        );
+    }
+
+    public function test_stats_sections_action_passes_all_time_as_nulls(): void {
+        $GLOBALS['_mock_fired_actions'] = [];
+        $_GET['range']     = 'all';
+        $_GET['date_from'] = '2026-11-04';
+        $this->stub_dashboard_repository();
+
+        $this->render();
+
+        $this->assertSame(
+            [ [ [ 'start' => null, 'end' => null, 'label' => 'All time' ] ] ],
+            get_mock_fired_actions( 'markdown_for_agents_stats_sections' )
+        );
+    }
+
+    public function test_stats_sections_action_does_not_fire_without_permission(): void {
+        $GLOBALS['_mock_fired_actions']    = [];
+        $GLOBALS['_mock_current_user_can'] = false;
+
+        $this->render();
+
+        $this->assertSame( [], get_mock_fired_actions( 'markdown_for_agents_stats_sections' ) );
+    }
+
     private function render(): string {
         ob_start();
         $this->page->render_page();

@@ -309,6 +309,7 @@ wp markdown-agents generate-taxonomies --dry-run
 * Feature: RiverBot and ibou-search are now recognised as AI search indexers. Both name themselves but were not on the list, so one site's statistics missed about 1,650 of their page requests in a week (plus 3,300 Markdown requests from ibou-search, which were counted but not categorised).
 * Fix: a site whose saved agent list was empty when it updated to 1.7.3 now gets back the 13 agents that have been on the list since 1.1.0, including GPTBot, ChatGPT-User, ClaudeBot and PerplexityBot. The update treated them as deliberately removed, so they were never served Markdown on their User-Agent. A list that still holds any of the 13 keeps its removals. Sites already updated to 1.7.3 or later are not changed: check Settings → Agent Detection and add any of the 13 that are missing.
 * Fix: the statistics screen shows the `Mozilla` label as "Unidentified (browser-like)". It is what gets recorded when a client posing as an ordinary browser asks for Markdown, and it read like the name of an agent. Stored labels are unchanged.
+* Developer: new `markdown_for_agents_stats_sections` action on the Agent Stats screen, passed the date range shown. A companion plugin such as MfA Signals can add its own sections there, for example the pages agents read as HTML, which this plugin does not count.
 * Performance: on HTML pages, the Markdown alternate for the `Link` header and the `<link rel="alternate">` tag is now worked out once per request instead of twice.
 
 = 1.7.4 =

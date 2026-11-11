@@ -693,6 +693,28 @@ class StatsPage {
 				</table>
 			<?php endif; ?>
 
+			<?php
+			/**
+			 * Add sections to the stats page, after the summary tables and before
+			 * the paginated daily records.
+			 *
+			 * Only the date range is passed. The page, agent, operator and access
+			 * method filters apply to this plugin's own counts; a section that
+			 * ignores them should say so. Output is printed as-is, so escape it.
+			 *
+			 * @since 1.8.0
+			 * @param array{start: string|null, end: string|null, label: string} $range The range shown: Y-m-d dates (UTC), null for an open bound, and its display label.
+			 */
+			do_action(
+				'markdown_for_agents_stats_sections',
+				array(
+					'start' => '' !== $date_from ? $date_from : null,
+					'end'   => '' !== $date_to ? $date_to : null,
+					'label' => $range_label,
+				)
+			);
+			?>
+
 			<h2 class="mfa-section-title"><?php esc_html_e( 'Daily records', 'markdown-for-agents-and-statistics' ); ?></h2>
 			<p class="description"><?php esc_html_e( 'One row per page, agent, access method and day.', 'markdown-for-agents-and-statistics' ); ?></p>
 			<table class="wp-list-table widefat fixed striped">
