@@ -11,13 +11,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\Environment;
 use Tclp\WpMarkdownForAgents\Vendor\League\HTMLToMarkdown\HtmlConverter;
 use Tclp\WpMarkdownForAgents\Generator\Converters\CodeBlockConverter;
+use Tclp\WpMarkdownForAgents\Generator\Converters\LinkConverter;
 use Tclp\WpMarkdownForAgents\Generator\Converters\TableConverter;
 
 /**
  * Converts HTML to Markdown.
  *
  * Wraps league/html-to-markdown v5.x with custom converters
- * (TableConverter, CodeBlockConverter) and HTML entity clean-up.
+ * (TableConverter, CodeBlockConverter, LinkConverter) and HTML entity
+ * clean-up.
  *
  * @since  1.0.0
  * @package Tclp\WpMarkdownForAgents\Generator
@@ -67,6 +69,7 @@ class Converter {
 		$environment = Environment::createDefaultEnvironment( $merged_options );
 		$environment->addConverter( new TableConverter() );
 		$environment->addConverter( new CodeBlockConverter() );
+		$environment->addConverter( new LinkConverter() );
 
 		$this->html_converter = new HtmlConverter( $environment );
 	}
