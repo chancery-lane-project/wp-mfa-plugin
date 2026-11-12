@@ -233,15 +233,44 @@ HTML;
         );
     }
 
-    public function test_link_text_whitespace_is_collapsed_and_trimmed(): void {
-        $html = '<ol><li><a href="https://example.com/part-3/"> <img src="part-3.jpg" alt="">   Part 03 · 15 min   Human in the Loop   → </a></li></ol>';
+    public function test_single_line_link_keeps_spaces_inside_brackets(): void {
+        // Editors often leave the space inside the <a>; trimming it would glue words together.
+        $output = $this->converter->convert( '<p>a material<a href="https://example.com/"> carbon footprint </a>threshold</p>' );
 
-        $output = $this->converter->convert( $html );
+        $this->assertStringContainsString( 'a material[ carbon footprint ](https://example.com/)threshold', $output );
+    }
 
-        $this->assertStringContainsString(
-            '1. [![](part-3.jpg) Part 03 · 15 min Human in the Loop →](https://example.com/part-3/)',
-            $output
+    public function test_single_line_link_keeps_leading_number(): void {
+        $output = $this->converter->convert( '<p><a href="#s1">1. Scope</a><br><a href="#s3">10) Termination</a></p>' );
+
+        $this->assertStringContainsString( '[1. Scope](#s1)', $output );
+        $this->assertStringContainsString( '[10) Termination](#s3)', $output );
+    }
+
+    public function test_single_line_link_keeps_leading_plus(): void {
+        $output = $this->converter->convert( '<p><a href="https://example.com/">+ Add a clause</a></p>' );
+
+        $this->assertStringContainsString( '[+ Add a clause](https://example.com/)', $output );
+    }
+
+    public function test_multi_line_link_keeps_numbers(): void {
+        $output = $this->converter->convert(
+            '<a href="https://example.com/"><h3>3. Governing law</h3><ol><li>First</li><li>Second</li></ol></a>'
         );
+
+        $this->assertStringContainsString( '[3. Governing law 1. First 2. Second](https://example.com/)', $output );
+    }
+
+    public function test_link_with_line_break_keeps_number_after_break(): void {
+        $output = $this->converter->convert( '<p><a href="https://example.com/">Schedule<br>2. Payment terms</a></p>' );
+
+        $this->assertStringContainsString( '[Schedule 2. Payment terms](https://example.com/)', $output );
+    }
+
+    public function test_multi_line_link_moves_edge_spaces_outside_brackets(): void {
+        $output = $this->converter->convert( '<p>Read<a href="https://example.com/"> the guide<br>today </a>now.</p>' );
+
+        $this->assertStringContainsString( 'Read [the guide today](https://example.com/) now.', $output );
     }
 
     public function test_link_with_title_attribute_is_flattened(): void {
