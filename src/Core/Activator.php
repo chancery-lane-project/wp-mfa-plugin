@@ -8,6 +8,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use Tclp\WpMarkdownForAgents\Generator\FileWriter;
+
 /**
  * Handles plugin activation tasks.
  *
@@ -31,10 +33,7 @@ class Activator {
 		if ( wp_mkdir_p( $export_dir ) ) {
 			$htaccess = $export_dir . '/.htaccess';
 			if ( ! file_exists( $htaccess ) ) {
-				file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-					$htaccess,
-					"# Deny direct access to generated Markdown files.\nDeny from all\n"
-				);
+				file_put_contents( $htaccess, FileWriter::HTACCESS_RULES ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			}
 		}
 

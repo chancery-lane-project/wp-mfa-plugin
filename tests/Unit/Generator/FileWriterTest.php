@@ -55,6 +55,22 @@ class FileWriterTest extends TestCase {
         $this->assertStringContainsString( 'Deny from all', file_get_contents( $this->base_dir . '/.htaccess' ) );
     }
 
+    public function test_htaccess_denies_access_on_apache_2_4_and_2_2(): void {
+        $this->writer->write( $this->base_dir . '/post/test.md', 'content' );
+
+        $htaccess = file_get_contents( $this->base_dir . '/.htaccess' );
+        $this->assertStringContainsString( 'Require all denied', $htaccess );
+        $this->assertStringContainsString( 'Deny from all', $htaccess );
+    }
+
+    public function test_write_upgrades_legacy_htaccess(): void {
+        file_put_contents( $this->base_dir . '/.htaccess', FileWriter::LEGACY_HTACCESS_RULES );
+
+        $this->writer->write( $this->base_dir . '/post/test.md', 'content' );
+
+        $this->assertSame( FileWriter::HTACCESS_RULES, file_get_contents( $this->base_dir . '/.htaccess' ) );
+    }
+
     public function test_write_does_not_overwrite_existing_htaccess(): void {
         file_put_contents( $this->base_dir . '/.htaccess', 'custom rules' );
 

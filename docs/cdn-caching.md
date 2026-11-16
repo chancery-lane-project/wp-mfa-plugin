@@ -120,6 +120,21 @@ not remove a previously cached copy. Apply this to indexes, manifests and bundle
 as well as individual Markdown files. A CDN bypass alone does not invalidate
 copies already held by browsers or another cache.
 
+The export directory's `.htaccess` denies direct access on Apache. nginx does
+not read `.htaccess`, so on nginx a direct URL serves the file until the plugin
+deletes it. The plugin deletes a post's file when the post leaves `publish`,
+gains a password or is excluded. To block direct access on nginx, add a rule
+such as:
+
+```nginx
+location ^~ /wp-content/uploads/wp-mfa-exports/ {
+    deny all;
+}
+```
+
+Use your configured export directory. The bundle zip sits one level up, in
+`uploads/`, and is not covered by this rule.
+
 ## Verify both request orders
 
 Agree a small request budget and use public, controlled URLs from an external

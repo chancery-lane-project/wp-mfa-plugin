@@ -23,6 +23,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 class FileWriter {
 
 	/**
+	 * Rules written to the export directory's .htaccess.
+	 *
+	 * `Require all denied` is the Apache 2.4 syntax; `Deny from all` covers
+	 * Apache 2.2. Apache 2.4 only honours `Deny` when mod_access_compat is
+	 * loaded. nginx ignores .htaccess files entirely.
+	 *
+	 * @since  1.8.0
+	 */
+	public const HTACCESS_RULES = "# Deny direct access to generated Markdown files.\n"
+		. "<IfModule mod_authz_core.c>\n"
+		. "\tRequire all denied\n"
+		. "</IfModule>\n"
+		. "<IfModule !mod_authz_core.c>\n"
+		. "\tDeny from all\n"
+		. "</IfModule>\n";
+
+	/**
+	 * The .htaccess written before 1.8.0. A file with exactly this content is
+	 * replaced with HTACCESS_RULES; any other existing file is left alone.
+	 *
+	 * @since  1.8.0
+	 */
+	public const LEGACY_HTACCESS_RULES = "# Deny direct access to generated Markdown files.\nDeny from all\n";
+
+	/**
 	 * Resolved real path of the export base directory.
 	 *
 	 * @since  1.0.0
@@ -91,19 +116,21 @@ class FileWriter {
 	/**
 	 * Write a protective .htaccess to the base directory if not already present.
 	 *
+	 * Also upgrades an unmodified pre-1.8.0 file, which used `Deny from all`
+	 * alone. Customised files are never touched.
+	 *
 	 * @since  1.0.0
+	 * @since  1.8.0 Upgrades the legacy rules.
 	 */
 	private function maybe_write_htaccess(): void {
 		$htaccess = $this->base_dir . '/.htaccess';
 
-		if ( file_exists( $htaccess ) ) {
+		if ( file_exists( $htaccess )
+			&& self::LEGACY_HTACCESS_RULES !== file_get_contents( $htaccess ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			return;
 		}
 
-		file_put_contents( // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
-			$htaccess,
-			"# Deny direct access to generated Markdown files.\nDeny from all\n"
-		);
+		file_put_contents( $htaccess, self::HTACCESS_RULES ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 	}
 
 	/**
