@@ -46,7 +46,7 @@ class Migrator {
 	 *
 	 * @since 1.7.3
 	 */
-	private const REGEN_REQUIRED_VERSION = '1.7.3';
+	private const REGEN_REQUIRED_VERSION = '1.8.0';
 
 	/**
 	 * The UA defaults shipped in 1.1.0, before the seen-list existed.
