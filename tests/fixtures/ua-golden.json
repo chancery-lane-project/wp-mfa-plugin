@@ -1571,6 +1571,36 @@
             "operator_ua": null,
             "operator_label": null
         },
+        "token-youbot": {
+            "ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; YouBot/1.0; +https://docs.you.com/youbot; env:prod) Chrome/142.0.0.0 Safari/537.36",
+            "detect_agent": null,
+            "normalise_ua": "YouBot",
+            "label": "YouBot",
+            "categorise_ua": "search",
+            "categorise_label": "search",
+            "operator_ua": "you-com",
+            "operator_label": "you-com"
+        },
+        "token-keenablebot": {
+            "ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; KeenableBot/1.0; +https://keenable.ai/bot)",
+            "detect_agent": "KeenableBot",
+            "normalise_ua": "KeenableBot",
+            "label": "KeenableBot",
+            "categorise_ua": "search",
+            "categorise_label": "search",
+            "operator_ua": "keenable",
+            "operator_label": "keenable"
+        },
+        "token-clueweb-crawler": {
+            "ua": "ClueWeb-Crawler/1.0 (+https://boston.lti.cs.cmu.edu/CMU-ClueWeb-Crawler/; mailto:cmu-clueweb-crawler@andrew.cmu.edu)",
+            "detect_agent": "ClueWeb-Crawler",
+            "normalise_ua": "ClueWeb-Crawler",
+            "label": "ClueWeb-Crawler",
+            "categorise_ua": "training",
+            "categorise_label": "training",
+            "operator_ua": null,
+            "operator_label": null
+        },
         "unlisted-firecrawl": {
             "ua": "Mozilla/5.0 (compatible; FirecrawlAgent/1.0; +https://firecrawl.dev)",
             "detect_agent": null,

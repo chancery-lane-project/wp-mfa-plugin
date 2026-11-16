@@ -211,6 +211,9 @@ class AgentDetector {
 				// fetching for a person. Categorised from that behaviour.
 				'RiverBot',
 				'ibou-search',
+				// Seen in access logs, 11–16 Nov 2026 (agent-signals#5).
+				'YouBot',
+				'KeenableBot',
 			),
 			'training'  => array(
 				// Baseline.
@@ -252,6 +255,9 @@ class AgentDetector {
 				'SemrushBot-SWA',
 				'WARDBot',
 				'ygs-scraper-bot',
+				// Seen in access logs, 11–16 Nov 2026 (agent-signals#5). Carnegie
+				// Mellon's ClueWeb research corpus crawler: training, as for CCBot.
+				'ClueWeb-Crawler',
 			),
 		);
 
@@ -397,6 +403,14 @@ class AgentDetector {
 			'linkup'       => array(
 				'label'  => 'Linkup',
 				'agents' => array( 'LinkupBot' ),
+			),
+			'you-com'      => array(
+				'label'  => 'You.com',
+				'agents' => array( 'YouBot' ),
+			),
+			'keenable'     => array(
+				'label'  => 'Keenable',
+				'agents' => array( 'KeenableBot' ),
 			),
 		);
 
