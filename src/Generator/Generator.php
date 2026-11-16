@@ -356,8 +356,11 @@ class Generator {
 	 *
 	 * Status-change deletions are handled by on_transition_post_status. This covers
 	 * the cases where post_status stays 'publish' but the file should be removed.
+	 * When auto_generate is off, existing term archives are refreshed too, so
+	 * they stop listing the post.
 	 *
 	 * @since  1.2.0
+	 * @since  1.8.0 Refreshes existing term archives when auto_generate is off.
 	 * @param  int      $post_id The post ID.
 	 * @param  \WP_Post $post    The post object.
 	 */
@@ -375,6 +378,7 @@ class Generator {
 		if ( ( 'publish' === $post->post_status && '' !== $post->post_password ) || $excluded ) {
 			try {
 				$this->delete_post( $post_id );
+				$this->refresh_existing_term_archives( $post_id );
 			} catch ( \Throwable $e ) {
 				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 					// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
@@ -407,22 +411,23 @@ class Generator {
 
 	/**
 	 * Hook callback for transition_post_status — deletes the export file when
-	 * a post is moved to a non-public status.
+	 * a post moves to any status other than 'publish'.
 	 *
 	 * Registered unconditionally so files are cleaned up even when auto_generate
-	 * is disabled (e.g. files created via CLI or manual regeneration).
+	 * is disabled (e.g. files created via CLI or manual regeneration). Every
+	 * non-public status counts, including 'future' and custom statuses added
+	 * by other plugins. Objects being created ('new' -> anything, such as each
+	 * revision WordPress inserts) have no export file and are skipped.
 	 *
 	 * @since  1.2.0
+	 * @since  1.8.0 Covers every non-public status; refreshes existing term
+	 *               archives when auto_generate is off.
 	 * @param  string   $new_status New post status.
 	 * @param  string   $old_status Previous post status.
 	 * @param  \WP_Post $post       The post object.
 	 */
 	public function on_transition_post_status( string $new_status, string $old_status, \WP_Post $post ): void {
-		if ( $new_status === $old_status ) {
-			return;
-		}
-
-		if ( ! in_array( $new_status, array( 'trash', 'draft', 'pending', 'private' ), true ) ) {
+		if ( $new_status === $old_status || 'publish' === $new_status || 'new' === $old_status ) {
 			return;
 		}
 
@@ -440,6 +445,8 @@ class Generator {
 			} else {
 				$this->delete_post( $post->ID );
 			}
+
+			$this->refresh_existing_term_archives( $post->ID );
 		} catch ( \Throwable $e ) {
 			if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Debug-only, guarded by WP_DEBUG.
@@ -557,9 +564,7 @@ class Generator {
 
 			if ( 'publish' === $post->post_status && '' === $post->post_password && ! $excluded ) {
 				$this->generate_post( $post );
-			} elseif ( in_array( $post->post_status, array( 'trash', 'draft', 'pending', 'private' ), true )
-				|| ( 'publish' === $post->post_status && '' !== $post->post_password )
-				|| $excluded ) {
+			} else {
 				$this->delete_post( $post_id );
 			}
 		} catch ( \Throwable $e ) {
@@ -797,9 +802,11 @@ class Generator {
 	 * Regenerate archives for every public taxonomy term the post belongs to.
 	 *
 	 * @since  1.1.0
-	 * @param  int $post_id The post ID.
+	 * @since  1.8.0 Added `$existing_only`.
+	 * @param  int  $post_id       The post ID.
+	 * @param  bool $existing_only Skip terms whose archive file does not exist yet.
 	 */
-	private function regenerate_term_archives( int $post_id ): void {
+	private function regenerate_term_archives( int $post_id, bool $existing_only = false ): void {
 		$taxonomies = array_keys( get_taxonomies( array( 'public' => true ) ) );
 
 		foreach ( $taxonomies as $taxonomy ) {
@@ -810,9 +817,34 @@ class Generator {
 			}
 
 			foreach ( $terms as $term ) {
+				if ( $existing_only && ! file_exists( $this->taxonomy_generator->get_export_path( $term ) ) ) {
+					continue;
+				}
+
 				$this->taxonomy_generator->generate_term( $term );
 			}
 		}
+	}
+
+	/**
+	 * Refresh existing term archives after a post stops being exportable,
+	 * when auto_generate is off.
+	 *
+	 * With auto_generate on, on_save_post regenerates the archives on the same
+	 * save, so this does nothing. With it off, archives already on disk would
+	 * keep listing the post's title and excerpt until the next manual run.
+	 * Only existing archives are rewritten: auto_generate being off means the
+	 * site does not want new files created on save.
+	 *
+	 * @since  1.8.0
+	 * @param  int $post_id The post ID.
+	 */
+	private function refresh_existing_term_archives( int $post_id ): void {
+		if ( ! empty( $this->options['auto_generate'] ) || null === $this->taxonomy_generator ) {
+			return;
+		}
+
+		$this->regenerate_term_archives( $post_id, true );
 	}
 
 	/**

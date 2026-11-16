@@ -183,9 +183,14 @@ class TaxonomyArchiveGenerator {
 	// -----------------------------------------------------------------------
 
 	/**
-	 * Fetch all published posts in a term, batched to avoid memory exhaustion.
+	 * Fetch all exportable posts in a term, batched to avoid memory exhaustion.
+	 *
+	 * Password-protected and excluded posts are left out: their titles and
+	 * excerpts must not leak through the archive once their own export is
+	 * withheld.
 	 *
 	 * @since  1.1.0
+	 * @since  1.8.0 Leaves out password-protected and excluded posts.
 	 * @param  \WP_Term $term The term.
 	 * @return \WP_Post[]
 	 */
@@ -199,6 +204,7 @@ class TaxonomyArchiveGenerator {
 				array(
 					'post_type'      => ExportPolicy::enabled_post_types( $this->options ),
 					'post_status'    => 'publish',
+					'has_password'   => false,
 					'posts_per_page' => $batch_size,
 					'offset'         => $offset,
 					'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query
@@ -214,7 +220,13 @@ class TaxonomyArchiveGenerator {
 				)
 			);
 
-			$all_posts = array_merge( $all_posts, $posts );
+			// has_password is repeated here so the rule does not depend on the query alone.
+			$listed    = array_filter(
+				$posts,
+				fn ( \WP_Post $post ): bool => '' === $post->post_password
+					&& ! get_post_meta( $post->ID, '_markdown_for_agents_excluded', true )
+			);
+			$all_posts = array_merge( $all_posts, array_values( $listed ) );
 			$offset   += $batch_size;
 		} while ( count( $posts ) === $batch_size );
 

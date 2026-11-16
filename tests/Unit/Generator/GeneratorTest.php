@@ -548,6 +548,124 @@ class GeneratorTest extends TestCase {
         $gen->on_save_post( 1, $post );
     }
 
+    public function test_on_save_post_deletes_for_scheduled_post(): void {
+        $post = $this->make_post( [ 'post_status' => 'future' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+
+        $this->file_writer->expects( $this->once() )->method( 'delete' )->willReturn( true );
+        $this->file_writer->expects( $this->never() )->method( 'write' );
+
+        $this->generator->on_save_post( 1, $post );
+    }
+
+    // -----------------------------------------------------------------------
+    // on_transition_post_status()
+    // -----------------------------------------------------------------------
+
+    /**
+     * @dataProvider non_public_status_provider
+     */
+    public function test_on_transition_deletes_when_leaving_publish( string $new_status ): void {
+        $post = $this->make_post( [ 'post_status' => $new_status ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+
+        $this->file_writer->expects( $this->once() )->method( 'delete' )->willReturn( true );
+
+        $this->generator->on_transition_post_status( $new_status, 'publish', $post );
+    }
+
+    public function non_public_status_provider(): array {
+        return [
+            'private'       => [ 'private' ],
+            'draft'         => [ 'draft' ],
+            'pending'       => [ 'pending' ],
+            'future'        => [ 'future' ],
+            'custom status' => [ 'archived' ],
+        ];
+    }
+
+    public function test_on_transition_does_not_delete_when_publishing(): void {
+        $post = $this->make_post( [ 'post_status' => 'publish' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+
+        $this->file_writer->expects( $this->never() )->method( 'delete' );
+
+        $this->generator->on_transition_post_status( 'publish', 'draft', $post );
+    }
+
+    public function test_on_transition_ignores_newly_created_objects(): void {
+        // Every save inserts a revision, which transitions new -> inherit.
+        $post = $this->make_post( [ 'post_type' => 'revision', 'post_status' => 'inherit' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+
+        $this->file_writer->expects( $this->never() )->method( 'delete' );
+
+        $this->generator->on_transition_post_status( 'inherit', 'new', $post );
+    }
+
+    public function test_on_transition_refreshes_existing_term_archives_when_auto_generate_off(): void {
+        $existing = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $missing  = new \WP_Term( ['term_id' => 11, 'taxonomy' => 'category', 'slug' => 'never-generated'] );
+        $GLOBALS['_mock_post_terms'][1]['category'] = [ $existing, $missing ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $archive = $this->base_dir . '/news.md';
+        file_put_contents( $archive, 'old' );
+
+        $post = $this->make_post( [ 'post_status' => 'private' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+        $this->file_writer->method( 'delete' )->willReturn( true );
+
+        $this->taxonomy_generator->method( 'get_export_path' )
+            ->willReturnCallback( fn ( \WP_Term $t ) => $this->base_dir . '/' . $t->slug . '.md' );
+        $this->taxonomy_generator->expects( $this->once() )
+            ->method( 'generate_term' )
+            ->with( $existing );
+
+        $gen = $this->make_generator_with_taxonomy( ['auto_generate' => false] );
+        $gen->on_transition_post_status( 'private', 'publish', $post );
+    }
+
+    public function test_on_transition_leaves_term_archives_to_save_post_when_auto_generate_on(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][1]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $post = $this->make_post( [ 'post_status' => 'private' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+        $this->file_writer->method( 'delete' )->willReturn( true );
+
+        $this->taxonomy_generator->expects( $this->never() )->method( 'generate_term' );
+
+        $gen = $this->make_generator_with_taxonomy();
+        $gen->on_transition_post_status( 'private', 'publish', $post );
+    }
+
+    // -----------------------------------------------------------------------
+    // on_save_post_cleanup()
+    // -----------------------------------------------------------------------
+
+    public function test_save_cleanup_refreshes_existing_term_archives_when_password_added(): void {
+        $term = new \WP_Term( ['term_id' => 10, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $GLOBALS['_mock_post_terms'][1]['category'] = [ $term ];
+        $GLOBALS['_mock_taxonomies'] = ['category' => 'category'];
+
+        $archive = $this->base_dir . '/news.md';
+        file_put_contents( $archive, 'old' );
+
+        $post = $this->make_post( [ 'post_status' => 'publish', 'post_password' => 'pw' ] );
+        $GLOBALS['_mock_post_objects'][1] = $post;
+        $this->file_writer->method( 'delete' )->willReturn( true );
+
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $archive );
+        $this->taxonomy_generator->expects( $this->once() )
+            ->method( 'generate_term' )
+            ->with( $term );
+
+        $gen = $this->make_generator_with_taxonomy( ['auto_generate' => false] );
+        $gen->on_save_post_cleanup( 1, $post );
+    }
+
     // -----------------------------------------------------------------------
     // cache_post_terms / regenerate_term_archives_after_delete
     // -----------------------------------------------------------------------

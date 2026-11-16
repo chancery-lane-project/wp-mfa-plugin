@@ -274,6 +274,40 @@ class TaxonomyArchiveGeneratorTest extends TestCase {
         $this->assertStringNotContainsString( 'wp-content/uploads', $captured );
     }
 
+    public function test_body_omits_password_protected_and_excluded_posts(): void {
+        $GLOBALS['_mock_posts']     = [
+            new \WP_Post( ['ID' => 1, 'post_title' => 'Open Post', 'post_excerpt' => '', 'post_name' => 'open', 'post_type' => 'post', 'post_status' => 'publish'] ),
+            new \WP_Post( ['ID' => 2, 'post_title' => 'Locked Post', 'post_excerpt' => 'Secret summary', 'post_name' => 'locked', 'post_type' => 'post', 'post_status' => 'publish', 'post_password' => 'pw'] ),
+            new \WP_Post( ['ID' => 3, 'post_title' => 'Excluded Post', 'post_excerpt' => '', 'post_name' => 'excluded', 'post_type' => 'post', 'post_status' => 'publish'] ),
+        ];
+        $GLOBALS['_mock_post_meta'][3]['_markdown_for_agents_excluded'] = '1';
+        $GLOBALS['_mock_permalink'] = 'https://example.com/post/';
+
+        $captured_yaml = null;
+        $this->yaml_formatter->method( 'format' )
+            ->willReturnCallback( function ( array $frontmatter ) use ( &$captured_yaml ) {
+                $captured_yaml = $frontmatter;
+                return '';
+            } );
+        $captured = null;
+        $this->file_writer->method( 'write' )
+            ->willReturnCallback( function ( string $path, string $content ) use ( &$captured ) {
+                $captured = $content;
+                return true;
+            } );
+
+        $gen = $this->make_generator( ['post_types' => ['post']] );
+        $gen->generate_term( $this->make_term() );
+        unset( $GLOBALS['_mock_post_meta'][3] );
+
+        $this->assertStringContainsString( 'Open Post', $captured );
+        $this->assertStringNotContainsString( 'Locked Post', $captured );
+        $this->assertStringNotContainsString( 'Secret summary', $captured );
+        $this->assertStringNotContainsString( 'Excluded Post', $captured );
+        $this->assertStringContainsString( 'Posts in this archive: 1', $captured );
+        $this->assertSame( 1, $captured_yaml['post_count'] );
+    }
+
     public function test_keeps_permalink_for_non_enabled_post_type(): void {
         $GLOBALS['_mock_posts']     = [
             new \WP_Post( ['ID' => 1, 'post_title' => 'Other Type Post', 'post_excerpt' => '', 'post_name' => 'other-post', 'post_type' => 'climate_contract'] ),
