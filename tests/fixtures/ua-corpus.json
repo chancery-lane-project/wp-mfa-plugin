@@ -1,0 +1,875 @@
+{
+	"_comment": "User-Agent corpus for the agent-signals parity work (PLAN.md phase 0). source \"log\" means the string was copied verbatim from site access logs; \"constructed\" means it was written around the listed token and has not been checked byte-for-byte against the operator. Golden answers live in ua-golden.json.",
+	"cases": [
+		{
+			"id": "token-gptbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; GPTBot/1.4; +https://openai.com/gptbot)",
+			"source": "log",
+			"note": "Most frequent logged UA holding GPTBot"
+		},
+		{
+			"id": "token-chatgpt-user",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ChatGPT-User/1.0; +https://openai.com/bot",
+			"source": "log",
+			"note": "Most frequent logged UA holding ChatGPT-User"
+		},
+		{
+			"id": "token-claudebot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)",
+			"source": "log",
+			"note": "Most frequent logged UA holding ClaudeBot"
+		},
+		{
+			"id": "token-claude-web",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-Web/1.0; +http://www.anthropic.com/bot.html)",
+			"source": "constructed",
+			"note": "Retired Anthropic UA"
+		},
+		{
+			"id": "token-anthropic-ai",
+			"ua": "anthropic-ai",
+			"source": "constructed",
+			"note": "Retired Anthropic token, bare"
+		},
+		{
+			"id": "token-perplexitybot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
+			"source": "log",
+			"note": "Most frequent logged UA holding PerplexityBot"
+		},
+		{
+			"id": "token-google-extended",
+			"ua": "Google-Extended",
+			"source": "constructed",
+			"note": "robots.txt product token only; Google never sends it as a UA"
+		},
+		{
+			"id": "token-amazonbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot) Chrome/119.0.6045.214 Safari/537.36",
+			"source": "log",
+			"note": "Most frequent logged UA holding Amazonbot"
+		},
+		{
+			"id": "token-cohere-ai",
+			"ua": "Mozilla/5.0 (compatible; cohere-ai; +https://cohere.com/crawler)",
+			"source": "log",
+			"note": "Most frequent logged UA holding cohere-ai"
+		},
+		{
+			"id": "token-meta-externalagent",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
+			"source": "log",
+			"note": "Most frequent logged UA holding meta-externalagent"
+		},
+		{
+			"id": "token-bytespider",
+			"ua": "Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Bytespider"
+		},
+		{
+			"id": "token-ccbot",
+			"ua": "CCBot/2.0 (https://commoncrawl.org/faq/)",
+			"source": "log",
+			"note": "Most frequent logged UA holding CCBot"
+		},
+		{
+			"id": "token-applebot-extended",
+			"ua": "Applebot-Extended",
+			"source": "constructed",
+			"note": "robots.txt product token only; Apple never sends it as a UA"
+		},
+		{
+			"id": "token-oai-searchbot",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; +https://openai.com/searchbot",
+			"source": "log",
+			"note": "Most frequent logged UA holding OAI-SearchBot"
+		},
+		{
+			"id": "token-claude-user",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claude-user@anthropic.com)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Claude-User"
+		},
+		{
+			"id": "token-perplexity-user",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Perplexity-User"
+		},
+		{
+			"id": "token-meta-externalfetcher",
+			"ua": "Mozilla/5.0 (compatible; Meta-ExternalFetcher/1.0; +https://developers.facebook.com/docs/sharing/webmasters/crawler)",
+			"source": "log",
+			"note": "Most frequent logged UA holding meta-externalfetcher"
+		},
+		{
+			"id": "token-mistralai-user",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; MistralAI-User/1.0; +https://docs.mistral.ai/robots)",
+			"source": "log",
+			"note": "Most frequent logged UA holding MistralAI-User"
+		},
+		{
+			"id": "token-google-agent",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Google-Agent; +https://developers.google.com/search/docs/crawling-indexing/google-user-triggered-fetchers) Chrome/131.0.0.0 Safari/537.36",
+			"source": "constructed"
+		},
+		{
+			"id": "token-duckassistbot",
+			"ua": "DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)",
+			"source": "log",
+			"note": "Most frequent logged UA holding DuckAssistBot"
+		},
+		{
+			"id": "token-devin",
+			"ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Devin/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-twinagent",
+			"ua": "Mozilla/5.0 (compatible; TwinAgent/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-apifywebsitecontentcrawler",
+			"ua": "Mozilla/5.0 (compatible; ApifyWebsiteContentCrawler/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-chathivecrawler",
+			"ua": "ChathiveCrawler/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-cledarabot",
+			"ua": "Mozilla/5.0 (compatible; CledaraBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-easyscan",
+			"ua": "EasyScan/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-harkbot",
+			"ua": "Mozilla/5.0 (compatible; HarkBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-hifibot",
+			"ua": "Mozilla/5.0 (compatible; HIFIBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-qatechbot",
+			"ua": "Mozilla/5.0 (compatible; QATechBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-instapaper",
+			"ua": "Instapaper/7.10 CFNetwork/1498.700.2 Darwin/23.6.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-nava",
+			"ua": "Nava/1.0",
+			"source": "constructed",
+			"note": "Listed as Nava/"
+		},
+		{
+			"id": "token-retool",
+			"ua": "Retool/2.0 (+https://docs.tryretool.com/docs/apis)",
+			"source": "constructed",
+			"note": "Listed as Retool/"
+		},
+		{
+			"id": "token-claude-searchbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-SearchBot/1.0; +claudebot@anthropic.com)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Claude-SearchBot"
+		},
+		{
+			"id": "token-bravebot",
+			"ua": "Mozilla/5.0 (compatible; Bravebot/1.0; +https://brave.com/search/)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Bravebot"
+		},
+		{
+			"id": "token-amzn-searchbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amzn-SearchBot/0.1) Chrome/119.0.6045.214 Safari/537.36",
+			"source": "constructed"
+		},
+		{
+			"id": "token-cloudflare-ai-search",
+			"ua": "Cloudflare-AI-Search/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-anomura",
+			"ua": "Mozilla/5.0 (compatible; Anomura/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-element451bot",
+			"ua": "Mozilla/5.0 (compatible; Element451Bot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-kernelsearchbot",
+			"ua": "Mozilla/5.0 (compatible; KernelSearchBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-shapbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ShapBot/0.1.0",
+			"source": "log",
+			"note": "Most frequent logged UA holding ShapBot"
+		},
+		{
+			"id": "token-alphalens-bot",
+			"ua": "Mozilla/5.0 (compatible; alphalens-bot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-kimibot",
+			"ua": "Mozilla/5.0 (compatible; KimiBot/1.0; +https://kimi.ai/)",
+			"source": "log",
+			"note": "Most frequent logged UA holding KimiBot"
+		},
+		{
+			"id": "token-petalbot",
+			"ua": "Mozilla/5.0 (Linux; Android 7.0;) AppleWebKit/537.36 (HTML, like Gecko) Mobile Safari/537.36 (compatible; PetalBot;+https://webmaster.petalsearch.com/site/petalbot)",
+			"source": "log",
+			"note": "Most frequent logged UA holding PetalBot"
+		},
+		{
+			"id": "token-googleother",
+			"ua": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.8010.52 Mobile Safari/537.36 (compatible; GoogleOther)",
+			"source": "log",
+			"note": "Most frequent logged UA holding GoogleOther"
+		},
+		{
+			"id": "token-cloudvertexbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Google-CloudVertexBot; +https://cloud.google.com/enterprise-search)",
+			"source": "constructed",
+			"note": "Listed token is a substring of Google-CloudVertexBot"
+		},
+		{
+			"id": "token-icc-crawler",
+			"ua": "ICC-Crawler/3.0 (Mozilla-compatible; ; https://ucri.nict.go.jp/en/icccrawler.html)",
+			"source": "constructed",
+			"note": "Listed as ICC-Crawler/"
+		},
+		{
+			"id": "token-cotoyogi",
+			"ua": "Mozilla/5.0 (compatible; Cotoyogi/4.0; +https://ds.rois.ac.jp/center8/crawler/)",
+			"source": "constructed",
+			"note": "Listed as Cotoyogi/"
+		},
+		{
+			"id": "token-atlassian-bot",
+			"ua": "Mozilla/5.0 (compatible; atlassian-bot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-linerbot",
+			"ua": "Mozilla/5.0 (compatible; LinerBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-magpie-crawler",
+			"ua": "magpie-crawler/1.1 (robots-txt-checker; +http://www.brandwatch.net)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-bigsur-ai",
+			"ua": "Mozilla/5.0 (compatible; bigsur.ai)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-qualifiedbot",
+			"ua": "Mozilla/5.0 (compatible; QualifiedBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-awario",
+			"ua": "Mozilla/5.0 (compatible; AwarioBot/1.0; +https://awario.com/bots.html)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Awario"
+		},
+		{
+			"id": "token-amazon-kendra",
+			"ua": "amazon-kendra-web-crawler",
+			"source": "constructed",
+			"note": "Listed token has a trailing hyphen"
+		},
+		{
+			"id": "token-anchor-browser",
+			"ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Anchor Browser",
+			"source": "constructed",
+			"note": "Listed token contains a space"
+		},
+		{
+			"id": "token-borderxbot",
+			"ua": "Mozilla/5.0 (compatible; BorderxBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-citibotsitecrawler",
+			"ua": "CitibotSiteCrawler/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-cloudflarebrowserrenderingcrawler",
+			"ua": "CloudflareBrowserRenderingCrawler/1.0",
+			"source": "log",
+			"note": "Most frequent logged UA holding CloudflareBrowserRenderingCrawler"
+		},
+		{
+			"id": "token-netestate-ne-crawler",
+			"ua": "netEstate NE Crawler (+http://www.website-datenbank.de/)",
+			"source": "constructed",
+			"note": "Listed token contains spaces"
+		},
+		{
+			"id": "token-fishbot",
+			"ua": "Mozilla/5.0 (compatible; FishBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-make-com",
+			"ua": "Make.com/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-navubot",
+			"ua": "Mozilla/5.0 (compatible; NavuBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-novellum",
+			"ua": "Novellum AI Crawl",
+			"source": "constructed"
+		},
+		{
+			"id": "token-adpresearchbot",
+			"ua": "Mozilla/5.0 (compatible; AdpResearchBot/1.0)",
+			"source": "constructed",
+			"note": "Listed as AdpResearchBot/"
+		},
+		{
+			"id": "token-selectikascraper",
+			"ua": "SelectikaScraper/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-semrushbot-ocob",
+			"ua": "Mozilla/5.0 (compatible; SemrushBot-OCOB/1; +https://www.semrush.com/bot/)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-semrushbot-swa",
+			"ua": "Mozilla/5.0 (compatible; SemrushBot-SWA/0.1; +http://www.semrush.com/bot.html)",
+			"source": "log",
+			"note": "Most frequent logged UA holding SemrushBot-SWA"
+		},
+		{
+			"id": "token-wardbot",
+			"ua": "Mozilla/5.0 (compatible; WARDBot/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "token-ygs-scraper-bot",
+			"ua": "ygs-scraper-bot/1.0",
+			"source": "constructed"
+		},
+		{
+			"id": "token-gemini-user",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Gemini-User/1.0)",
+			"source": "constructed",
+			"note": "Category-only token"
+		},
+		{
+			"id": "token-geminibot",
+			"ua": "Mozilla/5.0 Geminibot",
+			"source": "log",
+			"note": "Most frequent logged UA holding Geminibot"
+		},
+		{
+			"id": "token-google-notebooklm",
+			"ua": "Google-NotebookLM",
+			"source": "log",
+			"note": "Most frequent logged UA holding Google-NotebookLM"
+		},
+		{
+			"id": "token-claude-agent",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-Agent/1.0; +https://www.anthropic.com)",
+			"source": "log",
+			"note": "Most frequent logged UA holding Claude-Agent"
+		},
+		{
+			"id": "token-meta-webindexer",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
+			"source": "log",
+			"note": "Most frequent logged UA holding meta-webindexer"
+		},
+		{
+			"id": "token-linkupbot",
+			"ua": "LinkupBot/1.0 (LinkupBot for web indexing; https://linkup.so/bot; bot@linkup.so)",
+			"source": "log",
+			"note": "Most frequent logged UA holding LinkupBot"
+		},
+		{
+			"id": "token-riverbot",
+			"ua": "RiverBot/1.0 (+https://river.ai/bot)",
+			"source": "log",
+			"note": "Most frequent logged UA holding RiverBot"
+		},
+		{
+			"id": "token-ibou-search",
+			"ua": "Mozilla/5.0 (compatible; ibou-search/2.0; +https://ibou.com/crawlers.html)",
+			"source": "log",
+			"note": "Most frequent logged UA holding ibou-search"
+		},
+		{
+			"id": "variant-gptbot-semicolon",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.4; +https://openai.com/gptbot",
+			"source": "log",
+			"note": "Semicolon form, no parenthesised compatible"
+		},
+		{
+			"id": "variant-claudebot-chrome",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; ClaudeBot/1.0; +claudebot@anthropic.com)",
+			"source": "log",
+			"note": "Chrome-prefixed, no compatible;"
+		},
+		{
+			"id": "variant-perplexitybot-short",
+			"ua": "Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)",
+			"source": "log"
+		},
+		{
+			"id": "variant-amazonbot-short",
+			"ua": "Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)",
+			"source": "log"
+		},
+		{
+			"id": "variant-meta-externalagent-mac",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
+			"source": "log"
+		},
+		{
+			"id": "variant-bytespider-compatible-first",
+			"ua": "Mozilla/5.0 (compatible; Bytespider; spider-feedback@bytedance.com) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.0.0 Safari/537.36",
+			"source": "log"
+		},
+		{
+			"id": "variant-oai-searchbot-robots",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; robots.txt; +https://openai.com/searchbot",
+			"source": "log"
+		},
+		{
+			"id": "variant-claude-user-claudebot-email",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Claude-User/1.0; +claudebot@anthropic.com)",
+			"source": "log"
+		},
+		{
+			"id": "variant-claude-user-claude-code",
+			"ua": "Claude-User (claude-code/2.1.308; +https://support.anthropic.com/)",
+			"source": "log",
+			"note": "Claude Code fetch"
+		},
+		{
+			"id": "variant-duckassistbot-1-1",
+			"ua": "DuckAssistBot/1.1 (https://duckduckgo.com/duckassistbot)",
+			"source": "log"
+		},
+		{
+			"id": "variant-bravebot-chrome",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Bravebot/1.0; +https://search.brave.com/help/brave-search-crawler) Chrome/W.X.Y.Z Safari/537.36",
+			"source": "log",
+			"note": "Literal W.X.Y.Z in the Chrome version"
+		},
+		{
+			"id": "variant-shapbot-url",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; ShapBot/0.1.0; +https://parallel.ai/parallel-web-systems-bots",
+			"source": "log"
+		},
+		{
+			"id": "variant-petalbot-khtml",
+			"ua": "Mozilla/5.0 (Linux; Android 7.0;) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; PetalBot;+https://webmaster.petalsearch.com/site/petalbot)",
+			"source": "log"
+		},
+		{
+			"id": "variant-googleother-image",
+			"ua": "GoogleOther-Image/1.0",
+			"source": "log",
+			"note": "No slash after GoogleOther- prefix"
+		},
+		{
+			"id": "variant-awario-smartbot",
+			"ua": "AwarioSmartBot/1.0 (+https://awario.com/bots.html; bots@awario.com)",
+			"source": "log"
+		},
+		{
+			"id": "variant-meta-webindexer-mac",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
+			"source": "log"
+		},
+		{
+			"id": "variant-linkupbot-compatible",
+			"ua": "Mozilla/5.0 (compatible; LinkupBot/1.0; +https://linkup.so/bot)",
+			"source": "log"
+		},
+		{
+			"id": "variant-geminibot-chrome-windows",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Geminibot",
+			"source": "log"
+		},
+		{
+			"id": "awkward-curl-geminibot",
+			"ua": "curl/7.81.0 Geminibot",
+			"source": "log",
+			"note": "Category token, not on the serving list; label drifts to curl"
+		},
+		{
+			"id": "awkward-python-requests-geminibot",
+			"ua": "python-requests/2.34.2 Geminibot",
+			"source": "log",
+			"note": "Same drift, to python-requests"
+		},
+		{
+			"id": "awkward-bingbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36",
+			"source": "log",
+			"note": "Mozilla-prefixed, unlisted"
+		},
+		{
+			"id": "awkward-bingbot-compatible-only",
+			"ua": "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+			"source": "log"
+		},
+		{
+			"id": "awkward-bingbot-doubled",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/136.0.0.0 Safari/537.36 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36",
+			"source": "log",
+			"note": "UA repeated twice by a proxy"
+		},
+		{
+			"id": "awkward-googlebot-smartphone",
+			"ua": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.8010.52 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+			"source": "log"
+		},
+		{
+			"id": "awkward-googlebot-desktop",
+			"ua": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+			"source": "log"
+		},
+		{
+			"id": "awkward-googlebot-bare",
+			"ua": "Googlebot/2.1 (+http://www.google.com/bot.html)",
+			"source": "log"
+		},
+		{
+			"id": "awkward-googlebot-image",
+			"ua": "Googlebot-Image/1.0",
+			"source": "log"
+		},
+		{
+			"id": "awkward-applebot",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)",
+			"source": "log",
+			"note": "Bot token not after compatible;"
+		},
+		{
+			"id": "awkward-empty",
+			"ua": "",
+			"source": "log"
+		},
+		{
+			"id": "awkward-dash",
+			"ua": "-",
+			"source": "log",
+			"note": "nginx placeholder for a missing header"
+		},
+		{
+			"id": "awkward-bare-mozilla",
+			"ua": "Mozilla/5.0",
+			"source": "log"
+		},
+		{
+			"id": "awkward-whitespace-only",
+			"ua": "   ",
+			"source": "constructed"
+		},
+		{
+			"id": "awkward-leading-space",
+			"ua": " GPTBot/1.4",
+			"source": "constructed",
+			"note": "normalise_ua anchor fails on leading whitespace"
+		},
+		{
+			"id": "awkward-slash-only",
+			"ua": "/",
+			"source": "constructed"
+		},
+		{
+			"id": "awkward-lowercase-mozilla",
+			"ua": "mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
+			"source": "constructed",
+			"note": "Mozilla check is case-insensitive"
+		},
+		{
+			"id": "awkward-mixed-case-gptbot",
+			"ua": "gptbot/1.4",
+			"source": "constructed"
+		},
+		{
+			"id": "awkward-mixed-case-claudebot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; CLAUDEBOT/1.0; +claudebot@anthropic.com)",
+			"source": "constructed"
+		},
+		{
+			"id": "awkward-mixed-case-perplexity-user",
+			"ua": "Mozilla/5.0 (compatible; perplexity-USER/1.0)",
+			"source": "constructed"
+		},
+		{
+			"id": "awkward-two-tokens-list-order",
+			"ua": "Mozilla/5.0 (compatible; GPTBot/1.4; ClaudeBot/1.0)",
+			"source": "constructed",
+			"note": "Both listed; GPTBot is earlier in the list and in the UA"
+		},
+		{
+			"id": "awkward-two-tokens-reversed",
+			"ua": "Mozilla/5.0 (compatible; ClaudeBot/1.0; GPTBot/1.4)",
+			"source": "constructed",
+			"note": "List order wins over UA order"
+		},
+		{
+			"id": "awkward-two-tokens-category-split",
+			"ua": "Mozilla/5.0 (compatible; Claude-SearchBot/1.0; ChatGPT-User/1.0)",
+			"source": "constructed",
+			"note": "Search token and on-demand token together"
+		},
+		{
+			"id": "awkward-serving-and-category-only",
+			"ua": "Mozilla/5.0 (compatible; Claude-Agent/1.0; ClaudeBot/1.0)",
+			"source": "constructed",
+			"note": "Category-only token with a serving token"
+		},
+		{
+			"id": "awkward-token-inside-word",
+			"ua": "Mozilla/5.0 (compatible; NotGPTBotReally/1.0)",
+			"source": "constructed",
+			"note": "Substring matching inside a longer name"
+		},
+		{
+			"id": "awkward-token-in-url",
+			"ua": "Mozilla/5.0 (compatible; Fetcher/1.0; +https://example.com/blocks-ccbot)",
+			"source": "constructed",
+			"note": "Listed token only in a URL"
+		},
+		{
+			"id": "awkward-3kb-browser",
+			"ua": "Mozilla/5.0 (compatible; Padder/1.0; xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) ",
+			"source": "constructed",
+			"note": "3 KB, no listed token"
+		},
+		{
+			"id": "awkward-3kb-token-at-end",
+			"ua": "Mozilla/5.0 (compatible; Padder/1.0; xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) GPTBot/1.4",
+			"source": "constructed",
+			"note": "3 KB, listed token after the padding"
+		},
+		{
+			"id": "awkward-unicode",
+			"ua": "Mozilla/5.0 (compatible; Bötli/1.0; +https://example.ch/)",
+			"source": "constructed",
+			"note": "Non-ASCII product name"
+		},
+		{
+			"id": "awkward-no-slash-product",
+			"ua": "Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)",
+			"source": "log",
+			"note": "Product name ends at a space, not a slash"
+		},
+		{
+			"id": "browser-chrome-mac",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+			"source": "log"
+		},
+		{
+			"id": "browser-chrome-windows-old",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36",
+			"source": "log"
+		},
+		{
+			"id": "browser-edge",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36 Edg/155.0.0.0",
+			"source": "log"
+		},
+		{
+			"id": "browser-firefox",
+			"ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+			"source": "log"
+		},
+		{
+			"id": "browser-safari-iphone",
+			"ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1",
+			"source": "log"
+		},
+		{
+			"id": "browser-chrome-android",
+			"ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36",
+			"source": "log"
+		},
+		{
+			"id": "browser-safari-mac",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0.1 Safari/605.1.15",
+			"source": "log"
+		},
+		{
+			"id": "browser-headless-chrome",
+			"ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-oai-adsbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; OAI-AdsBot/1.0; +https://openai.com/adsbot",
+			"source": "log",
+			"note": "OpenAI, not listed"
+		},
+		{
+			"id": "unlisted-chatgpt-app",
+			"ua": "ChatGPT/1.2026.272 (iOS 26.6.1; iPhone18,1; build 37078235773)",
+			"source": "log",
+			"note": "ChatGPT app; ChatGPT-User is not a substring of ChatGPT"
+		},
+		{
+			"id": "unlisted-grokbot",
+			"ua": "Mozilla/5.0 (compatible; GrokBot/1.0; +https://x.ai/)",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-xai-grok",
+			"ua": "Mozilla/5.0 (compatible; xAI-Grok/1.0; +https://x.ai/)",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-deepseekbot",
+			"ua": "Mozilla/5.0 (compatible; DeepSeekBot/1.0; +https://www.deepseek.com/)",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-cohere-websearch",
+			"ua": "CohereWebSearchArchive/1.0",
+			"source": "log",
+			"note": "Cohere; cohere-ai is not a substring"
+		},
+		{
+			"id": "unlisted-sumblebot-httpx",
+			"ua": "python-httpx/0.28.1 (SumbleBot/1.0)",
+			"source": "log",
+			"note": "Bot name inside a client UA"
+		},
+		{
+			"id": "unlisted-yandexbot",
+			"ua": "Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots)",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-duckduckbot",
+			"ua": "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)",
+			"source": "log",
+			"note": "DuckDuckGo search, not DuckAssistBot"
+		},
+		{
+			"id": "unlisted-facebookexternalhit",
+			"ua": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-link-preview-combo",
+			"ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/601.2.4 (KHTML, like Gecko) Version/9.0.1 Safari/601.2.4 facebookexternalhit/1.1 Facebot Twitterbot/1.0",
+			"source": "log",
+			"note": "Mozilla-prefixed, bot token not compatible;"
+		},
+		{
+			"id": "unlisted-twitterbot",
+			"ua": "Twitterbot/1.0",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-telegrambot",
+			"ua": "TelegramBot (like TwitterBot)",
+			"source": "log"
+		},
+		{
+			"id": "client-curl",
+			"ua": "curl/8.7.1",
+			"source": "log"
+		},
+		{
+			"id": "client-python-requests",
+			"ua": "python-requests/2.31.0",
+			"source": "log"
+		},
+		{
+			"id": "client-python-httpx",
+			"ua": "python-httpx/0.28.1",
+			"source": "log"
+		},
+		{
+			"id": "client-go-http",
+			"ua": "Go-http-client/2.0",
+			"source": "log"
+		},
+		{
+			"id": "client-axios",
+			"ua": "axios/1.16.1",
+			"source": "log"
+		},
+		{
+			"id": "client-node",
+			"ua": "node",
+			"source": "log"
+		},
+		{
+			"id": "client-node-fetch",
+			"ua": "node-fetch/1.0 (+https://github.com/bitinn/node-fetch)",
+			"source": "log"
+		},
+		{
+			"id": "client-okhttp",
+			"ua": "okhttp/4.12.0",
+			"source": "log"
+		},
+		{
+			"id": "client-scrapy",
+			"ua": "Scrapy/2.17.0 (+https://scrapy.org)",
+			"source": "log"
+		},
+		{
+			"id": "client-wget",
+			"ua": "Wget/1.21.1",
+			"source": "log"
+		},
+		{
+			"id": "unlisted-langchain",
+			"ua": "LangChain/0.3.0",
+			"source": "constructed",
+			"note": "Example in normalise_ua docblock"
+		},
+		{
+			"id": "unlisted-firecrawl",
+			"ua": "Mozilla/5.0 (compatible; FirecrawlAgent/1.0; +https://firecrawl.dev)",
+			"source": "constructed"
+		},
+		{
+			"id": "unlisted-jina-reader",
+			"ua": "Mozilla/5.0 (compatible; Jina-Reader/1.0; +https://jina.ai/reader)",
+			"source": "constructed"
+		}
+	]
+}
