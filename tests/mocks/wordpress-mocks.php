@@ -1099,6 +1099,15 @@ if (!function_exists('add_menu_page')) {
     }
 }
 
+$GLOBALS['_mock_submenu_pages'] = [];
+
+if (!function_exists('add_submenu_page')) {
+    function add_submenu_page(string $parent_slug, string $page_title, string $menu_title, string $capability, string $menu_slug, ?callable $callback = null, ?int $position = null): string|false {
+        $GLOBALS['_mock_submenu_pages'][$parent_slug][] = compact('page_title', 'menu_title', 'capability', 'menu_slug', 'position');
+        return $parent_slug . '_page_' . $menu_slug;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // dbDelta stub
 // ---------------------------------------------------------------------------
