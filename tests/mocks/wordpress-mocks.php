@@ -530,6 +530,15 @@ if (!function_exists('esc_url_raw')) {
     }
 }
 
+if (!function_exists('wp_get_canonical_url')) {
+    function wp_get_canonical_url(int|\WP_Post|null $post = null): string|false {
+        // Per-post override, as an SEO plugin's get_canonical_url filter would set:
+        // $GLOBALS['_mock_canonical_urls'][ $id ] = 'https://…'.
+        $id = $post instanceof \WP_Post ? $post->ID : (int) $post;
+        return $GLOBALS['_mock_canonical_urls'][ $id ] ?? get_permalink( $id );
+    }
+}
+
 if (!function_exists('wp_is_post_revision')) {
     function wp_is_post_revision(int|\WP_Post $post): int|false {
         return $GLOBALS['_mock_is_post_revision'] ?? false;

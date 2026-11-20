@@ -819,6 +819,109 @@ class NegotiatorTest extends TestCase {
     }
 
     // -----------------------------------------------------------------------
+    // maybe_serve_markdown — canonical Link header
+    // -----------------------------------------------------------------------
+
+    private function serve_post_markdown(): void {
+        $md_file = $this->tmp_dir . '/test-post.md';
+        file_put_contents( $md_file, '# Test' );
+
+        $GLOBALS['_mock_is_singular']    = true;
+        $GLOBALS['_mock_queried_object'] = $this->make_post();
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        $this->generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+    }
+
+    private function canonical_headers(): array {
+        return array_values( array_filter(
+            $GLOBALS['_mock_sent_headers'],
+            static fn( string $header ): bool => str_starts_with( $header, 'Link:' )
+        ) );
+    }
+
+    public function test_post_markdown_names_the_permalink_as_canonical(): void {
+        $GLOBALS['_mock_permalink'] = 'https://example.com/test-post/';
+
+        $this->serve_post_markdown();
+
+        $this->assertSame(
+            [ 'Link: <https://example.com/test-post/>; rel="canonical"' ],
+            $this->canonical_headers()
+        );
+        unset( $GLOBALS['_mock_permalink'] );
+    }
+
+    public function test_post_markdown_uses_the_pages_own_canonical(): void {
+        $GLOBALS['_mock_permalink']          = 'https://example.com/test-post/';
+        $GLOBALS['_mock_canonical_urls'][1] = 'https://example.org/original-press-release/';
+
+        $this->serve_post_markdown();
+
+        $this->assertSame(
+            [ 'Link: <https://example.org/original-press-release/>; rel="canonical"' ],
+            $this->canonical_headers()
+        );
+        unset( $GLOBALS['_mock_canonical_urls'], $GLOBALS['_mock_permalink'] );
+    }
+
+    public function test_taxonomy_markdown_names_the_term_link_as_canonical(): void {
+        $md_file = $this->tmp_dir . '/news.md';
+        file_put_contents( $md_file, '# News' );
+
+        $GLOBALS['_mock_is_tax']         = true;
+        $GLOBALS['_mock_queried_object'] = new \WP_Term( ['term_id' => 1, 'taxonomy' => 'category', 'slug' => 'news'] );
+        $_SERVER['HTTP_ACCEPT']          = 'text/markdown';
+        $this->taxonomy_generator->method( 'get_export_path' )->willReturn( $md_file );
+
+        try {
+            $this->make_negotiator()->maybe_serve_markdown();
+        } catch ( \Exception $e ) {}
+
+        $this->assertSame(
+            [ 'Link: <https://example.com/category/news/>; rel="canonical"' ],
+            $this->canonical_headers()
+        );
+    }
+
+    public function test_canonical_filter_receives_url_and_object_and_can_omit_it(): void {
+        $GLOBALS['_mock_permalink'] = 'https://example.com/test-post/';
+        $received = null;
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_canonical_url'] = static function ( string $url, $object ) use ( &$received ): string {
+            $received = [ $url, $object->ID ];
+            return '';
+        };
+
+        $this->serve_post_markdown();
+
+        $this->assertSame( [ 'https://example.com/test-post/', 1 ], $received );
+        $this->assertSame( [], $this->canonical_headers() );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_canonical_url'], $GLOBALS['_mock_permalink'] );
+    }
+
+    public function test_no_canonical_without_a_permalink(): void {
+        $GLOBALS['_mock_permalink'] = false;
+
+        $this->serve_post_markdown();
+
+        $this->assertSame( [], $this->canonical_headers() );
+        unset( $GLOBALS['_mock_permalink'] );
+    }
+
+    public function test_canonical_from_a_filter_cannot_break_the_header(): void {
+        $GLOBALS['_mock_permalink'] = 'https://example.com/test-post/';
+        $GLOBALS['_mock_apply_filters']['markdown_for_agents_canonical_url'] = static fn(): string => "https://example.com/>; rel=\"next\"\r\nSet-Cookie: x=1";
+
+        $this->serve_post_markdown();
+
+        $this->assertSame( [], $this->canonical_headers() );
+        unset( $GLOBALS['_mock_apply_filters']['markdown_for_agents_canonical_url'], $GLOBALS['_mock_permalink'] );
+    }
+
+    // -----------------------------------------------------------------------
     // output_html_headers — Link + Vary on the HTML response
     // -----------------------------------------------------------------------
 

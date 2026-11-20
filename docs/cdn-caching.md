@@ -110,10 +110,11 @@ have answered instead. Inspect origin cache headers/logs and export eligibility.
 
 The plugin streams an export through PHP when a canonical page URL negotiates
 Markdown. A direct `/wp-content/uploads/{export_dir}/...md` URL normally goes
-straight to the web server. Internal exported links use these direct URLs.
+straight to the web server. Internal exported links don't use these direct URLs:
+they point at the target's `?output_format=md` page URL, which goes through PHP.
 
-Static responses do not run the negotiator, receive its PHP cache-header filters,
-or increment its statistics. Configure their content type and caching separately.
+Static responses do not run the negotiator, receive its PHP cache-header filters
+or canonical `Link` header, or increment its statistics. Configure their content type and caching separately.
 Either bypass storage of these URLs or define a bounded TTL and a reliable purge
 process for regeneration, deletion and withdrawal. Deleting the origin file does
 not remove a previously cached copy. Apply this to indexes, manifests and bundles

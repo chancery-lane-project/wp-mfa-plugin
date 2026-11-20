@@ -108,7 +108,7 @@ class Negotiator {
 			}
 
 			$this->log_access( $post->ID, StatsRepository::OBJECT_POST, $ua, $method, $access_method );
-			$this->send_markdown_file( $filepath, $access_method );
+			$this->send_markdown_file( $filepath, $access_method, $this->canonical_url( wp_get_canonical_url( $post ), $post ) );
 			return;
 		}
 
@@ -134,8 +134,9 @@ class Negotiator {
 				return;
 			}
 
+			$term_link = get_term_link( $term );
 			$this->log_access( $term->term_id, StatsRepository::OBJECT_TERM, $ua, $method, $access_method );
-			$this->send_markdown_file( $filepath, $access_method );
+			$this->send_markdown_file( $filepath, $access_method, $this->canonical_url( is_wp_error( $term_link ) ? false : $term_link, $term ) );
 		}
 	}
 
@@ -363,6 +364,39 @@ class Negotiator {
 	}
 
 	/**
+	 * The HTML URL a Markdown response names as canonical, or null for none.
+	 *
+	 * Search engines and AI search indexes read `Link: <…>; rel="canonical"`
+	 * and cite the page instead of the Markdown representation. Posts use
+	 * wp_get_canonical_url(), so the header matches the page's own
+	 * `<link rel="canonical">`, including `get_canonical_url` filter changes.
+	 *
+	 * @since  1.9.0
+	 * @param  string|false      $url    The permalink or term link, or false.
+	 * @param  \WP_Post|\WP_Term $item   The post or term being served.
+	 * @return string|null
+	 */
+	private function canonical_url( string|false $url, \WP_Post|\WP_Term $item ): ?string {
+		/**
+		 * Filter the canonical URL sent with a Markdown response.
+		 *
+		 * Return an empty string to omit the `Link: <…>; rel="canonical"` header.
+		 *
+		 * @since 1.9.0
+		 * @param string            $url    The permalink or term link.
+		 * @param \WP_Post|\WP_Term $item   The post or term being served.
+		 */
+		$url = (string) apply_filters( 'markdown_for_agents_canonical_url', (string) $url, $item );
+
+		// Control characters or angle brackets would break out of the header value.
+		if ( '' === $url || preg_match( '/[\x00-\x20\x7f<>"]/', $url ) ) {
+			return null;
+		}
+
+		return esc_url_raw( $url );
+	}
+
+	/**
 	 * Send HTTP headers and stream the Markdown file to the client.
 	 *
 	 * Emits cache-bypass headers so full-page caches (LiteSpeed, Varnish,
@@ -370,10 +404,11 @@ class Negotiator {
 	 * to subsequent HTML browser requests on the same URL.
 	 *
 	 * @since  1.1.0
-	 * @param  string $filepath      Absolute path to the .md file.
-	 * @param  string $access_method How the request was identified: 'query-param', 'accept-header' or 'ua'.
+	 * @param  string      $filepath      Absolute path to the .md file.
+	 * @param  string      $access_method How the request was identified: 'query-param', 'accept-header' or 'ua'.
+	 * @param  string|null $canonical     The page's URL for the canonical `Link` header, or null for none.
 	 */
-	private function send_markdown_file( string $filepath, string $access_method ): void {
+	private function send_markdown_file( string $filepath, string $access_method, ?string $canonical = null ): void {
 		header( 'Content-Type: text/markdown; charset=utf-8' );
 
 		/**
@@ -414,6 +449,10 @@ class Negotiator {
 		}
 
 		header( 'X-Markdown-Source: markdown-for-agents' );
+
+		if ( null !== $canonical && '' !== $canonical ) {
+			header( 'Link: <' . $canonical . '>; rel="canonical"', false );
+		}
 
 		/**
 		 * Filter the Content-Signal header value.
