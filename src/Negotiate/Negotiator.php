@@ -108,7 +108,7 @@ class Negotiator {
 			}
 
 			$this->log_access( $post->ID, StatsRepository::OBJECT_POST, $ua, $method, $access_method );
-			$this->send_markdown_file( $filepath, $access_method, $this->canonical_url( get_permalink( $post->ID ), $post ) );
+			$this->send_markdown_file( $filepath, $access_method, $this->canonical_url( wp_get_canonical_url( $post ), $post ) );
 			return;
 		}
 
@@ -367,7 +367,9 @@ class Negotiator {
 	 * The HTML URL a Markdown response names as canonical, or null for none.
 	 *
 	 * Search engines and AI search indexes read `Link: <…>; rel="canonical"`
-	 * and cite the page instead of the Markdown representation.
+	 * and cite the page instead of the Markdown representation. Posts use
+	 * wp_get_canonical_url(), so the header matches the page's own
+	 * `<link rel="canonical">`, including `get_canonical_url` filter changes.
 	 *
 	 * @since  1.8.0
 	 * @param  string|false      $url    The permalink or term link, or false.

@@ -855,6 +855,19 @@ class NegotiatorTest extends TestCase {
         unset( $GLOBALS['_mock_permalink'] );
     }
 
+    public function test_post_markdown_uses_the_pages_own_canonical(): void {
+        $GLOBALS['_mock_permalink']          = 'https://example.com/test-post/';
+        $GLOBALS['_mock_canonical_urls'][1] = 'https://example.org/original-press-release/';
+
+        $this->serve_post_markdown();
+
+        $this->assertSame(
+            [ 'Link: <https://example.org/original-press-release/>; rel="canonical"' ],
+            $this->canonical_headers()
+        );
+        unset( $GLOBALS['_mock_canonical_urls'], $GLOBALS['_mock_permalink'] );
+    }
+
     public function test_taxonomy_markdown_names_the_term_link_as_canonical(): void {
         $md_file = $this->tmp_dir . '/news.md';
         file_put_contents( $md_file, '# News' );
