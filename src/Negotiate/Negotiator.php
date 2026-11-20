@@ -371,7 +371,7 @@ class Negotiator {
 	 * wp_get_canonical_url(), so the header matches the page's own
 	 * `<link rel="canonical">`, including `get_canonical_url` filter changes.
 	 *
-	 * @since  1.8.0
+	 * @since  1.9.0
 	 * @param  string|false      $url    The permalink or term link, or false.
 	 * @param  \WP_Post|\WP_Term $item   The post or term being served.
 	 * @return string|null
@@ -382,7 +382,7 @@ class Negotiator {
 		 *
 		 * Return an empty string to omit the `Link: <…>; rel="canonical"` header.
 		 *
-		 * @since 1.8.0
+		 * @since 1.9.0
 		 * @param string            $url    The permalink or term link.
 		 * @param \WP_Post|\WP_Term $item   The post or term being served.
 		 */
