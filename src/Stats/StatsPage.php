@@ -76,16 +76,34 @@ class StatsPage {
 	/**
 	 * Register the admin menu page.
 	 *
+	 * The top-level menu is "Agents" and this screen is its first item,
+	 * "Stats". MfA Signals and MfA Homepage add "Signals" and "Homepage"
+	 * under the same menu at `admin_menu` priority 20, after this runs.
+	 *
 	 * @since  1.1.0
+	 * @since  1.8.0 Menu reads Agents → Stats, not Agent Stats → Agent Stats.
 	 */
 	public function add_page(): void {
+		$page_title = __( 'Agent Access Statistics', 'markdown-for-agents-and-statistics' );
+
 		add_menu_page(
-			__( 'Agent Access Statistics', 'markdown-for-agents-and-statistics' ),
-			__( 'Agent Stats', 'markdown-for-agents-and-statistics' ),
+			$page_title,
+			__( 'Agents', 'markdown-for-agents-and-statistics' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' ),
 			'dashicons-chart-bar'
+		);
+
+		// Same slug as the parent, so WordPress uses this label for the first
+		// item instead of repeating "Agents".
+		add_submenu_page(
+			self::PAGE_SLUG,
+			$page_title,
+			__( 'Stats', 'markdown-for-agents-and-statistics' ),
+			'manage_options',
+			self::PAGE_SLUG,
+			array( $this, 'render_page' )
 		);
 	}
 

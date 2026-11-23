@@ -23,6 +23,7 @@ class StatsPageTest extends TestCase {
     protected function setUp(): void {
         $_GET = [];
         $GLOBALS['_mock_menu_pages']       = [];
+        $GLOBALS['_mock_submenu_pages']    = [];
         $GLOBALS['_mock_current_user_can'] = true;
 
         $this->repository = $this->createMock( StatsRepository::class );
@@ -37,6 +38,20 @@ class StatsPageTest extends TestCase {
     public function test_add_page_registers_menu_page(): void {
         $this->page->add_page();
         $this->assertArrayHasKey( 'markdown-for-agents-stats', $GLOBALS['_mock_menu_pages'] );
+    }
+
+    public function test_add_page_labels_parent_menu_agents(): void {
+        $this->page->add_page();
+        $this->assertSame( 'Agents', $GLOBALS['_mock_menu_pages']['markdown-for-agents-stats']['menu_title'] );
+    }
+
+    public function test_add_page_registers_stats_as_first_submenu_item(): void {
+        $this->page->add_page();
+        $first = $GLOBALS['_mock_submenu_pages']['markdown-for-agents-stats'][0] ?? null;
+        $this->assertSame(
+            [ 'Agent Access Statistics', 'Stats', 'manage_options', 'markdown-for-agents-stats' ],
+            [ $first['page_title'] ?? null, $first['menu_title'] ?? null, $first['capability'] ?? null, $first['menu_slug'] ?? null ]
+        );
     }
 
     public function test_add_page_uses_chart_icon(): void {
