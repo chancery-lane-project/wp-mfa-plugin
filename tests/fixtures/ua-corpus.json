@@ -883,7 +883,7 @@
 			"id": "token-azureai-searchbot",
 			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;",
 			"source": "log",
-			"note": "Logged 16–22 Nov 2026 (agent-signals#EVIDENCE)"
+			"note": "Logged 16–22 Nov 2026 (agent-signals#7)"
 		},
 		{
 			"id": "unlisted-firecrawl",

@@ -197,7 +197,7 @@ class AgentDetectorTest extends TestCase {
 
     /**
      * Full User-Agent seen in two sites' access logs, 16–22 Nov 2026
-     * (agent-signals#EVIDENCE). Added to agent-signals list revision 3 at the
+     * (agent-signals#7). Added to agent-signals list revision 3 at the
      * same time. Categorised but not served, and no operator.
      */
     public function test_categorise_agent_maps_azureai_searchbot(): void {

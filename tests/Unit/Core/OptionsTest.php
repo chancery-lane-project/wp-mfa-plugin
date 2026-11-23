@@ -84,7 +84,7 @@ class OptionsTest extends TestCase {
 
     /**
      * Meta documents meta-webindexer as its Meta AI search crawler, and it
-     * followed Markdown links 58 times in a week (agent-signals#EVIDENCE), so
+     * followed Markdown links 58 times in a week (agent-signals#7), so
      * it is served on its User-Agent from 1.8.0-rc.3. 72 strings, the same as
      * agent-signals list revision 3. AzureAI-SearchBot is named, not served.
      */
