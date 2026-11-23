@@ -67,6 +67,21 @@ class OptionsTest extends TestCase {
         $this->assertNotEmpty( $strings );
     }
 
+    /**
+     * KeenableBot asked for Markdown and ClueWeb-Crawler followed Markdown
+     * links, so both are served on their User-Agent. YouBot is named in the
+     * stats but not served: it made no Markdown requests (agent-signals#5).
+     * 71 strings, the same as agent-signals list revision 2 (wp-mfa-plugin#46).
+     */
+    public function test_defaults_serve_keenablebot_and_clueweb_but_not_youbot(): void {
+        $strings = Options::get_defaults()['ua_agent_strings'];
+
+        $this->assertContains( 'KeenableBot', $strings );
+        $this->assertContains( 'ClueWeb-Crawler', $strings );
+        $this->assertNotContains( 'YouBot', $strings );
+        $this->assertCount( 71, $strings );
+    }
+
     public function test_defaults_ua_agent_strings_contains_known_agents(): void {
         $strings = Options::get_defaults()['ua_agent_strings'];
         $this->assertContains( 'GPTBot', $strings );

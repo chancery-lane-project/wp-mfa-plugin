@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.7.4
+Stable tag: 1.8.0-rc.2
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -179,8 +179,8 @@ The plugin counts singular-post Markdown GET selections made by WordPress, not
 all agent traffic or confirmed body delivery. HEAD and other methods, taxonomy
 archives, HTML fallback, direct static exports and bundles do not increment
 these counters. Neither do cache hits or requests blocked before WordPress.
-Versions up to 1.7.2 also counted negotiated singular HEAD requests; the GET-only
-correction is listed under Unreleased below.
+Versions before 1.7.2 also counted negotiated singular HEAD requests; the GET-only
+correction is listed under 1.7.2 below.
 
 Complete discovery and probes before a baseline snapshot because GET probes can
 increment counters. For reconciliation, verify both correlation IDs in actual
@@ -305,10 +305,11 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= Unreleased =
+= 1.8.0 =
 * Feature: Markdown served through WordPress (`?output_format=md`, `Accept: text/markdown` or a known AI User-Agent) now names the page as canonical with `Link: <…>; rel="canonical"`: the post's own canonical URL from `wp_get_canonical_url()`, or the term's archive URL for taxonomy archives. Search engines and AI search indexes then cite the page rather than the Markdown. Direct `/wp-content/uploads/…` file URLs are served by the web server and don't get the header. New `markdown_for_agents_canonical_url` filter to change or omit it.
 * Feature: access statistics are now cleaned up automatically. Daily totals older than the period set under Settings → Agent Detection → Statistics are deleted once a day by WP-Cron. The default is 365 days, so no existing site loses data on update (statistics started in March 2026). Choose 30, 90 or 180 days, or keep everything. `wp markdown-agents prune-stats` still works for one-off clean-ups.
 * Feature: RiverBot and ibou-search are now recognised as AI search indexers. Both name themselves but were not on the list, so one site's statistics missed about 1,650 of their page requests in a week (plus 3,300 Markdown requests from ibou-search, which were counted but not categorised).
+* Feature: YouBot (You.com) and KeenableBot are recognised as AI search indexers, and ClueWeb-Crawler (Carnegie Mellon's research corpus crawler) as a training crawler. KeenableBot and ClueWeb-Crawler are served Markdown on their User-Agent, because they asked for it or followed Markdown links; YouBot is counted but served HTML. The same three join the shared agent-signals list (revision 2) used by MfA Signals and MfA Homepage.
 * Fix: a site whose saved agent list was empty when it updated to 1.7.3 now gets back the 13 agents that have been on the list since 1.1.0, including GPTBot, ChatGPT-User, ClaudeBot and PerplexityBot. The update treated them as deliberately removed, so they were never served Markdown on their User-Agent. A list that still holds any of the 13 keeps its removals. Sites already updated to 1.7.3 or later are not changed: check Settings → Agent Detection and add any of the 13 that are missing.
 * Fix: images in exported Markdown are no longer split from what follows them. A blank line was forced after any image followed directly by a character, which broke linked images (`[![Logo](logo.png)](https://example.com)` lost its link), moved a full stop after an image into a paragraph of its own, and changed image syntax shown inside inline code and code blocks. Run `wp markdown-agents generate --force` (or regenerate from the settings screen) to fix files already exported.
 * Fix: a link that wraps a whole card (image, tags, heading, summary) now exports as one valid Markdown link. Headings, list items and blank lines were put inside the link text, so Markdown readers ended the link early, the card's title and summary lost their link, and a stray `](url)` was left behind. Link text that runs over more than one line is now joined into one line with single spaces. Heading, bullet and quote markers are dropped; all text, numbers and images are kept. Links whose text is already on one line are unchanged. Regenerate to fix files already exported.
@@ -452,6 +453,9 @@ wp markdown-agents generate-taxonomies --dry-run
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.8.0 =
+Regenerate after updating: the link and image fixes change files already exported, and the plugin shows a notice until you do. Also adds automatic clean-up of old statistics (365 days by default) and a hook for MfA Signals on Agent Stats.
 
 = 1.7.4 =
 Makes bulk generation faster and lighter on large sites, and stops generation fetching embeds. You do not need to regenerate. Regenerate only if you want embed URLs to appear as links in files that already exist.

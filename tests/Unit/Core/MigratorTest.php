@@ -297,13 +297,24 @@ class MigratorTest extends TestCase {
         }
     }
 
-    public function test_upgrade_from_before_1_7_3_with_exports_flags_regeneration(): void {
+    public function test_upgrade_from_before_1_8_0_with_exports_flags_regeneration(): void {
         $this->with_exports( true, function (): void {
             Migrator::maybe_flag_upgrade_regen();
 
             $this->assertSame( [ 'post', 'page' ], get_transient( NeedsRegenTracker::TRANSIENT ) );
-            $this->assertSame( '1.7.3', get_option( NeedsRegenTracker::UPGRADE_OPTION ) );
-            $this->assertSame( '1.7.3', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
+            $this->assertSame( '1.8.0', get_option( NeedsRegenTracker::UPGRADE_OPTION ) );
+            $this->assertSame( '1.8.0', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
+        } );
+    }
+
+    public function test_a_site_already_checked_for_1_7_3_is_flagged_again_for_1_8_0(): void {
+        $this->with_exports( true, function (): void {
+            update_option( Migrator::REGEN_VERSION_OPTION_KEY, '1.7.3' );
+
+            Migrator::maybe_flag_upgrade_regen();
+
+            $this->assertSame( [ 'post', 'page' ], get_transient( NeedsRegenTracker::TRANSIENT ) );
+            $this->assertSame( '1.8.0', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
         } );
     }
 
@@ -312,7 +323,7 @@ class MigratorTest extends TestCase {
             Migrator::maybe_flag_upgrade_regen();
 
             $this->assertFalse( get_transient( NeedsRegenTracker::TRANSIENT ) );
-            $this->assertSame( '1.7.3', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
+            $this->assertSame( '1.8.0', get_option( Migrator::REGEN_VERSION_OPTION_KEY ) );
         } );
     }
 
