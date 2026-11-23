@@ -164,6 +164,13 @@ class Options {
 				 */
 				'KeenableBot',
 				'ClueWeb-Crawler',
+
+				/*
+				 * Meta's crawler for Meta AI search, which cites and links to what it
+				 * reads. Categorised since 1.8.0, served from 1.8.0-rc.3: it followed
+				 * Markdown links 58 times in a week, 16–22 Nov 2026 (agent-signals#EVIDENCE).
+				 */
+				'meta-webindexer',
 			),
 		);
 	}
