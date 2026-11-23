@@ -79,7 +79,20 @@ class OptionsTest extends TestCase {
         $this->assertContains( 'KeenableBot', $strings );
         $this->assertContains( 'ClueWeb-Crawler', $strings );
         $this->assertNotContains( 'YouBot', $strings );
-        $this->assertCount( 71, $strings );
+        $this->assertCount( 72, $strings );
+    }
+
+    /**
+     * Meta documents meta-webindexer as its Meta AI search crawler, and it
+     * followed Markdown links 58 times in a week (agent-signals#7), so
+     * it is served on its User-Agent from 1.8.0-rc.3. 72 strings, the same as
+     * agent-signals list revision 3. AzureAI-SearchBot is named, not served.
+     */
+    public function test_defaults_serve_meta_webindexer_but_not_azureai_searchbot(): void {
+        $strings = Options::get_defaults()['ua_agent_strings'];
+
+        $this->assertContains( 'meta-webindexer', $strings );
+        $this->assertNotContains( 'AzureAI-SearchBot', $strings );
     }
 
     public function test_defaults_ua_agent_strings_contains_known_agents(): void {

@@ -214,6 +214,10 @@ class AgentDetector {
 				// Seen in access logs, 11–16 Nov 2026 (agent-signals#5).
 				'YouBot',
 				'KeenableBot',
+				// Seen in access logs, 16–22 Nov 2026 (agent-signals#7).
+				// Categorised, not served: it never asked for Markdown. No operator:
+				// Microsoft doesn't document it.
+				'AzureAI-SearchBot',
 			),
 			'training'  => array(
 				// Baseline.

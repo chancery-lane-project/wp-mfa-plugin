@@ -196,6 +196,21 @@ class AgentDetectorTest extends TestCase {
     }
 
     /**
+     * Full User-Agent seen in two sites' access logs, 16–22 Nov 2026
+     * (agent-signals#7). Added to agent-signals list revision 3 at the
+     * same time. Categorised but not served, and no operator.
+     */
+    public function test_categorise_agent_maps_azureai_searchbot(): void {
+        $detector = $this->make_detector();
+        $azure    = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;';
+
+        $this->assertSame( 'search', $detector->categorise_agent( $azure ) );
+        $this->assertSame( 'AzureAI-SearchBot', $detector->normalise_ua( $azure ) );
+        $this->assertNull( $detector->detect_agent( $azure ) );
+        $this->assertNull( $detector->get_operator( 'AzureAI-SearchBot' ) );
+    }
+
+    /**
      * Same logs. Geminibot came in short topic-led bursts, followed Markdown
      * links and swapped HTTP clients mid-burst: an agent working a task, not
      * a crawler. NotebookLM fetched single pages as sources were added.

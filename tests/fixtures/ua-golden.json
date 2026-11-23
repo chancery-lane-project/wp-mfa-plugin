@@ -733,7 +733,7 @@
         },
         "token-meta-webindexer": {
             "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
-            "detect_agent": null,
+            "detect_agent": "meta-webindexer",
             "normalise_ua": "meta-webindexer",
             "label": "meta-webindexer",
             "categorise_ua": "search",
@@ -923,7 +923,7 @@
         },
         "variant-meta-webindexer-mac": {
             "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 (compatible; meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler))",
-            "detect_agent": null,
+            "detect_agent": "meta-webindexer",
             "normalise_ua": "meta-webindexer",
             "label": "meta-webindexer",
             "categorise_ua": "search",
@@ -1598,6 +1598,16 @@
             "label": "ClueWeb-Crawler",
             "categorise_ua": "training",
             "categorise_label": "training",
+            "operator_ua": null,
+            "operator_label": null
+        },
+        "token-azureai-searchbot": {
+            "ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;",
+            "detect_agent": null,
+            "normalise_ua": "AzureAI-SearchBot",
+            "label": "AzureAI-SearchBot",
+            "categorise_ua": "search",
+            "categorise_label": "search",
             "operator_ua": null,
             "operator_label": null
         },
