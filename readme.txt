@@ -304,9 +304,6 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= Unreleased =
-* Change: the admin menu is now "Agents", with "Stats" as its first item. It read "Agent Stats" twice, and MfA Signals and MfA Homepage add "Signals" and "Homepage" under it. The page address is unchanged, so bookmarks and links still work.
-
 = 1.8.0 =
 * Feature: access statistics are now cleaned up automatically. Daily totals older than the period set under Settings → Agent Detection → Statistics are deleted once a day by WP-Cron. The default is 365 days, so no existing site loses data on update (statistics started in March 2026). Choose 30, 90 or 180 days, or keep everything. `wp markdown-agents prune-stats` still works for one-off clean-ups.
 * Feature: RiverBot and ibou-search are now recognised as AI search indexers. Both name themselves but were not on the list, so one site's statistics missed about 1,650 of their page requests in a week (plus 3,300 Markdown requests from ibou-search, which were counted but not categorised).
@@ -316,6 +313,7 @@ wp markdown-agents generate-taxonomies --dry-run
 * Fix: a link that wraps a whole card (image, tags, heading, summary) now exports as one valid Markdown link. Headings, list items and blank lines were put inside the link text, so Markdown readers ended the link early, the card's title and summary lost their link, and a stray `](url)` was left behind. Link text that runs over more than one line is now joined into one line with single spaces. Heading, bullet and quote markers are dropped; all text, numbers and images are kept. Links whose text is already on one line are unchanged. Regenerate to fix files already exported.
 * Fix: the statistics screen shows the `Mozilla` label as "Unidentified (browser-like)". It is what gets recorded when a client posing as an ordinary browser asks for Markdown, and it read like the name of an agent. Stored labels are unchanged.
 * Developer: new `markdown_for_agents_stats_sections` action on the Agent Stats screen, passed the date range shown. A companion plugin such as MfA Signals can add its own sections there, for example the pages agents read as HTML, which this plugin does not count.
+* Change: the admin menu is now "Agents", with "Stats" as its first item. It read "Agent Stats" twice, and MfA Signals and MfA Homepage add "Signals" and "Homepage" under it. The page address is unchanged, so bookmarks and links still work.
 * Fix: a post that moves to any non-public status now loses its Markdown file. Only private, draft, pending and trash were handled, so a published post that was scheduled again or moved to a custom status (for example by an editorial workflow plugin) kept its file. Serving was already blocked; the file stayed on disk and in the bundle.
 * Fix: taxonomy archives no longer list password-protected or excluded posts. They showed the post's title and its manual excerpt, which WordPress itself hides for protected posts. Regenerate taxonomy archives to fix files already exported.
 * Fix: with automatic generation turned off, existing taxonomy archives are now refreshed when a post becomes private, draft, scheduled, trashed, password-protected or excluded. Before, they kept listing the post until the next manual run. Archives that do not exist yet are not created.

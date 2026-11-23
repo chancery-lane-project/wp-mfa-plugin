@@ -81,7 +81,7 @@ class StatsPage {
 	 * under the same menu at `admin_menu` priority 20, after this runs.
 	 *
 	 * @since  1.1.0
-	 * @since  1.8.1 Menu reads Agents → Stats, not Agent Stats → Agent Stats.
+	 * @since  1.8.0 Menu reads Agents → Stats, not Agent Stats → Agent Stats.
 	 */
 	public function add_page(): void {
 		$page_title = __( 'Agent Access Statistics', 'markdown-for-agents-and-statistics' );
