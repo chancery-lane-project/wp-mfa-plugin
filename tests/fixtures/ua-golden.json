@@ -1601,6 +1601,16 @@
             "operator_ua": null,
             "operator_label": null
         },
+        "token-azureai-searchbot": {
+            "ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;",
+            "detect_agent": null,
+            "normalise_ua": "AzureAI-SearchBot",
+            "label": "AzureAI-SearchBot",
+            "categorise_ua": "search",
+            "categorise_label": "search",
+            "operator_ua": null,
+            "operator_label": null
+        },
         "unlisted-firecrawl": {
             "ua": "Mozilla/5.0 (compatible; FirecrawlAgent/1.0; +https://firecrawl.dev)",
             "detect_agent": null,

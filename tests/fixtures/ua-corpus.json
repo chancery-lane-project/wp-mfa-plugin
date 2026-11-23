@@ -880,6 +880,12 @@
 			"note": "Logged 11–16 Nov 2026 (agent-signals#5)"
 		},
 		{
+			"id": "token-azureai-searchbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;",
+			"source": "log",
+			"note": "Logged 16–22 Nov 2026 (agent-signals#EVIDENCE)"
+		},
+		{
 			"id": "unlisted-firecrawl",
 			"ua": "Mozilla/5.0 (compatible; FirecrawlAgent/1.0; +https://firecrawl.dev)",
 			"source": "constructed"
