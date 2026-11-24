@@ -604,6 +604,20 @@ if (!function_exists('get_post')) {
     }
 }
 
+if (!function_exists('setup_postdata')) {
+    // Sets a subset of the loop globals core's setup_postdata() sets, enough
+    // for tests to see that they were set and then restored.
+    function setup_postdata(\WP_Post|int $post): bool {
+        $post = get_post($post);
+        if (!$post) {
+            return false;
+        }
+        $GLOBALS['id']    = $post->ID;
+        $GLOBALS['pages'] = [ $post->post_content ];
+        return true;
+    }
+}
+
 if (!function_exists('url_to_postid')) {
     function url_to_postid(string $url): int {
         $GLOBALS['_mock_url_to_postid_calls'] = ($GLOBALS['_mock_url_to_postid_calls'] ?? 0) + 1;
