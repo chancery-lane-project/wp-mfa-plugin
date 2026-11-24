@@ -862,6 +862,30 @@
 			"note": "Example in normalise_ua docblock"
 		},
 		{
+			"id": "token-youbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; YouBot/1.0; +https://docs.you.com/youbot; env:prod) Chrome/142.0.0.0 Safari/537.36",
+			"source": "log",
+			"note": "Logged 11–16 Nov 2026 (agent-signals#5)"
+		},
+		{
+			"id": "token-keenablebot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; KeenableBot/1.0; +https://keenable.ai/bot)",
+			"source": "log",
+			"note": "Logged 11–16 Nov 2026 (agent-signals#5)"
+		},
+		{
+			"id": "token-clueweb-crawler",
+			"ua": "ClueWeb-Crawler/1.0 (+https://boston.lti.cs.cmu.edu/CMU-ClueWeb-Crawler/; mailto:cmu-clueweb-crawler@andrew.cmu.edu)",
+			"source": "log",
+			"note": "Logged 11–16 Nov 2026 (agent-signals#5)"
+		},
+		{
+			"id": "token-azureai-searchbot",
+			"ua": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;",
+			"source": "log",
+			"note": "Logged 16–22 Nov 2026 (agent-signals#7)"
+		},
+		{
 			"id": "unlisted-firecrawl",
 			"ua": "Mozilla/5.0 (compatible; FirecrawlAgent/1.0; +https://firecrawl.dev)",
 			"source": "constructed"

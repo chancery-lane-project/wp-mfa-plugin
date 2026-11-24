@@ -173,6 +173,44 @@ class AgentDetectorTest extends TestCase {
     }
 
     /**
+     * Full User-Agents seen in a site's access logs, 11–16 Nov 2026
+     * (agent-signals#5). Added to agent-signals list revision 2 at the same
+     * time, so both lists name them alike (wp-mfa-plugin#46).
+     */
+    public function test_categorise_agent_maps_youbot_keenablebot_and_clueweb(): void {
+        $detector = $this->make_detector();
+        $you      = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; YouBot/1.0; +https://docs.you.com/youbot; env:prod) Chrome/142.0.0.0 Safari/537.36';
+        $keenable = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; KeenableBot/1.0; +https://keenable.ai/bot)';
+        $clueweb  = 'ClueWeb-Crawler/1.0 (+https://boston.lti.cs.cmu.edu/CMU-ClueWeb-Crawler/; mailto:cmu-clueweb-crawler@andrew.cmu.edu)';
+
+        $this->assertSame( 'search', $detector->categorise_agent( $you ) );
+        $this->assertSame( 'search', $detector->categorise_agent( $keenable ) );
+        $this->assertSame( 'training', $detector->categorise_agent( $clueweb ) );
+        $this->assertSame( 'YouBot', $detector->normalise_ua( $you ) );
+        $this->assertSame( 'KeenableBot', $detector->normalise_ua( $keenable ) );
+        $this->assertSame( 'ClueWeb-Crawler', $detector->normalise_ua( $clueweb ) );
+        $this->assertSame( 'you-com', $detector->get_operator( 'YouBot' ) );
+        $this->assertSame( 'You.com', $detector->get_operator_label( 'you-com' ) );
+        $this->assertSame( 'keenable', $detector->get_operator( 'KeenableBot' ) );
+        $this->assertSame( 'Keenable', $detector->get_operator_label( 'keenable' ) );
+    }
+
+    /**
+     * Full User-Agent seen in two sites' access logs, 16–22 Nov 2026
+     * (agent-signals#7). Added to agent-signals list revision 3 at the
+     * same time. Categorised but not served, and no operator.
+     */
+    public function test_categorise_agent_maps_azureai_searchbot(): void {
+        $detector = $this->make_detector();
+        $azure    = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; AzureAI-SearchBot/1.0;';
+
+        $this->assertSame( 'search', $detector->categorise_agent( $azure ) );
+        $this->assertSame( 'AzureAI-SearchBot', $detector->normalise_ua( $azure ) );
+        $this->assertNull( $detector->detect_agent( $azure ) );
+        $this->assertNull( $detector->get_operator( 'AzureAI-SearchBot' ) );
+    }
+
+    /**
      * Same logs. Geminibot came in short topic-led bursts, followed Markdown
      * links and swapped HTTP clients mid-burst: an agent working a task, not
      * a crawler. NotebookLM fetched single pages as sources were added.

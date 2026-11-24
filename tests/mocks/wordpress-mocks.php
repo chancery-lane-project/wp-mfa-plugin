@@ -530,6 +530,15 @@ if (!function_exists('esc_url_raw')) {
     }
 }
 
+if (!function_exists('wp_get_canonical_url')) {
+    function wp_get_canonical_url(int|\WP_Post|null $post = null): string|false {
+        // Per-post override, as an SEO plugin's get_canonical_url filter would set:
+        // $GLOBALS['_mock_canonical_urls'][ $id ] = 'https://…'.
+        $id = $post instanceof \WP_Post ? $post->ID : (int) $post;
+        return $GLOBALS['_mock_canonical_urls'][ $id ] ?? get_permalink( $id );
+    }
+}
+
 if (!function_exists('wp_is_post_revision')) {
     function wp_is_post_revision(int|\WP_Post $post): int|false {
         return $GLOBALS['_mock_is_post_revision'] ?? false;
@@ -1096,6 +1105,15 @@ if (!function_exists('add_menu_page')) {
     function add_menu_page(string $page_title, string $menu_title, string $capability, string $menu_slug, ?callable $callback = null, string $icon_url = '', ?int $position = null): string {
         $GLOBALS['_mock_menu_pages'][$menu_slug] = compact('page_title', 'menu_title', 'capability', 'icon_url', 'position');
         return 'toplevel_page_' . $menu_slug;
+    }
+}
+
+$GLOBALS['_mock_submenu_pages'] = [];
+
+if (!function_exists('add_submenu_page')) {
+    function add_submenu_page(string $parent_slug, string $page_title, string $menu_title, string $capability, string $menu_slug, ?callable $callback = null, ?int $position = null): string|false {
+        $GLOBALS['_mock_submenu_pages'][$parent_slug][] = compact('page_title', 'menu_title', 'capability', 'menu_slug', 'position');
+        return $parent_slug . '_page_' . $menu_slug;
     }
 }
 

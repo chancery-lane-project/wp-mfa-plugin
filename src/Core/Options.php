@@ -156,6 +156,21 @@ class Options {
 				'SemrushBot-SWA/',
 				'WARDBot',
 				'ygs-scraper-bot',
+
+				/*
+				 * Seen in access logs, 11–16 Nov 2026 (agent-signals#5): KeenableBot
+				 * asked for Markdown, ClueWeb-Crawler followed Markdown links. YouBot
+				 * is categorised but not served: it made no Markdown requests.
+				 */
+				'KeenableBot',
+				'ClueWeb-Crawler',
+
+				/*
+				 * Meta's crawler for Meta AI search, which cites and links to what it
+				 * reads. Categorised since 1.8.0, served from 1.8.0-rc.3: it followed
+				 * Markdown links 58 times in a week, 16–22 Nov 2026 (agent-signals#7).
+				 */
+				'meta-webindexer',
 			),
 		);
 	}

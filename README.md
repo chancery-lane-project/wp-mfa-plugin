@@ -319,6 +319,7 @@ wp markdown-agents bundle --if-stale
 | `markdown_for_agents_pre_convert` | `(string $html, WP_Post $post)` | Filter HTML before Markdown conversion |
 | `markdown_for_agents_post_convert` | `(string $markdown, WP_Post $post)` | Filter Markdown after conversion |
 | `markdown_for_agents_content_signal` | `(string $signal)` | Modify the `Content-Signal` header value |
+| `markdown_for_agents_canonical_url` | `(string $url, WP_Post\|WP_Term $item)` | Change the page URL sent as `Link: <…>; rel="canonical"` with Markdown served through WordPress, or return `''` to omit it |
 | `markdown_for_agents_cache_headers` | `(array $headers, string $filepath, string $access_method)` | Override the cache-related headers on the Markdown response; `$access_method` is `query-param`, `accept-header` or `ua` |
 | `markdown_for_agents_html_headers` | `(array $headers, string $url)` | Modify or omit the `Link` and `Vary: Accept` headers added to HTML responses that have a Markdown alternate |
 | `markdown_for_agents_flat_tags` | `(array $tags, WP_Post $post)` | Modify the flat cross-taxonomy tags list |
@@ -367,7 +368,7 @@ Run a full regeneration after adding either filter.
 | `markdown_for_agents_taxonomy_file_generated` | Fired after a taxonomy archive `.md` file is written |
 | `markdown_for_agents_taxonomy_file_deleted` | Fired after a taxonomy archive `.md` file is deleted |
 | `markdown_for_agents_unresolved_link` | `(string $url, string $reason)` — fired when a same-host link in post content could not be mapped to an exported document, so it stays an HTML permalink. `$reason` is `not_found` or `ineligible`. Root-relative links are reported in absolute form. Hook to audit export coverage |
-| `markdown_for_agents_stats_sections` | `(array $range)` — fired on the Agent Stats screen after the summary tables and before the daily records, so a companion plugin can add its own sections for the same dates. `$range` is `['start' => ?string, 'end' => ?string, 'label' => string]`: `Y-m-d` dates in UTC, `null` for an open bound (both `null` for All time), and the range as the screen shows it. The page, agent, operator and access method filters are not passed. Output is printed as-is, so escape it. Only users with `manage_options` see the screen |
+| `markdown_for_agents_stats_sections` | `(array $range)` — fired on the Agents → Stats screen after the summary tables and before the daily records, so a companion plugin can add its own sections for the same dates. `$range` is `['start' => ?string, 'end' => ?string, 'label' => string]`: `Y-m-d` dates in UTC, `null` for an open bound (both `null` for All time), and the range as the screen shows it. The page, agent, operator and access method filters are not passed. Output is printed as-is, so escape it. Only users with `manage_options` see the screen |
 
 ---
 
