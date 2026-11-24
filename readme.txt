@@ -252,6 +252,7 @@ Yes. Several filters are available:
 * `markdown_for_agents_serve_taxonomies` — enable/disable serving for taxonomy archive pages
 * `markdown_for_agents_cache_headers` — override the cache-related headers sent with the Markdown response (receives the access method since 1.6.1)
 * `markdown_for_agents_html_headers` — modify or omit the `Link` and `Vary: Accept` headers added to HTML responses that have a Markdown alternate
+* `markdown_for_agents_canonical_url` — change the page URL sent as `Link: <…>; rel="canonical"` with Markdown responses, or return an empty string to omit it
 * `markdown_for_agents_file_generated` — action fired after a file is written
 * `markdown_for_agents_file_deleted` — action fired after a file is deleted
 
@@ -305,6 +306,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Changelog ==
 
 = 1.8.0 =
+* Feature: Markdown served through WordPress (`?output_format=md`, `Accept: text/markdown` or a known AI User-Agent) now names the page as canonical with `Link: <…>; rel="canonical"`: the post's own canonical URL from `wp_get_canonical_url()`, or the term's archive URL for taxonomy archives. Search engines and AI search indexes then cite the page rather than the Markdown. Direct `/wp-content/uploads/…` file URLs are served by the web server and don't get the header. New `markdown_for_agents_canonical_url` filter to change or omit it.
 * Feature: access statistics are now cleaned up automatically. Daily totals older than the period set under Settings → Agent Detection → Statistics are deleted once a day by WP-Cron. The default is 365 days, so no existing site loses data on update (statistics started in March 2026). Choose 30, 90 or 180 days, or keep everything. `wp markdown-agents prune-stats` still works for one-off clean-ups.
 * Feature: RiverBot and ibou-search are now recognised as AI search indexers. Both name themselves but were not on the list, so one site's statistics missed about 1,650 of their page requests in a week (plus 3,300 Markdown requests from ibou-search, which were counted but not categorised).
 * Feature: YouBot (You.com) and KeenableBot are recognised as AI search indexers, and ClueWeb-Crawler (Carnegie Mellon's research corpus crawler) as a training crawler. KeenableBot and ClueWeb-Crawler are served Markdown on their User-Agent, because they asked for it or followed Markdown links; YouBot is counted but served HTML. The same three join the shared agent-signals list (revision 2) used by MfA Signals and MfA Homepage.
