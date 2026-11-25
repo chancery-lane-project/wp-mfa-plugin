@@ -120,6 +120,27 @@ class EarlyServerTest extends TestCase {
         $this->assertNull( $this->server()->resolve( '/2026/10/plain/' ) );
     }
 
+    public function test_reads_long_front_matter_to_its_end(): void {
+        @mkdir( $this->base . '/post', 0755, true );
+        $padding = str_repeat( "excerpt_line: " . str_repeat( 'x', 90 ) . "\n", 100 ); // ~10 KB before the permalink.
+        file_put_contents( $this->base . '/post/long.md', "---\ntype: post\nwpid: 5\n{$padding}permalink: \"https://example.com/2026/10/long/\"\n---\n\n# Long\n" );
+
+        $this->assertSame( 5, $this->server()->resolve( '/2026/10/long/' )['object_id'] );
+    }
+
+    public function test_ignores_front_matter_that_never_closes(): void {
+        @mkdir( $this->base . '/post', 0755, true );
+        file_put_contents( $this->base . '/post/open.md', "---\ntype: post\nwpid: 5\npermalink: \"https://example.com/2026/10/open/\"\n\n# No closing marker\n" );
+
+        $this->assertNull( $this->server()->resolve( '/2026/10/open/' ) );
+    }
+
+    public function test_a_directory_named_like_an_export_is_not_a_match(): void {
+        mkdir( $this->base . '/post/odd.md', 0755, true );
+
+        $this->assertNull( $this->server()->resolve( '/2026/10/odd/' ) );
+    }
+
     public function test_root_path_is_never_resolved(): void {
         $this->assertNull( $this->server()->resolve( '/' ) );
     }

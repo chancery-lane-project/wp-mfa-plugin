@@ -66,9 +66,9 @@ class EarlyServer {
 	);
 
 	/**
-	 * Bytes of a file read to find its front matter.
+	 * Most bytes of a file read while looking for the end of its front matter.
 	 */
-	private const FRONT_MATTER_BYTES = 8192;
+	private const FRONT_MATTER_MAX_BYTES = 16384;
 
 	/**
 	 * @since  1.9.0
@@ -193,10 +193,13 @@ class EarlyServer {
 	 *
 	 * Candidates follow ExportPolicy's default layout: for each enabled post
 	 * type, {type}/{last segment}.md and, for nested paths,
-	 * {type}/{full path}.md; for each taxonomy directory present,
-	 * taxonomy/{taxonomy}/{last segment}.md. A candidate is accepted only if
-	 * it is a file inside the export directory whose front matter permalink
-	 * has the same path as the request, ignoring a trailing slash.
+	 * {type}/{full path}.md; then, for each taxonomy directory present,
+	 * taxonomy/{taxonomy}/{last segment}.md. They are tried in that order and
+	 * the taxonomy directories are only listed if no post matches, because
+	 * every file-system call counts on hosts with slow storage. A candidate is
+	 * accepted only if it is a file inside the export directory whose front
+	 * matter permalink has the same path as the request, ignoring a trailing
+	 * slash.
 	 *
 	 * @since  1.9.0
 	 * @param  string $path Request path.
@@ -220,31 +223,10 @@ class EarlyServer {
 			return null;
 		}
 
-		$last       = sanitize_file_name( (string) end( $segments ) );
-		$nested     = implode( '/', array_map( 'sanitize_file_name', $segments ) );
-		$candidates = array();
-
-		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $type ) {
-			$type         = sanitize_file_name( (string) $type );
-			$candidates[] = $type . '/' . $last . '.md';
-			if ( count( $segments ) > 1 ) {
-				$candidates[] = $type . '/' . $nested . '.md';
-			}
-		}
-
-		$taxonomy_root = $base . '/taxonomy';
-		if ( is_dir( $taxonomy_root ) ) {
-			foreach ( (array) scandir( $taxonomy_root ) as $taxonomy ) {
-				if ( '.' !== $taxonomy[0] && is_dir( $taxonomy_root . '/' . $taxonomy ) ) {
-					$candidates[] = 'taxonomy/' . $taxonomy . '/' . $last . '.md';
-				}
-			}
-		}
-
 		$want = rtrim( $path, '/' );
-		foreach ( array_unique( $candidates ) as $candidate ) {
+		foreach ( $this->candidates( $base, $segments ) as $candidate ) {
 			$file = realpath( $base . '/' . $candidate );
-			if ( false === $file || ! str_starts_with( $file, $base . DIRECTORY_SEPARATOR ) || ! is_file( $file ) ) {
+			if ( false === $file || ! str_starts_with( $file, $base . DIRECTORY_SEPARATOR ) ) {
 				continue;
 			}
 
@@ -272,29 +254,80 @@ class EarlyServer {
 	}
 
 	/**
+	 * Candidate export paths, relative to the export directory, in the order
+	 * resolve() tries them. Generated lazily so the taxonomy directories are
+	 * listed only when every post candidate has failed.
+	 *
+	 * @since  1.9.0
+	 * @param  string   $base     Real path of the export directory.
+	 * @param  string[] $segments Request path segments.
+	 * @return \Generator<int, string>
+	 */
+	private function candidates( string $base, array $segments ): \Generator {
+		$last   = sanitize_file_name( (string) end( $segments ) );
+		$nested = implode( '/', array_map( 'sanitize_file_name', $segments ) );
+		$seen   = array();
+
+		foreach ( (array) ( $this->options['post_types'] ?? array() ) as $type ) {
+			$type  = sanitize_file_name( (string) $type );
+			$paths = count( $segments ) > 1 ? array( $type . '/' . $last . '.md', $type . '/' . $nested . '.md' ) : array( $type . '/' . $last . '.md' );
+			foreach ( $paths as $candidate ) {
+				if ( ! isset( $seen[ $candidate ] ) ) {
+					$seen[ $candidate ] = true;
+					yield $candidate;
+				}
+			}
+		}
+
+		$taxonomies = is_dir( $base . '/taxonomy' ) ? scandir( $base . '/taxonomy' ) : false;
+		foreach ( false === $taxonomies ? array() : $taxonomies as $taxonomy ) {
+			if ( '.' !== $taxonomy[0] ) {
+				yield 'taxonomy/' . $taxonomy . '/' . $last . '.md';
+			}
+		}
+	}
+
+	/**
 	 * Read the scalar fields of a file's YAML front matter.
 	 *
 	 * Only top-level `key: value` lines are read, which is all resolve() needs.
+	 * The file is read a line at a time and closed at the end of the front
+	 * matter, so the body is never read.
 	 *
 	 * @since  1.9.0
 	 * @param  string $file Absolute path.
-	 * @return array<string, string>|null Null when the file has no front matter.
+	 * @return array<string, string>|null Null when the file has no complete front matter.
 	 */
 	private static function front_matter( string $file ): ?array {
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$head = file_get_contents( $file, false, null, 0, self::FRONT_MATTER_BYTES );
-		if ( false === $head || ! preg_match( '/\A---\R(.*?)\R---/s', $head, $block ) ) {
+		// A directory or unreadable file is simply not a match, so the warning is silenced.
+		$handle = @fopen( $file, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen, WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( false === $handle ) {
 			return null;
 		}
 
-		$fields = array();
-		foreach ( preg_split( '/\R/', $block[1] ) as $line ) {
-			if ( preg_match( '/^([a-z_]+):[ \t]*(.*?)[ \t]*$/', $line, $m ) && '' !== $m[2] ) {
-				$value           = $m[2];
-				$quoted          = strlen( $value ) > 1 && '"' === $value[0] && '"' === substr( $value, -1 );
-				$fields[ $m[1] ] = $quoted ? stripcslashes( substr( $value, 1, -1 ) ) : $value;
+		$fields = null;
+		$read   = 0;
+		// On a directory fopen() succeeds and the first read fails with a warning.
+		$line = @fgets( $handle ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+
+		if ( false !== $line && '---' === rtrim( $line, "\r\n" ) ) {
+			$found = array();
+			while ( false !== ( $line = fgets( $handle ) ) && $read < self::FRONT_MATTER_MAX_BYTES ) { // phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition
+				$read += strlen( $line );
+				$line  = rtrim( $line, "\r\n" );
+				if ( '---' === $line ) {
+					$fields = $found;
+					break;
+				}
+				if ( preg_match( '/^([a-z_]+):[ \t]*(.*?)[ \t]*$/', $line, $m ) && '' !== $m[2] ) {
+					$value          = $m[2];
+					$quoted         = strlen( $value ) > 1 && '"' === $value[0] && '"' === substr( $value, -1 );
+					$found[ $m[1] ] = $quoted ? stripcslashes( substr( $value, 1, -1 ) ) : $value;
+				}
 			}
 		}
+
+		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 
 		return $fields;
 	}
