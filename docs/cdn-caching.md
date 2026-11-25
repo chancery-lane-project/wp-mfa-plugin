@@ -99,12 +99,57 @@ values, but only the plugin's recognised values select Markdown.
 | LiteSpeed Cache | Exclude the export directory and `output_format`; also exclude **all configured agent UAs**. Add the Accept rewrite rule from the [README](../README.md#litespeed-cache). |
 | nginx proxy/fastcgi cache | Map the Accept, query and configured-UA triggers to both cache bypass and no-cache controls. `X-Accel-Expires: 0` prevents storing a new negotiated response; it does not rescue an existing HTML hit. |
 | Varnish/Fastly | Pass agent-shaped requests, or correctly normalise/key Accept variants. UA-only requests still need bypass unless independently varied. |
-| Managed hosting, including WP Engine | Ask the provider to exclude these requests at its own cache as well as the CDN. If headers cannot be used for bypass, verify the query route with that provider. |
+| Managed hosting, including WP Engine and Pressable | Ask the provider to exclude these requests at its own cache as well as the CDN. If headers cannot be used for bypass, verify the query route with that provider. For Pressable, see the measured result below. |
 | WordPress page-cache plugins | Check whether an early cache/drop-in answers before `template_redirect`. PHP headers and later hooks cannot repair that hit. |
 
 Multiple layers can each be wrong. `CF-Cache-Status: DYNAMIC` with HTML, for
 example, does not prove WordPress selected HTML: an origin-side page cache may
 have answered instead. Inspect origin cache headers/logs and export eligibility.
+
+### Pressable (WP Cloud edge cache)
+
+Pressable sites sit behind the WP Cloud edge cache, which reports itself in an
+`x-ac` header such as `22.lhr _atomic_ams HIT`. A site may also have Cloudflare
+in front.
+
+On a **controlled test of one posts-only Pressable site on 25 November 2026**,
+behind Cloudflare, an external client fetched 16 URLs, 15 of them eligible.
+Each URL was requested as browser HTML, `?output_format=md`, `Accept:
+text/markdown` and a listed UA, in that order. There was one warm-up and three
+timed rounds.
+
+| Request | Result on every eligible URL |
+| --- | --- |
+| Browser HTML | HTML from the edge cache (`x-ac … HIT` or `STALE`), about 21 ms median |
+| `?output_format=md` | Markdown, `x-ac … MISS` every time, about 470 ms median: the no-store response is not stored, so each one reaches WordPress |
+| `Accept: text/markdown` on the page URL, after the HTML was cached | **Cached HTML** (`x-ac … HIT`) |
+| Synthetic `GPTBot` UA from a non-vendor network | `403` crawler-verification challenge ("Checking search engine crawler") from the edge, before WordPress |
+
+Cloudflare reported `CF-Cache-Status: DYNAMIC` throughout, so the HTML hits came
+from the host's edge, not Cloudflare. A cache bypass rule at Cloudflare does not
+change them.
+
+The cached HTML carried both the plugin's `Vary: Accept` and the edge's own
+`vary: accept, content-type, cookie`, and the edge still replayed it to a
+Markdown request. One earlier single `Accept: text/markdown` request, to a page
+whose HTML was not yet cached, did receive Markdown. So the result depends on
+request order, as the procedure below expects. We have not confirmed with
+Pressable how its edge keys on `Accept`.
+
+What this means on that host:
+
+- `?output_format=md`, the route the `Link` header and `<link rel="alternate">`
+  advertise, works.
+- Agents that negotiate only through `Accept` receive HTML once a page is warm.
+  WordPress never sees the request, so it is not counted in the statistics.
+- UA detection could not be exercised from outside, because the edge challenges
+  a spoofed crawler UA. Genuine vendor fetches from their published networks may
+  pass, but this test does not show that.
+- Markdown always costs an origin request, and edge-cached HTML does not.
+
+Treat this as one dated measurement of one site, not a description of every
+Pressable plan. Run the both-orders procedure below on your own site, and ask
+Pressable about `Accept`-based bypass at its edge if you need it.
 
 ### Direct uploads are a separate path
 
