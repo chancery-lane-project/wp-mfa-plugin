@@ -19,22 +19,25 @@ for HTML pages.
 - You don't rely on filters in a theme or regular plugin to decide what is
   served (see [What it skips](#what-it-skips)).
 
-Measured on one site on Pressable, 25 November 2026, with the prototype this
-feature is based on (5 runs of 15 URLs, medians):
+Measured on one site on Pressable, 25 November 2026 (5 runs of 14 URLs,
+medians):
 
 | Markdown request | Through WordPress | Served early |
 | --- | --- | --- |
-| PHP time | 269 ms | 27 ms |
-| CPU time | 250 ms | 6.5 ms |
-| Peak memory | 28 MB | 4 MB |
-| Time to first byte | 450 ms | 186 ms |
+| PHP time | 269 ms | 36 ms |
+| CPU time | 250 ms | 13 ms |
+| Peak memory | 28 MB | 6 MB |
+| Time to first byte | 450 ms | 169 ms |
 
-What remains is WordPress core starting up. Your figures will differ with your
+For comparison, an HTML page that missed the cache on the same site took
+363 ms of CPU and 32 MB. What remains of an early request is WordPress core
+starting up and the must-use plugins loading; early serving waits for all
+must-use plugins so their filters and any security code in them still run. Your figures will differ with your
 plugins, theme and host: compare the PHP and CPU time of a Markdown request
 with the loader in place and without it before relying on these.
 
-On energy: about 0.24 s of CPU saved per request is roughly 0.05–0.24 mWh at
-0.7–3.5 W per vCPU, or 0.05–0.24 kWh per million Markdown requests. That is a
+On energy: about 0.24 s of CPU saved per request is roughly 0.05–0.23 mWh at
+0.7–3.5 W per vCPU, or 0.05–0.23 kWh per million Markdown requests. That is a
 modelled figure, not a measurement, and small for one site. The stronger
 reasons are capacity and speed: a crawler sending five Markdown requests a
 second keeps about 1.2 CPU cores busy through WordPress and about 0.03 served

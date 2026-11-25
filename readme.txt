@@ -82,7 +82,7 @@ a full WordPress page.
 Yes, optionally. Copy `mu-plugins/markdown-for-agents-early.php` from the plugin
 into `wp-content/mu-plugins/`. Markdown requests are then answered before other
 plugins and the theme load, with the same headers and statistics. On one
-Pressable site that cut each Markdown request from 250 ms of CPU to 6.5 ms. It
+Pressable site that cut each Markdown request from 250 ms of CPU to 13 ms. It
 switches itself off while a regular plugin or the theme hooks one of the
 plugin's serving filters, and it skips plugins that act on every request, such
 as maintenance mode. Delete the file to switch it off. The
@@ -318,7 +318,7 @@ wp markdown-agents generate-taxonomies --dry-run
 == Changelog ==
 
 = Unreleased =
-* Feature: optional early serving. Copy `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` and Markdown requests are answered before other plugins, the theme and the main query load, using the same triggers, response headers and statistics as before. On one Pressable site that took a Markdown request from 250 ms of CPU and 28 MB to 6.5 ms and 4 MB. It finds the export from the URL path and serves it only if the file's own permalink matches. It stands aside while a regular plugin or the theme hooks one of the serving filters, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. Off unless you copy the file; see docs/early-serving.md.
+* Feature: optional early serving. Copy `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` and Markdown requests are answered before other plugins, the theme and the main query load, using the same triggers, response headers and statistics as before. On one Pressable site that took a Markdown request from 250 ms of CPU and 28 MB to 13 ms and 6 MB. It finds the export from the URL path and serves it only if the file's own permalink matches. It stands aside while a regular plugin or the theme hooks one of the serving filters, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. Off unless you copy the file; see docs/early-serving.md.
 * Developer: Markdown responses and their statistics are sent by a new `MarkdownResponder` class shared by both serving routes. No change to hooks or output.
 
 = 1.8.0 =
