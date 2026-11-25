@@ -27,6 +27,7 @@ delete_option( 'markdown_for_agents_db_version' );
 delete_option( 'markdown_for_agents_ua_defaults_seen' );
 delete_option( 'markdown_for_agents_regen_version' );
 delete_option( 'markdown_for_agents_regen_upgrade' );
+delete_option( 'markdown_for_agents_early_guard' );
 delete_transient( 'markdown_for_agents_needs_regen' );
 wp_clear_scheduled_hook( 'markdown_for_agents_rebuild_bundle' );
 

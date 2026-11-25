@@ -77,6 +77,18 @@ No. Markdown files are generated ahead of time (on post save or via manual/CLI
 bulk generation). Serving them is a simple file read, much faster than rendering
 a full WordPress page.
 
+= Can Markdown requests be made cheaper for the server? =
+
+Yes, optionally. Copy `mu-plugins/markdown-for-agents-early.php` from the plugin
+into `wp-content/mu-plugins/`. Markdown requests are then answered before other
+plugins and the theme load, with the same headers and statistics. On one
+Pressable site that cut each Markdown request from 250 ms of CPU to 6.5 ms. It
+switches itself off while a regular plugin or the theme hooks one of the
+plugin's serving filters, and it skips plugins that act on every request, such
+as maintenance mode. Delete the file to switch it off. The
+[early serving guide](https://github.com/chancery-lane-project/wp-mfa-plugin/blob/main/docs/early-serving.md)
+covers what it skips and how to check it.
+
 = Does bulk generation need anything special on my host? =
 
 Bulk generation (the "Generate everything" and per-post-type/taxonomy buttons)
@@ -304,6 +316,10 @@ wp markdown-agents generate-taxonomies --dry-run
 3. WP-CLI status output.
 
 == Changelog ==
+
+= Unreleased =
+* Feature: optional early serving. Copy `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` and Markdown requests are answered before other plugins, the theme and the main query load, using the same triggers, response headers and statistics as before. On one Pressable site that took a Markdown request from 250 ms of CPU and 28 MB to 6.5 ms and 4 MB. It finds the export from the URL path and serves it only if the file's own permalink matches. It stands aside while a regular plugin or the theme hooks one of the serving filters, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. Off unless you copy the file; see docs/early-serving.md.
+* Developer: Markdown responses and their statistics are sent by a new `MarkdownResponder` class shared by both serving routes. No change to hooks or output.
 
 = 1.8.0 =
 * Feature: Markdown served through WordPress (`?output_format=md`, `Accept: text/markdown` or a known AI User-Agent) now names the page as canonical with `Link: <…>; rel="canonical"`: the post's own canonical URL from `wp_get_canonical_url()`, or the term's archive URL for taxonomy archives. Search engines and AI search indexes then cite the page rather than the Markdown. Direct `/wp-content/uploads/…` file URLs are served by the web server and don't get the header. New `markdown_for_agents_canonical_url` filter to change or omit it.
