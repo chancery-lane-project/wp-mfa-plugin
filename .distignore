@@ -14,5 +14,6 @@ phpcs.xml
 .distignore
 .gitignore
 CLAUDE.md
+/vendor/bin
 /vendor-prefixed/league/html-to-markdown/bin
 *.zip
