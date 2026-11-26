@@ -18,7 +18,7 @@ use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
  * trigger rules, the statistics and the response headers here means the two
  * routes cannot drift apart.
  *
- * @since  1.9.0
+ * @since  1.8.0
  * @package Tclp\WpMarkdownForAgents\Negotiate
  */
 class MarkdownResponder {
@@ -29,7 +29,7 @@ class MarkdownResponder {
 	public const SOURCE = 'markdown-for-agents';
 
 	/**
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  AgentDetector $agent_detector Detects known AI agent user-agents.
 	 * @param  AccessLogger  $access_logger  Records agent access events for statistics.
 	 */
@@ -44,7 +44,7 @@ class MarkdownResponder {
 	 * Precedence: query-param > accept-header > ua. The User-Agent trigger
 	 * applies only when UA serving is enabled (AgentDetector::get_matched_agent()).
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  AgentDetector $agent_detector Detector built from the plugin options.
 	 * @param  string        $accept         Sanitised Accept header.
 	 * @param  string        $ua             Sanitised User-Agent header.
@@ -69,7 +69,7 @@ class MarkdownResponder {
 	 * Counts GET selections only, not HEAD probes or other HTTP methods.
 	 *
 	 * @since  1.7.3 As Negotiator::log_access().
-	 * @since  1.9.0 Moved here.
+	 * @since  1.8.0 Moved here.
 	 * @param  int    $object_id     Post ID, or term ID for term archives.
 	 * @param  string $object_type   StatsRepository::OBJECT_POST or StatsRepository::OBJECT_TERM.
 	 * @param  string $ua            Sanitised User-Agent header.
@@ -97,7 +97,7 @@ class MarkdownResponder {
 	 * to subsequent HTML browser requests on the same URL.
 	 *
 	 * @since  1.1.0 As Negotiator::send_markdown_file().
-	 * @since  1.9.0 Moved here; $source added.
+	 * @since  1.8.0 Moved here; $source added.
 	 * @param  string      $filepath      Absolute path to the .md file.
 	 * @param  string      $access_method How the request was identified: 'query-param', 'accept-header' or 'ua'.
 	 * @param  string|null $canonical     The page's URL for the canonical `Link` header, or null for none.

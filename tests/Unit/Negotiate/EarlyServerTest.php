@@ -36,7 +36,7 @@ class EarlyServerTest extends TestCase {
 
     protected function tearDown(): void {
         $this->remove_dir( $this->base );
-        unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ], $GLOBALS['wp_filter'], $GLOBALS['_mock_readfile_path'] );
+        unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ], $GLOBALS['_mock_options']['show_on_front'], $GLOBALS['_mock_options']['page_for_posts'], $GLOBALS['wp_filter'], $GLOBALS['_mock_readfile_path'] );
     }
 
     // -----------------------------------------------------------------------
@@ -145,6 +145,25 @@ class EarlyServerTest extends TestCase {
         $this->assertNull( $this->server()->resolve( '/' ) );
     }
 
+    public function test_the_posts_page_is_left_to_wordpress(): void {
+        // WordPress shows the blog index there, not the page, so Negotiator
+        // never serves the page's export at that URL.
+        $this->export( 'page/blog.md', 'https://example.com/blog/', 'page', 12 );
+        $GLOBALS['_mock_options']['show_on_front']  = 'page';
+        $GLOBALS['_mock_options']['page_for_posts'] = 12;
+
+        $this->assertNull( $this->server()->resolve( '/blog/' ) );
+    }
+
+    public function test_a_page_named_as_posts_page_is_served_while_the_front_page_shows_posts(): void {
+        // page_for_posts is only used when the front page is a static page.
+        $this->export( 'page/blog.md', 'https://example.com/blog/', 'page', 12 );
+        $GLOBALS['_mock_options']['show_on_front']  = 'posts';
+        $GLOBALS['_mock_options']['page_for_posts'] = 12;
+
+        $this->assertSame( 12, $this->server()->resolve( '/blog/' )['object_id'] );
+    }
+
     // -----------------------------------------------------------------------
     // maybe_serve()
     // -----------------------------------------------------------------------
@@ -200,6 +219,14 @@ class EarlyServerTest extends TestCase {
         $this->assertFalse( $this->server()->maybe_serve( '/2026/10/missing/', 'GET', 'text/markdown', '', '' ) );
     }
 
+    public function test_stands_aside_at_once_when_a_must_use_plugin_hooks_a_filter_it_cannot_apply(): void {
+        // Hooked at muplugins_loaded, so it is a must-use plugin's callback.
+        $this->export( 'post/a-post.md', 'https://example.com/2026/10/a-post/', 'post', 42 );
+        $this->hook( 'markdown_for_agents_serve_enabled', 1 );
+
+        $this->assertFalse( $this->server()->maybe_serve( '/2026/10/a-post/', 'GET', '', '', 'md' ) );
+    }
+
     // -----------------------------------------------------------------------
     // Guard
     // -----------------------------------------------------------------------
@@ -210,7 +237,7 @@ class EarlyServerTest extends TestCase {
 
         $this->hook( 'markdown_for_agents_cache_headers', 2 );
         $this->hook( 'get_canonical_url', 1 );
-        EarlyServer::record_guard( $before );
+        EarlyServer::record_guard( $before, '/uploads/x', '/uploads/x' );
 
         $this->assertSame(
             [ 'markdown_for_agents_cache_headers', 'get_canonical_url' ],
@@ -224,7 +251,7 @@ class EarlyServerTest extends TestCase {
         $this->hook( 'markdown_for_agents_cache_headers', 1 );
         unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] );
 
-        EarlyServer::record_guard( EarlyServer::callback_counts() );
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
 
         $this->assertTrue( EarlyServer::guard_is_clear() );
     }
@@ -232,9 +259,76 @@ class EarlyServerTest extends TestCase {
     public function test_record_guard_leaves_an_unchanged_guard_alone(): void {
         $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] = [ 'hooked' => [], 'checked' => 123 ];
 
-        EarlyServer::record_guard( EarlyServer::callback_counts() );
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
 
         $this->assertSame( 123, get_option( EarlyServer::GUARD_OPTION )['checked'] );
+    }
+
+    /**
+     * @dataProvider unapplied_filters
+     */
+    public function test_must_use_plugin_callbacks_on_filters_the_early_route_cannot_apply_block( string $hook ): void {
+        $this->hook( $hook, 1 );
+        unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] );
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
+
+        $this->assertSame( [ $hook ], get_option( EarlyServer::GUARD_OPTION )['hooked'] );
+    }
+
+    /** @return array<string, array{string}> */
+    public static function unapplied_filters(): array {
+        $cases = [];
+        foreach ( EarlyServer::UNAPPLIED_FILTERS as $hook ) {
+            $cases[ $hook ] = [ $hook ];
+        }
+
+        return $cases;
+    }
+
+    public function test_serve_post_types_filter_is_guarded(): void {
+        $this->assertContains( 'markdown_for_agents_serve_post_types', EarlyServer::GUARDED_FILTERS );
+    }
+
+    public function test_a_hooked_filter_stays_recorded_when_a_later_request_does_not_see_it(): void {
+        // A plugin that hooks a filter only for some visitors must not have it
+        // cleared by another visitor's request.
+        $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] = [ 'hooked' => [ 'markdown_for_agents_cache_headers' ], 'checked' => 123 ];
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
+
+        $this->assertSame( [ 'markdown_for_agents_cache_headers' ], get_option( EarlyServer::GUARD_OPTION )['hooked'] );
+        $this->assertSame( 123, get_option( EarlyServer::GUARD_OPTION )['checked'] );
+    }
+
+    public function test_an_export_directory_moved_after_must_use_plugins_blocks(): void {
+        // A regular plugin filtering upload_dir: the early route would read
+        // the export directory from the wrong place.
+        unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] );
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/var/www/wp-content/uploads/wp-mfa-exports', '/srv/media/wp-mfa-exports' );
+
+        $this->assertSame( [ 'upload_dir' ], get_option( EarlyServer::GUARD_OPTION )['hooked'] );
+    }
+
+    public function test_reset_guard_switches_early_serving_off_until_the_next_check(): void {
+        EarlyServer::reset_guard();
+
+        $this->assertFalse( get_option( EarlyServer::GUARD_OPTION ) );
+        $this->assertFalse( EarlyServer::guard_is_clear() );
+    }
+
+    // -----------------------------------------------------------------------
+    // is_front_end_path()
+    // -----------------------------------------------------------------------
+
+    public function test_front_end_paths(): void {
+        $this->assertTrue( EarlyServer::is_front_end_path( '/2026/10/a-post/', '' ) );
+        $this->assertTrue( EarlyServer::is_front_end_path( '/blog/a-post/', '/blog' ) );
+        $this->assertFalse( EarlyServer::is_front_end_path( '/wp-json/wp/v2/posts', '' ) );
+        $this->assertFalse( EarlyServer::is_front_end_path( '/blog/wp-json/wp/v2/posts', '/blog' ) );
+        $this->assertFalse( EarlyServer::is_front_end_path( '/blog/wp-admin/', '/blog' ) );
+        $this->assertFalse( EarlyServer::is_front_end_path( '/xmlrpc.php', '' ) );
     }
 
     // -----------------------------------------------------------------------

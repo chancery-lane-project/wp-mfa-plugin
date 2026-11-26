@@ -32,6 +32,7 @@ use Tclp\WpMarkdownForAgents\Jobs\StageFactory;
 use Tclp\WpMarkdownForAgents\Jobs\SystemClock;
 use Tclp\WpMarkdownForAgents\Jobs\TickMutex;
 use Tclp\WpMarkdownForAgents\Negotiate\AgentDetector;
+use Tclp\WpMarkdownForAgents\Negotiate\EarlyServer;
 use Tclp\WpMarkdownForAgents\Negotiate\Negotiator;
 use Tclp\WpMarkdownForAgents\Stats\AccessLogger;
 use Tclp\WpMarkdownForAgents\Stats\StatsPage;
@@ -81,6 +82,14 @@ class Plugin {
 				Migrator::maybe_flag_upgrade_regen();
 			}
 		);
+
+		// Plugins, themes and updates can add or remove the filters early
+		// serving watches. Clearing its guard switches it off until the next
+		// full front-end request checks them again. Registered whether or not
+		// the loader is installed: these hooks are rare and it costs one query.
+		foreach ( array( 'activated_plugin', 'deactivated_plugin', 'switch_theme', 'upgrader_process_complete' ) as $hook ) {
+			add_action( $hook, array( EarlyServer::class, 'reset_guard' ) );
+		}
 
 		$this->define_negotiate_hooks( $options );
 		$this->define_stats_retention();

@@ -27,11 +27,12 @@ use Tclp\WpMarkdownForAgents\Stats\StatsRepository;
  *
  * Without the main query it finds the export file from the URL path, and
  * serves it only if the permalink in the file's own front matter is the path
- * asked for. Filters added by regular plugins or the theme have not loaded
- * yet, so it switches itself off while any of GUARDED_FILTERS has a callback
- * from them; see record_guard().
+ * asked for. It cannot apply the filters in UNAPPLIED_FILTERS, so it stands
+ * aside while anything hooks them. Filters added by regular plugins or the
+ * theme have not loaded yet, so it also stands aside once a full request has
+ * seen one of them hook APPLIED_FILTERS; see record_guard().
  *
- * @since  1.9.0
+ * @since  1.8.0
  * @package Tclp\WpMarkdownForAgents\Negotiate
  */
 class EarlyServer {
@@ -44,26 +45,52 @@ class EarlyServer {
 	/**
 	 * Autoloaded option holding the guard: array{hooked: string[], checked: int}.
 	 * Absent until a full request has checked the filters; early serving stays
-	 * off until then.
+	 * off until then. `hooked` only grows; reset_guard() clears it.
 	 */
 	public const GUARD_OPTION = 'markdown_for_agents_early_guard';
 
 	/**
-	 * Filters that change what is served or how. When a regular plugin or the
-	 * theme hooks one, the early route cannot honour it, so it stands aside.
+	 * Filters the early route applies itself, through MarkdownResponder::send().
+	 * Must-use plugins have loaded, so their callbacks are honoured; a callback
+	 * from a regular plugin or the theme makes it stand aside.
 	 *
 	 * @var string[]
 	 */
-	public const GUARDED_FILTERS = array(
-		'markdown_for_agents_serve_enabled',
-		'markdown_for_agents_serve_taxonomies',
-		'markdown_for_agents_canonical_url',
+	public const APPLIED_FILTERS = array(
 		'markdown_for_agents_content_signal',
 		'markdown_for_agents_cache_headers',
+	);
+
+	/**
+	 * Filters the early route never applies: it has no main query, post object
+	 * or canonical URL. Any callback, a must-use plugin's included, makes it
+	 * stand aside.
+	 *
+	 * @var string[]
+	 */
+	public const UNAPPLIED_FILTERS = array(
+		'markdown_for_agents_serve_enabled',
+		'markdown_for_agents_serve_post_types',
+		'markdown_for_agents_serve_taxonomies',
+		'markdown_for_agents_canonical_url',
 		'markdown_for_agents_export_path',
 		'markdown_for_agents_post_relative_path',
 		'get_canonical_url',
 	);
+
+	/**
+	 * Every filter that changes what is served or how.
+	 *
+	 * @var string[]
+	 */
+	public const GUARDED_FILTERS = array( ...self::APPLIED_FILTERS, ...self::UNAPPLIED_FILTERS );
+
+	/**
+	 * Name recorded in the guard when the export directory a full request
+	 * resolves differs from the one resolved at muplugins_loaded, i.e. a
+	 * regular plugin or the theme filters `upload_dir`.
+	 */
+	public const MOVED_EXPORT_BASE = 'upload_dir';
 
 	/**
 	 * Most bytes of a file read while looking for the end of its front matter.
@@ -71,7 +98,7 @@ class EarlyServer {
 	private const FRONT_MATTER_MAX_BYTES = 16384;
 
 	/**
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  array<string, mixed> $options     Plugin options.
 	 * @param  AgentDetector        $detector    Detector built from the options.
 	 * @param  MarkdownResponder    $responder   Shared response sender and logger.
@@ -94,7 +121,7 @@ class EarlyServer {
 	 * plugins or the theme. Then, if the request asks for Markdown, it tries
 	 * to serve the file and exit.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 */
 	public static function bootstrap(): void {
 		// Front-end GET and HEAD only. The guard is recorded on the same
@@ -105,7 +132,7 @@ class EarlyServer {
 			return;
 		}
 
-		$method = strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) );
+		$method = strtoupper( sanitize_text_field( self::request_value( $_SERVER, 'REQUEST_METHOD', 'GET' ) ) );
 		if ( 'GET' !== $method && 'HEAD' !== $method ) {
 			return;
 		}
@@ -115,51 +142,99 @@ class EarlyServer {
 			return;
 		}
 
-		$path = (string) wp_parse_url( esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ?? '/' ) ), PHP_URL_PATH );
-		if ( str_starts_with( $path, '/wp-' ) || str_contains( $path, '.php' ) ) {
+		$path      = (string) wp_parse_url( esc_url_raw( self::request_value( $_SERVER, 'REQUEST_URI', '/' ) ), PHP_URL_PATH );
+		$home_path = rtrim( (string) wp_parse_url( (string) get_option( 'home' ), PHP_URL_PATH ), '/' );
+		if ( ! self::is_front_end_path( $path, $home_path ) ) {
 			return;
 		}
 
-		$before = self::callback_counts();
+		$options    = Options::get();
+		$early_base = Options::get_export_base( $options );
+		$before     = self::callback_counts();
 		add_action(
 			'wp_loaded',
-			static function () use ( $before ): void {
-				self::record_guard( $before );
+			static function () use ( $before, $early_base ): void {
+				self::record_guard( $before, $early_base, Options::get_export_base() );
 			},
 			PHP_INT_MAX
 		);
 
 		// The home page has no export of its own to find.
-		if ( '' === $path || '/' === $path ) {
+		if ( '/' === self::strip_home( $path, $home_path ) ) {
 			return;
 		}
 
 		global $wpdb;
-		$options   = Options::get();
-		$detector  = new AgentDetector( $options );
-		$home_path = rtrim( (string) wp_parse_url( (string) get_option( 'home' ), PHP_URL_PATH ), '/' );
-		$server    = new self(
+		$detector = new AgentDetector( $options );
+		$server   = new self(
 			$options,
 			$detector,
 			new MarkdownResponder( $detector, new AccessLogger( new StatsRepository( $wpdb ) ) ),
-			Options::get_export_base( $options ),
+			$early_base,
 			$home_path
 		);
 
 		$server->maybe_serve(
 			$path,
 			$method,
-			sanitize_text_field( wp_unslash( $_SERVER['HTTP_ACCEPT'] ?? '' ) ),
-			sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ?? '' ) ),
-			sanitize_key( wp_unslash( $_GET['output_format'] ?? '' ) ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			sanitize_text_field( self::request_value( $_SERVER, 'HTTP_ACCEPT' ) ),
+			sanitize_text_field( self::request_value( $_SERVER, 'HTTP_USER_AGENT' ) ),
+			sanitize_key( self::request_value( $_GET, 'output_format' ) ) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		);
+	}
+
+	/**
+	 * Whether a request path is one early serving should look at: not
+	 * wp-admin, wp-json or another wp-* path, and not a PHP file. Allows for
+	 * a home URL with a path, such as /blog/wp-json/.
+	 *
+	 * @since  1.8.0
+	 * @param  string $path      Request path.
+	 * @param  string $home_path Path of the home URL, e.g. '' or '/blog'.
+	 */
+	public static function is_front_end_path( string $path, string $home_path ): bool {
+		return ! str_starts_with( $path, '/wp-' )
+			&& ! str_starts_with( self::strip_home( $path, $home_path ), '/wp-' )
+			&& ! str_contains( $path, '.php' );
+	}
+
+	/**
+	 * A request value as the client sent it.
+	 *
+	 * At muplugins_loaded, wp_magic_quotes() has not run yet (it runs after
+	 * plugins_loaded), so the superglobals are not slashed. wp_unslash() here
+	 * would strip backslashes the client really sent, and an agent would be
+	 * labelled differently from the same request served through Negotiator.
+	 *
+	 * @since  1.8.0
+	 * @param  array<string, mixed> $source  $_SERVER or $_GET.
+	 * @param  string               $key     Key to read.
+	 * @param  string               $fallback Value when the key is absent or not a string.
+	 */
+	private static function request_value( array $source, string $key, string $fallback = '' ): string {
+		return isset( $source[ $key ] ) && is_string( $source[ $key ] ) ? $source[ $key ] : $fallback;
+	}
+
+	/**
+	 * A request path relative to the home URL's path, always starting with '/'.
+	 *
+	 * @since  1.8.0
+	 * @param  string $path      Request path.
+	 * @param  string $home_path Path of the home URL, e.g. '' or '/blog'.
+	 */
+	private static function strip_home( string $path, string $home_path ): string {
+		if ( '' !== $home_path && ( $path === $home_path || str_starts_with( $path, $home_path . '/' ) ) ) {
+			$path = substr( $path, strlen( $home_path ) );
+		}
+
+		return '/' . ltrim( $path, '/' );
 	}
 
 	/**
 	 * Serve the request's Markdown if it asks for it and a matching export
 	 * exists. Exits after sending; returns false when it did not serve.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  string $path      Request path, e.g. '/2026/10/a-post/'.
 	 * @param  string $method    'GET' or 'HEAD'.
 	 * @param  string $accept    Sanitised Accept header.
@@ -201,17 +276,13 @@ class EarlyServer {
 	 * matter permalink has the same path as the request, ignoring a trailing
 	 * slash.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  string $path Request path.
 	 * @return array{file: string, permalink: string, object_id: int, object_type: string}|null
 	 */
 	public function resolve( string $path ): ?array {
-		$path = rawurldecode( $path );
-		if ( '' !== $this->home_path && str_starts_with( $path, $this->home_path . '/' ) ) {
-			$relative = substr( $path, strlen( $this->home_path ) );
-		} else {
-			$relative = $path;
-		}
+		$path     = rawurldecode( $path );
+		$relative = self::strip_home( $path, $this->home_path );
 
 		$segments = array_values( array_filter( explode( '/', trim( $relative, '/' ) ), 'strlen' ) );
 		if ( ! $segments ) {
@@ -242,6 +313,12 @@ class EarlyServer {
 			$is_term   = 'taxonomy_archive' === ( $front['type'] ?? '' );
 			$object_id = (int) ( $is_term ? ( $front['term_id'] ?? 0 ) : ( $front['wpid'] ?? 0 ) );
 
+			// WordPress shows the blog index at the posts page's URL, and
+			// Negotiator serves nothing there (is_singular() is false).
+			if ( ! $is_term && $object_id > 0 && $object_id === self::posts_page_id() ) {
+				return null;
+			}
+
 			return array(
 				'file'        => $file,
 				'permalink'   => esc_url_raw( $front['permalink'] ),
@@ -258,7 +335,7 @@ class EarlyServer {
 	 * resolve() tries them. Generated lazily so the taxonomy directories are
 	 * listed only when every post candidate has failed.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  string   $base     Real path of the export directory.
 	 * @param  string[] $segments Request path segments.
 	 * @return \Generator<int, string>
@@ -294,7 +371,7 @@ class EarlyServer {
 	 * The file is read a line at a time and closed at the end of the front
 	 * matter, so the body is never read.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
 	 * @param  string $file Absolute path.
 	 * @return array<string, string>|null Null when the file has no complete front matter.
 	 */
@@ -333,28 +410,54 @@ class EarlyServer {
 	}
 
 	/**
-	 * Whether a full request has checked the guarded filters and found none
-	 * hooked by regular plugins or the theme.
+	 * The page set as the posts page, or 0 when the front page shows posts.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
+	 */
+	private static function posts_page_id(): int {
+		return 'page' === get_option( 'show_on_front' ) ? (int) get_option( 'page_for_posts' ) : 0;
+	}
+
+	/**
+	 * Whether early serving may answer: a full request has checked the guarded
+	 * filters and recorded none, and nothing hooks a filter the early route
+	 * cannot apply. Called at muplugins_loaded, so any callback present now
+	 * comes from a must-use plugin.
+	 *
+	 * @since  1.8.0
 	 */
 	public static function guard_is_clear(): bool {
 		$guard = get_option( self::GUARD_OPTION );
+		if ( ! is_array( $guard ) || ! isset( $guard['hooked'] ) || array() !== $guard['hooked'] ) {
+			return false;
+		}
 
-		return is_array( $guard ) && isset( $guard['hooked'] ) && array() === $guard['hooked'];
+		return array() === array_filter( self::callback_counts( self::UNAPPLIED_FILTERS ) );
+	}
+
+	/**
+	 * Switch early serving off until the next full front-end request checks
+	 * the filters again. Hooked to plugin activation and deactivation, theme
+	 * switches and updates, which can add or remove filters.
+	 *
+	 * @since  1.8.0
+	 */
+	public static function reset_guard(): void {
+		delete_option( self::GUARD_OPTION );
 	}
 
 	/**
 	 * Count the callbacks on each guarded filter.
 	 *
-	 * @since  1.9.0
+	 * @since  1.8.0
+	 * @param  string[]|null $hooks Filters to count; GUARDED_FILTERS when null.
 	 * @return array<string, int>
 	 */
-	public static function callback_counts(): array {
+	public static function callback_counts( ?array $hooks = null ): array {
 		global $wp_filter;
 
 		$counts = array();
-		foreach ( self::GUARDED_FILTERS as $hook ) {
+		foreach ( $hooks ?? self::GUARDED_FILTERS as $hook ) {
 			$count = 0;
 			if ( isset( $wp_filter[ $hook ] ) && is_object( $wp_filter[ $hook ] ) ) {
 				foreach ( (array) $wp_filter[ $hook ]->callbacks as $callbacks ) {
@@ -368,30 +471,46 @@ class EarlyServer {
 	}
 
 	/**
-	 * Record which guarded filters gained callbacks after must-use plugins.
+	 * Record which guarded filters early serving cannot honour.
 	 *
 	 * Runs at wp_loaded on front-end requests that load fully, once regular
-	 * plugins, the theme and init have run. Callbacks added by
-	 * must-use plugins were already counted in $before, so they do not block
-	 * early serving: they are loaded on early requests too. Writes the option
-	 * only when the list changes.
+	 * plugins, the theme and init have run. A filter is recorded when:
+	 *
+	 * - it is in UNAPPLIED_FILTERS and has any callback;
+	 * - it is in APPLIED_FILTERS and gained a callback after must-use plugins
+	 *   (those in $before load on early requests too, so they are honoured);
+	 * - MOVED_EXPORT_BASE, when the export directory differs from the one
+	 *   resolved at muplugins_loaded.
+	 *
+	 * The list only grows: a plugin that hooks a filter for some visitors only
+	 * must not have it cleared by another visitor's request, and the option is
+	 * written only when something new is seen. reset_guard() starts it again.
 	 *
 	 * A callback added after wp_loaded, for example inside a template_redirect
 	 * callback, is not seen. The documentation says so.
 	 *
-	 * @since  1.9.0
-	 * @param  array<string, int> $before Counts taken at muplugins_loaded.
+	 * @since  1.8.0
+	 * @param  array<string, int> $before     Counts taken at muplugins_loaded.
+	 * @param  string             $early_base Export directory resolved at muplugins_loaded.
+	 * @param  string             $late_base  Export directory resolved now.
 	 */
-	public static function record_guard( array $before ): void {
-		$hooked = array();
+	public static function record_guard( array $before, string $early_base, string $late_base ): void {
+		$current = get_option( self::GUARD_OPTION );
+		$known   = is_array( $current ) && is_array( $current['hooked'] ?? null ) ? array_values( $current['hooked'] ) : array();
+
+		$seen = array();
 		foreach ( self::callback_counts() as $hook => $count ) {
-			if ( $count > ( $before[ $hook ] ?? 0 ) ) {
-				$hooked[] = $hook;
+			$allowed = in_array( $hook, self::APPLIED_FILTERS, true ) ? ( $before[ $hook ] ?? 0 ) : 0;
+			if ( $count > $allowed ) {
+				$seen[] = $hook;
 			}
 		}
+		if ( $early_base !== $late_base ) {
+			$seen[] = self::MOVED_EXPORT_BASE;
+		}
 
-		$current = get_option( self::GUARD_OPTION );
-		if ( is_array( $current ) && ( $current['hooked'] ?? null ) === $hooked ) {
+		$hooked = array_values( array_unique( array_merge( $known, $seen ) ) );
+		if ( is_array( $current ) && $known === $hooked ) {
 			return;
 		}
 
