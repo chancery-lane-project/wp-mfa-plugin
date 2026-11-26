@@ -12,6 +12,10 @@
  * it is working.
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 foreach ( (array) get_option( 'active_plugins', array() ) as $markdown_for_agents_plugin ) {
 	$markdown_for_agents_plugin = (string) $markdown_for_agents_plugin;
 

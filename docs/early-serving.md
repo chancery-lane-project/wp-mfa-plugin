@@ -1,4 +1,9 @@
-# Early serving (optional)
+# Early serving (experimental)
+
+> Experimental. It has been measured on one site, it skips regular plugins and
+> the theme for the requests it answers, and it may change or be removed in a
+> later release. Try it on a staging site first, and check the statistics
+> still look as they did after a week or two.
 
 Normally the plugin decides whether to serve Markdown at `template_redirect`.
 By then WordPress has loaded every active plugin, the theme, run every `init`
@@ -120,6 +125,8 @@ checked on every early request.
 **Plugins that act on every request.** Maintenance-mode and coming-soon
 plugins, membership plugins and security plugins that block or rate-limit in
 PHP have not loaded. Remove the loader while the site is in maintenance mode.
+Response headers a regular plugin or the theme adds, such as CORS headers, are
+missing from early responses.
 Firewalls that run before WordPress, such as a CDN or `auto_prepend_file`
 WAF, are unaffected.
 
