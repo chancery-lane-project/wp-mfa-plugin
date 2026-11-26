@@ -43,9 +43,12 @@ class EarlyServer {
 	public const SOURCE = 'markdown-for-agents-early';
 
 	/**
-	 * Autoloaded option holding the guard: array{hooked: string[], checked: int}.
-	 * Absent until a full request has checked the filters; early serving stays
-	 * off until then. `hooked` only grows; reset_guard() clears it.
+	 * Autoloaded option holding the guard:
+	 * array{hooked?: string[], checked?: int, reset?: string}.
+	 * `hooked` is absent until a full request has checked the filters; early
+	 * serving stays off until then. `hooked` only grows; reset_guard() drops it
+	 * and sets a new `reset` token, which stops a request that started before
+	 * the reset from recording what it saw.
 	 */
 	public const GUARD_OPTION = 'markdown_for_agents_early_guard';
 
@@ -151,16 +154,29 @@ class EarlyServer {
 		$options    = Options::get();
 		$early_base = Options::get_export_base( $options );
 		$before     = self::callback_counts();
+		$token      = self::guard_token( get_option( self::GUARD_OPTION ) );
 		add_action(
 			'wp_loaded',
-			static function () use ( $before, $early_base ): void {
-				self::record_guard( $before, $early_base, Options::get_export_base() );
+			static function () use ( $before, $early_base, $token ): void {
+				// get_export_base() above cached the uploads directory for
+				// this request, and a cached value only has the `upload_dir`
+				// filter re-applied. Working it out again also sees a regular
+				// plugin or the theme that moves it another way (the
+				// upload_path option, the UPLOADS constant), and gives the
+				// rest of the request the right value.
+				wp_upload_dir( null, false, true );
+				self::record_guard( $before, $early_base, Options::get_export_base(), $token );
 			},
 			PHP_INT_MAX
 		);
 
 		// The home page has no export of its own to find.
 		if ( '/' === self::strip_home( $path, $home_path ) ) {
+			return;
+		}
+
+		// Public content-negotiation parameter on anonymous frontend requests — nonces are not applicable here.
+		if ( self::has_other_query_vars( $_GET ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
 
@@ -196,6 +212,23 @@ class EarlyServer {
 		return ! str_starts_with( $path, '/wp-' )
 			&& ! str_starts_with( self::strip_home( $path, $home_path ), '/wp-' )
 			&& ! str_contains( $path, '.php' );
+	}
+
+	/**
+	 * Whether the query string carries anything besides output_format.
+	 *
+	 * A query variable can change what WordPress shows at a path (?s=, ?p=,
+	 * ?feed=, ?preview=), and plugins register their own after this runs.
+	 * Without the main query the early route cannot tell which ones matter, so
+	 * it leaves every such request to WordPress.
+	 *
+	 * @since  1.8.0
+	 * @param  array<int|string, mixed> $query $_GET.
+	 */
+	public static function has_other_query_vars( array $query ): bool {
+		unset( $query['output_format'] );
+
+		return array() !== $query;
 	}
 
 	/**
@@ -440,10 +473,51 @@ class EarlyServer {
 	 * the filters again. Hooked to plugin activation and deactivation, theme
 	 * switches and updates, which can add or remove filters.
 	 *
+	 * The option is replaced, not deleted: the new token tells record_guard()
+	 * on a request already under way, which loaded the old plugins or theme,
+	 * not to write what it saw.
+	 *
 	 * @since  1.8.0
 	 */
 	public static function reset_guard(): void {
-		delete_option( self::GUARD_OPTION );
+		update_option( self::GUARD_OPTION, array( 'reset' => bin2hex( random_bytes( 8 ) ) ), true );
+	}
+
+	/**
+	 * The reset token in a guard value, or '' when it has none.
+	 *
+	 * @since  1.8.0
+	 * @param  mixed $guard Value of GUARD_OPTION.
+	 */
+	public static function guard_token( mixed $guard ): string {
+		return is_array( $guard ) && is_string( $guard['reset'] ?? null ) ? $guard['reset'] : '';
+	}
+
+	/**
+	 * The filters listed in a guard value, or null when it has no valid list.
+	 *
+	 * @since  1.8.0
+	 * @param  mixed $guard Value of GUARD_OPTION.
+	 * @return string[]|null
+	 */
+	private static function guard_hooked( mixed $guard ): ?array {
+		return is_array( $guard ) && is_array( $guard['hooked'] ?? null ) ? array_values( $guard['hooked'] ) : null;
+	}
+
+	/**
+	 * The guard as stored now, read past the options cache: this request's
+	 * cached copy cannot show a reset made by another request since it started.
+	 *
+	 * @since  1.8.0
+	 * @return mixed False when the option does not exist.
+	 */
+	private static function stored_guard(): mixed {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- The cached value is the one being checked against.
+		$raw = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", self::GUARD_OPTION ) );
+
+		return is_string( $raw ) ? maybe_unserialize( $raw ) : false;
 	}
 
 	/**
@@ -484,7 +558,12 @@ class EarlyServer {
 	 *
 	 * The list only grows: a plugin that hooks a filter for some visitors only
 	 * must not have it cleared by another visitor's request, and the option is
-	 * written only when something new is seen. reset_guard() starts it again.
+	 * written only when something new is seen or it holds no valid list.
+	 * reset_guard() starts it again.
+	 *
+	 * Nothing is written when the stored reset token differs from $token: a
+	 * plugin or theme changed while this request ran, so what it saw is out of
+	 * date. The next full request records the guard instead.
 	 *
 	 * A callback added after wp_loaded, for example inside a template_redirect
 	 * callback, is not seen. The documentation says so.
@@ -493,11 +572,9 @@ class EarlyServer {
 	 * @param  array<string, int> $before     Counts taken at muplugins_loaded.
 	 * @param  string             $early_base Export directory resolved at muplugins_loaded.
 	 * @param  string             $late_base  Export directory resolved now.
+	 * @param  string             $token      Reset token of the guard at muplugins_loaded.
 	 */
-	public static function record_guard( array $before, string $early_base, string $late_base ): void {
-		$current = get_option( self::GUARD_OPTION );
-		$known   = is_array( $current ) && is_array( $current['hooked'] ?? null ) ? array_values( $current['hooked'] ) : array();
-
+	public static function record_guard( array $before, string $early_base, string $late_base, string $token = '' ): void {
 		$seen = array();
 		foreach ( self::callback_counts() as $hook => $count ) {
 			$allowed = in_array( $hook, self::APPLIED_FILTERS, true ) ? ( $before[ $hook ] ?? 0 ) : 0;
@@ -509,18 +586,25 @@ class EarlyServer {
 			$seen[] = self::MOVED_EXPORT_BASE;
 		}
 
-		$hooked = array_values( array_unique( array_merge( $known, $seen ) ) );
-		if ( is_array( $current ) && $known === $hooked ) {
+		$known = self::guard_hooked( get_option( self::GUARD_OPTION ) );
+		if ( null !== $known && array() === array_diff( $seen, $known ) ) {
 			return;
 		}
 
-		update_option(
-			self::GUARD_OPTION,
-			array(
-				'hooked'  => $hooked,
-				'checked' => time(),
-			),
-			true
+		// Something to write, which is rare, so one uncached read is affordable.
+		$stored = self::stored_guard();
+		if ( self::guard_token( $stored ) !== $token ) {
+			return;
+		}
+
+		$guard = array(
+			'hooked'  => array_values( array_unique( array_merge( self::guard_hooked( $stored ) ?? array(), $seen ) ) ),
+			'checked' => time(),
 		);
+		if ( '' !== $token ) {
+			$guard['reset'] = $token;
+		}
+
+		update_option( self::GUARD_OPTION, $guard, true );
 	}
 }

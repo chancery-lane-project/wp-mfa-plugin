@@ -73,10 +73,12 @@ curl -sI 'https://example.org/a-post/?output_format=md' | grep -i x-markdown-sou
 wp option get markdown_for_agents_early_guard --format=json
 ```
 
-`{"hooked":[]}` means early serving is active. A list of filter names means it
-is standing aside because something hooks them. `upload_dir` in the list means
-a regular plugin or the theme moves the uploads directory, so the early route
-would look for exports in the wrong place.
+An empty `hooked` list means early serving is active. A list of filter names
+means it is standing aside because something hooks them. `upload_dir` in the
+list means a regular plugin or the theme moves the uploads directory, so the
+early route would look for exports in the wrong place. No `hooked` at all, only
+a `reset` value, means a plugin or theme changed and no full front-end request
+has checked the filters since.
 
 A filter stays on the list once it has been seen, even if later requests
 don't see it: a plugin may hook a filter for some visitors only. The list
@@ -134,6 +136,11 @@ URL it cannot match carries on to WordPress and is handled as usual. That
 includes the home page, the page set as the posts page (WordPress shows the
 blog index there, which has no Markdown), files moved by the path filters,
 and, if `sanitize_file_name()` changes them, slugs with non-ASCII characters.
+
+**Query strings.** A query variable can change what WordPress shows at a path
+(`?s=`, `?p=`, `?preview=`), and early serving has no main query to tell. Any
+request whose query string holds something other than `output_format`,
+tracking parameters such as `utm_source` included, goes through WordPress.
 
 **Multisite.** Not supported; the loader does nothing there.
 

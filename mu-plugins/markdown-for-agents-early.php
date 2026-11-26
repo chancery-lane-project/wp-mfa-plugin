@@ -18,11 +18,12 @@ foreach ( (array) get_option( 'active_plugins', array() ) as $markdown_for_agent
 	if ( 'markdown-for-agents.php' === basename( $markdown_for_agents_plugin ) && '.' !== dirname( $markdown_for_agents_plugin ) ) {
 		$markdown_for_agents_early = WP_PLUGIN_DIR . '/' . dirname( $markdown_for_agents_plugin ) . '/early-serve.php';
 
+		// Another plugin's main file can share the name, so keep looking
+		// until one of them has the entry point.
 		if ( is_readable( $markdown_for_agents_early ) ) {
 			require_once $markdown_for_agents_early;
+			break;
 		}
-
-		break;
 	}
 }
 

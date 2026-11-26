@@ -23,7 +23,28 @@ class EarlyServerTest extends TestCase {
     /** @var AccessLogger&MockObject */
     private AccessLogger $logger;
 
+    private mixed $previous_wpdb;
+
     protected function setUp(): void {
+        // record_guard() reads the stored guard past the options cache. The
+        // stub answers with the mocked option unless a test sets ->stored to
+        // play another request having changed it.
+        $this->previous_wpdb = $GLOBALS['wpdb'] ?? null;
+        $GLOBALS['wpdb']     = new class() {
+            public string $options = 'wp_options';
+            public mixed $stored   = null;
+
+            public function prepare( string $query, mixed ...$args ): string {
+                return $query;
+            }
+
+            public function get_var( string $query ): ?string {
+                $value = $this->stored ?? $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] ?? null;
+
+                return null === $value ? null : serialize( $value );
+            }
+        };
+
         $this->base   = sys_get_temp_dir() . '/' . uniqid( 'wp-mfa-early-', true );
         $this->logger = $this->createMock( AccessLogger::class );
         mkdir( $this->base, 0755, true );
@@ -36,6 +57,7 @@ class EarlyServerTest extends TestCase {
 
     protected function tearDown(): void {
         $this->remove_dir( $this->base );
+        $GLOBALS['wpdb'] = $this->previous_wpdb;
         unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ], $GLOBALS['_mock_options']['show_on_front'], $GLOBALS['_mock_options']['page_for_posts'], $GLOBALS['wp_filter'], $GLOBALS['_mock_readfile_path'] );
     }
 
@@ -314,8 +336,97 @@ class EarlyServerTest extends TestCase {
     public function test_reset_guard_switches_early_serving_off_until_the_next_check(): void {
         EarlyServer::reset_guard();
 
-        $this->assertFalse( get_option( EarlyServer::GUARD_OPTION ) );
+        $guard = get_option( EarlyServer::GUARD_OPTION );
+        $this->assertArrayNotHasKey( 'hooked', $guard );
+        $this->assertNotSame( '', EarlyServer::guard_token( $guard ) );
         $this->assertFalse( EarlyServer::guard_is_clear() );
+    }
+
+    public function test_each_reset_has_its_own_token(): void {
+        EarlyServer::reset_guard();
+        $first = EarlyServer::guard_token( get_option( EarlyServer::GUARD_OPTION ) );
+        EarlyServer::reset_guard();
+
+        $this->assertNotSame( $first, EarlyServer::guard_token( get_option( EarlyServer::GUARD_OPTION ) ) );
+    }
+
+    public function test_the_first_full_request_after_a_reset_records_the_guard_and_keeps_the_token(): void {
+        EarlyServer::reset_guard();
+        $token = EarlyServer::guard_token( get_option( EarlyServer::GUARD_OPTION ) );
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x', $token );
+
+        $this->assertTrue( EarlyServer::guard_is_clear() );
+        $this->assertSame( $token, EarlyServer::guard_token( get_option( EarlyServer::GUARD_OPTION ) ) );
+    }
+
+    public function test_a_request_that_started_before_a_reset_does_not_record_what_it_saw(): void {
+        // The request loaded the old plugins and still has the old guard in
+        // its options cache; another request has reset the stored one since.
+        $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] = [ 'reset' => 'old' ];
+        $GLOBALS['wpdb']->stored                               = [ 'reset' => 'new' ];
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x', 'old' );
+
+        $this->assertSame( [ 'reset' => 'old' ], get_option( EarlyServer::GUARD_OPTION ) );
+        $this->assertFalse( EarlyServer::guard_is_clear() );
+    }
+
+    public function test_a_reset_of_a_guard_that_had_no_token_is_seen_too(): void {
+        $GLOBALS['wpdb']->stored = [ 'reset' => 'new' ];
+
+        $this->hook( 'get_canonical_url', 1 );
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x', '' );
+
+        $this->assertSame( [ 'hooked' => [], 'checked' => 1 ], get_option( EarlyServer::GUARD_OPTION ) );
+    }
+
+    public function test_record_guard_adds_to_what_another_request_has_stored(): void {
+        unset( $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] );
+        $GLOBALS['wpdb']->stored = [ 'hooked' => [ 'markdown_for_agents_cache_headers' ], 'checked' => 1 ];
+
+        $this->hook( 'get_canonical_url', 1 );
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
+
+        $this->assertSame( [ 'markdown_for_agents_cache_headers', 'get_canonical_url' ], get_option( EarlyServer::GUARD_OPTION )['hooked'] );
+    }
+
+    /**
+     * @dataProvider malformed_guards
+     * @param mixed $guard
+     */
+    public function test_record_guard_repairs_a_guard_without_a_valid_list( $guard ): void {
+        // A bad import or manual edit would otherwise keep early serving off
+        // until someone deleted the option.
+        $GLOBALS['_mock_options'][ EarlyServer::GUARD_OPTION ] = $guard;
+        $this->assertFalse( EarlyServer::guard_is_clear() );
+
+        EarlyServer::record_guard( EarlyServer::callback_counts(), '/uploads/x', '/uploads/x' );
+
+        $this->assertTrue( EarlyServer::guard_is_clear() );
+    }
+
+    /** @return array<string, array{mixed}> */
+    public static function malformed_guards(): array {
+        return [
+            'no list'       => [ [ 'checked' => 123 ] ],
+            'null list'     => [ [ 'hooked' => null ] ],
+            'list a string' => [ [ 'hooked' => '', 'checked' => 123 ] ],
+            'not an array'  => [ 'yes' ],
+        ];
+    }
+
+    // -----------------------------------------------------------------------
+    // has_other_query_vars()
+    // -----------------------------------------------------------------------
+
+    public function test_only_output_format_may_be_in_the_query_string(): void {
+        $this->assertFalse( EarlyServer::has_other_query_vars( [] ) );
+        $this->assertFalse( EarlyServer::has_other_query_vars( [ 'output_format' => 'md' ] ) );
+        // WordPress would run a search, show another post or a preview.
+        $this->assertTrue( EarlyServer::has_other_query_vars( [ 'output_format' => 'md', 's' => 'climate' ] ) );
+        $this->assertTrue( EarlyServer::has_other_query_vars( [ 'p' => '7' ] ) );
+        $this->assertTrue( EarlyServer::has_other_query_vars( [ 'preview' => 'true' ] ) );
     }
 
     // -----------------------------------------------------------------------
