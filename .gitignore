@@ -2,6 +2,7 @@
 ~*
 /docs/*
 !/docs/cdn-caching.md
+!/docs/early-serving.md
 .superpowers
 
 phpcs.xml.dist

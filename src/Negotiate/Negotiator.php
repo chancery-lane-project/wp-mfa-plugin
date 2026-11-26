@@ -34,6 +34,11 @@ class Negotiator {
 	private ?array $alternate_url = null;
 
 	/**
+	 * Sends Markdown responses and records them; shared with EarlyServer.
+	 */
+	private MarkdownResponder $responder;
+
+	/**
 	 * @since  1.0.0
 	 * @param  array<string, mixed>    $options           Plugin options.
 	 * @param  Generator               $generator         Generator instance (provides get_export_path).
@@ -47,7 +52,9 @@ class Negotiator {
 		private readonly TaxonomyArchiveGenerator $taxonomy_generator,
 		private readonly AgentDetector $agent_detector,
 		private readonly AccessLogger $access_logger
-	) {}
+	) {
+		$this->responder = new MarkdownResponder( $agent_detector, $access_logger );
+	}
 
 	/**
 	 * Serve the Markdown file if the request accepts text/markdown.
@@ -63,21 +70,10 @@ class Negotiator {
 		// Public content-negotiation parameter on anonymous frontend requests — nonces are not applicable here.
 		$format_qp = sanitize_key( $_GET['output_format'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		$matched_agent = $this->agent_detector->get_matched_agent( $ua );  // serving gate.
-		$via_accept    = str_contains( $accept, 'text/markdown' );
-		$via_query     = in_array( $format_qp, array( 'md', 'markdown' ), true );
+		$access_method = MarkdownResponder::access_method( $this->agent_detector, $accept, $ua, $format_qp );
 
-		if ( ! $via_accept && ! $via_query && null === $matched_agent ) {
+		if ( null === $access_method ) {
 			return;
-		}
-
-		// Method precedence: query-param > accept-header > ua.
-		if ( $via_query ) {
-			$access_method = 'query-param';
-		} elseif ( $via_accept ) {
-			$access_method = 'accept-header';
-		} else {
-			$access_method = 'ua';
 		}
 
 		if ( $this->is_eligible_singular() ) {
@@ -153,16 +149,7 @@ class Negotiator {
 	 * @param  string $access_method How the request arrived: 'ua', 'accept-header', or 'query-param'.
 	 */
 	private function log_access( int $object_id, string $object_type, string $ua, string $method, string $access_method ): void {
-		if ( 'GET' !== $method ) {
-			return;
-		}
-
-		// Agent detection for stats: always tries UA match, ignores ua_force_enabled.
-		// Falls back to normalised UA so query-param / accept-header requests still
-		// record the caller's product name even when no known-agent pattern matches.
-		$agent = $this->agent_detector->detect_agent( $ua ) ?? $this->agent_detector->normalise_ua( $ua );
-
-		$this->access_logger->log_access( $object_id, $agent, $access_method, $object_type );
+		$this->responder->log_access( $object_id, $object_type, $ua, $method, $access_method );
 	}
 
 	/**
@@ -397,11 +384,7 @@ class Negotiator {
 	}
 
 	/**
-	 * Send HTTP headers and stream the Markdown file to the client.
-	 *
-	 * Emits cache-bypass headers so full-page caches (LiteSpeed, Varnish,
-	 * nginx fastcgi_cache) do not store the Markdown response and replay it
-	 * to subsequent HTML browser requests on the same URL.
+	 * Send the Markdown response; see MarkdownResponder::send().
 	 *
 	 * @since  1.1.0
 	 * @param  string      $filepath      Absolute path to the .md file.
@@ -409,78 +392,6 @@ class Negotiator {
 	 * @param  string|null $canonical     The page's URL for the canonical `Link` header, or null for none.
 	 */
 	private function send_markdown_file( string $filepath, string $access_method, ?string $canonical = null ): void {
-		header( 'Content-Type: text/markdown; charset=utf-8' );
-
-		/**
-		 * Filter the cache-related headers sent with the Markdown response.
-		 *
-		 * Caches that respect these defaults do not store the negotiated
-		 * Markdown variant. An overriding cache rule can defeat the headers.
-		 * Override with caution — but note the risk differs by access method:
-		 * 'accept-header' and 'ua' responses share the page URL with the HTML
-		 * representation, so allowing them to be cached risks a cache layer
-		 * that ignores `Vary` serving Markdown to browsers. 'query-param'
-		 * responses have their own key only when every cache preserves
-		 * output_format; verify that before making them cacheable. Map a
-		 * header to an empty string to omit it entirely.
-		 *
-		 * @since 1.5.1
-		 * @since 1.6.1 Added the `$access_method` parameter.
-		 * @param array<string,string> $headers       Header name => value pairs.
-		 * @param string               $filepath      Absolute path to the .md file.
-		 * @param string               $access_method 'query-param', 'accept-header' or 'ua'.
-		 */
-		$cache_headers = apply_filters(
-			'markdown_for_agents_cache_headers',
-			array(
-				'Cache-Control'             => 'private, no-store, max-age=0',
-				'X-LiteSpeed-Cache-Control' => 'no-cache',
-				'X-Accel-Expires'           => '0',
-				'Vary'                      => 'Accept, User-Agent',
-			),
-			$filepath,
-			$access_method
-		);
-
-		foreach ( (array) $cache_headers as $name => $value ) {
-			if ( '' !== $value ) {
-				header( $name . ': ' . $value );
-			}
-		}
-
-		header( 'X-Markdown-Source: markdown-for-agents' );
-
-		if ( null !== $canonical && '' !== $canonical ) {
-			header( 'Link: <' . $canonical . '>; rel="canonical"', false );
-		}
-
-		/**
-		 * Filter the Content-Signal header value.
-		 *
-		 * Return an empty string to suppress the header entirely.
-		 *
-		 * @since 1.1.0
-		 * @param string $signal The default signal value.
-		 */
-		$content_signal = preg_replace(
-			'/[^\w=,\-\. ]/',
-			'',
-			(string) apply_filters( 'markdown_for_agents_content_signal', 'ai-input=yes, search=yes' )
-		);
-
-		if ( $content_signal ) {
-			header( 'Content-Signal: ' . $content_signal );
-		}
-
-		// Discard anything already buffered, such as whitespace a theme or
-		// plugin printed outside its PHP tags, so the body starts with the
-		// file's front matter. Output that has already been flushed to the
-		// client cannot be recalled.
-		for ( $level = ob_get_level(); $level > 0; $level-- ) {
-			ob_end_clean();
-		}
-
-		readfile( $filepath ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
-		exit;
+		$this->responder->send( $filepath, $access_method, $canonical );
 	}
 }

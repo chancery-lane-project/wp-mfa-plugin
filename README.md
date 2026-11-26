@@ -140,6 +140,10 @@ These rules bypass requests with Markdown triggers while ordinary browser reques
 
 ---
 
+## Early serving (optional)
+
+Every Markdown response is sent `no-store`, so every one reaches WordPress, and by `template_redirect` WordPress has loaded every plugin and the theme. Copying `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` lets the plugin answer Markdown requests before those load, with the same triggers, headers and statistics. On one Pressable site that cut a Markdown request from 250 ms of CPU to 13 ms. It is off unless you copy the loader, stands aside automatically while a regular plugin or the theme hooks a filter it can't honour, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. See [docs/early-serving.md](docs/early-serving.md) for what it skips and how to check it.
+
 ## File structure
 
 ```
