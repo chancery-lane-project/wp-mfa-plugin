@@ -100,7 +100,10 @@ class Generator {
 		$frontmatter = $this->frontmatter_builder->build( $post );
 		$html        = $this->render_as_permalink_request(
 			$post,
-			fn(): string => $this->without_autoembed( $post, fn(): string => $this->get_post_content( $post ) )
+			fn(): string => $this->with_post_context(
+				$post,
+				fn(): string => $this->without_autoembed( $post, fn(): string => $this->get_post_content( $post ) )
+			)
 		);
 		$html        = $this->content_filter->filter( $html );
 		$markdown    = $this->converter->convert( $html, $post );
@@ -700,13 +703,59 @@ class Generator {
 	}
 
 	/**
+	 * Run a render callback with the post as the global $post.
+	 *
+	 * Shortcodes and blocks that render against the current post read it from
+	 * the global, through get_the_ID() or get_post() with no argument.
+	 * Generation runs outside the loop: under WP-CLI and cron there is no
+	 * global post, and in an admin save or AJAX batch it can be a different
+	 * one. Those callbacks then render against nothing, and the export
+	 * carries their fallback text instead of what the page shows.
+	 *
+	 * setup_postdata() also sets the loop globals ($id, $authordata, $pages
+	 * and the rest). Each one is put back as it was, or unset if it was
+	 * absent, even if rendering throws.
+	 *
+	 * @since  1.8.0
+	 * @param  \WP_Post          $post   The post being rendered.
+	 * @param  \Closure():string $render The render callback.
+	 * @return string
+	 */
+	private function with_post_context( \WP_Post $post, \Closure $render ): string {
+		$names    = array( 'post', 'id', 'authordata', 'currentday', 'currentmonth', 'page', 'pages', 'multipage', 'more', 'numpages' );
+		$previous = array();
+
+		foreach ( $names as $name ) {
+			if ( array_key_exists( $name, $GLOBALS ) ) {
+				$previous[ $name ] = $GLOBALS[ $name ];
+			}
+		}
+
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- Restored in the finally block below.
+		$GLOBALS['post'] = $post;
+		setup_postdata( $post );
+
+		try {
+			return $render();
+		} finally {
+			foreach ( $names as $name ) {
+				if ( array_key_exists( $name, $previous ) ) {
+					// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Restoring core's loop globals.
+					$GLOBALS[ $name ] = $previous[ $name ];
+				} else {
+					unset( $GLOBALS[ $name ] );
+				}
+			}
+		}
+	}
+
+	/**
 	 * Run a render callback with core's oEmbed auto-discovery switched off.
 	 *
 	 * WP_Embed::autoembed() turns a URL on its own line (including every
 	 * block-editor embed) into the provider's HTML. During export that is
-	 * expensive and the output is thrown away. Generation renders without a
-	 * global $post, so WP_Embed misses the post-meta cache the front end built
-	 * and makes a live HTTP request per embed (a loopback request for the
+	 * expensive and the output is thrown away. Any embed not already in the
+	 * post-meta cache costs a live HTTP request (a loopback request for the
 	 * site's own URLs). The result is usually an <iframe>, which the converter
 	 * strips to nothing. Left alone, the URL survives as text in the Markdown.
 	 *

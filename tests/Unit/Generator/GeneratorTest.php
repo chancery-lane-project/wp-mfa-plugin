@@ -948,6 +948,70 @@ class GeneratorTest extends TestCase {
         }
     }
 
+    public function test_get_post_markdown_renders_content_with_the_post_as_global_post(): void {
+        // WP-CLI and cron runs have no global post, so a shortcode that reads
+        // get_the_ID() rendered against nothing.
+        unset( $GLOBALS['post'], $GLOBALS['id'] );
+        $seen = null;
+        $GLOBALS['_mock_apply_filters']['the_content'] = function ( $value ) use ( &$seen ) {
+            $seen = [ $GLOBALS['post'] ?? null, $GLOBALS['id'] ?? null ];
+            return $value;
+        };
+
+        $post = $this->make_post( [ 'ID' => 174690, 'post_type' => 'post', 'post_status' => 'publish' ] );
+
+        try {
+            $this->generator->get_post_markdown( $post );
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['the_content'] );
+        }
+
+        $this->assertSame( [ $post, 174690 ], $seen );
+        $this->assertArrayNotHasKey( 'post', $GLOBALS, 'An absent global post must stay absent after rendering.' );
+        $this->assertArrayNotHasKey( 'id', $GLOBALS );
+        $this->assertArrayNotHasKey( 'pages', $GLOBALS );
+    }
+
+    public function test_get_post_markdown_restores_the_previous_global_post(): void {
+        // An admin save or AJAX batch may already have a different global post.
+        $previous         = $this->make_post( [ 'ID' => 7 ] );
+        $GLOBALS['post']  = $previous;
+        $GLOBALS['id']    = 7;
+        $GLOBALS['pages'] = [ 'previous content' ];
+
+        $post = $this->make_post( [ 'ID' => 8, 'post_type' => 'post', 'post_status' => 'publish' ] );
+
+        try {
+            $this->generator->get_post_markdown( $post );
+
+            $this->assertSame( $previous, $GLOBALS['post'] );
+            $this->assertSame( 7, $GLOBALS['id'] );
+            $this->assertSame( [ 'previous content' ], $GLOBALS['pages'] );
+        } finally {
+            unset( $GLOBALS['post'], $GLOBALS['id'], $GLOBALS['pages'] );
+        }
+    }
+
+    public function test_get_post_markdown_restores_the_global_post_when_rendering_throws(): void {
+        $previous        = $this->make_post( [ 'ID' => 7 ] );
+        $GLOBALS['post'] = $previous;
+        $GLOBALS['_mock_apply_filters']['the_content'] = function () {
+            throw new \RuntimeException( 'render failed' );
+        };
+
+        $post = $this->make_post( [ 'ID' => 8, 'post_type' => 'post', 'post_status' => 'publish' ] );
+
+        try {
+            $this->generator->get_post_markdown( $post );
+            $this->fail( 'Expected the render exception to propagate.' );
+        } catch ( \RuntimeException $e ) {
+            $this->assertSame( $previous, $GLOBALS['post'] );
+            $this->assertArrayNotHasKey( 'id', $GLOBALS );
+        } finally {
+            unset( $GLOBALS['_mock_apply_filters']['the_content'], $GLOBALS['post'], $GLOBALS['id'], $GLOBALS['pages'] );
+        }
+    }
+
     /** Registers a stand-in WP_Embed's autoembed on the_content at core's priority 8. */
     private function register_mock_autoembed(): array {
         $GLOBALS['wp_embed'] = new class {
