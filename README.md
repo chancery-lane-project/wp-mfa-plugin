@@ -140,9 +140,9 @@ These rules bypass requests with Markdown triggers while ordinary browser reques
 
 ---
 
-## Early serving (optional)
+## Early serving (experimental)
 
-Every Markdown response is sent `no-store`, so every one reaches WordPress, and by `template_redirect` WordPress has loaded every plugin and the theme. Copying `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` lets the plugin answer Markdown requests before those load, with the same triggers, headers and statistics. On one Pressable site that cut a Markdown request from 250 ms of CPU to 13 ms. It is off unless you copy the loader, stands aside automatically while a regular plugin or the theme hooks a filter it can't honour, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. See [docs/early-serving.md](docs/early-serving.md) for what it skips and how to check it.
+Experimental and off by default: most sites don't need it, and it may change or be removed in a later release. Every Markdown response is sent `no-store`, so every one reaches WordPress, and by `template_redirect` WordPress has loaded every plugin and the theme. Copying `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` lets the plugin answer Markdown requests before those load, with the same triggers, headers and statistics. On one Pressable site that cut a Markdown request from 250 ms of CPU to 13 ms; other sites have not been measured. Early requests skip regular plugins and the theme, so maintenance mode, access rules and response headers they add do not apply. It stands aside automatically while anything hooks a serving filter it can't apply, while a regular plugin or the theme hooks one of the two response filters it does apply or moves the uploads directory, and after a plugin or theme change until a full page load has checked again. It leaves any URL it can't match, and any URL with a query string other than `output_format`, to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. Read [docs/early-serving.md](docs/early-serving.md) for what it skips and how to check it before switching it on.
 
 ## File structure
 

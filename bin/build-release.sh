@@ -47,6 +47,8 @@ rsync -a \
 	"$PLUGIN_ROOT/vendor-prefixed" \
 	"$PLUGIN_ROOT/LICENSE" \
 	"$PLUGIN_ROOT/markdown-for-agents.php" \
+	"$PLUGIN_ROOT/early-serve.php" \
+	"$PLUGIN_ROOT/mu-plugins" \
 	"$PLUGIN_ROOT/uninstall.php" \
 	"$PLUGIN_ROOT/README.md" \
 	"$PLUGIN_ROOT/readme.txt" \

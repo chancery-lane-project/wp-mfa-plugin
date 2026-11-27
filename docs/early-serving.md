@@ -1,4 +1,9 @@
-# Early serving (optional)
+# Early serving (experimental)
+
+> Experimental. It has been measured on one site, it skips regular plugins and
+> the theme for the requests it answers, and it may change or be removed in a
+> later release. Try it on a staging site first, and check the statistics
+> still look as they did after a week or two.
 
 Normally the plugin decides whether to serve Markdown at `template_redirect`.
 By then WordPress has loaded every active plugin, the theme, run every `init`
@@ -54,12 +59,14 @@ cp wp-content/plugins/markdown-for-agents-and-statistics/mu-plugins/markdown-for
 
 Delete that file to switch it off. The loader only loads code from the plugin.
 It does nothing if the plugin is deactivated or missing, and it updates with
-the plugin. If the plugin's folder has a different name, edit the path in the
-loader.
+the plugin. It finds the plugin among the active plugins, so the plugin's
+folder can have any name.
 
 Early serving stays off until one ordinary front-end request has loaded fully
-and checked the filters below. On a site whose pages are all cached that can
-take a while; requesting any uncached URL, such as `/?mfa-check`, does it.
+and checked the filters below. It switches off again, until the next such
+request, whenever a plugin is activated or deactivated, the theme is switched
+or an update runs. On a site whose pages are all cached that can take a
+while; requesting any uncached URL, such as `/?mfa-check`, does it.
 
 ## Checking it
 
@@ -71,33 +78,55 @@ curl -sI 'https://example.org/a-post/?output_format=md' | grep -i x-markdown-sou
 wp option get markdown_for_agents_early_guard --format=json
 ```
 
-`{"hooked":[]}` means early serving is active. A list of filter names means it
-is standing aside because something hooks them.
+An empty `hooked` list means early serving is active. A list of filter names
+means it is standing aside because something hooks them. `upload_dir` in the
+list means a regular plugin or the theme moves the uploads directory, so the
+early route would look for exports in the wrong place. No `hooked` at all, only
+a `reset` value, means a plugin or theme changed and no full front-end request
+has checked the filters since.
+
+A filter stays on the list once it has been seen, even if later requests
+don't see it: a plugin may hook a filter for some visitors only. The list
+starts again when a plugin is activated or deactivated, the theme is switched
+or an update runs. If you remove a filter by editing code, clear it yourself:
+
+```bash
+wp option delete markdown_for_agents_early_guard
+```
 
 ## What it skips
 
-**Filters from regular plugins and the theme.** They have not loaded yet. Early
-serving watches these, and stands aside while any regular plugin or the theme
-hooks one:
+**Serving filters.** Early serving has no main query, post object or canonical
+URL, so it can't apply these. It stands aside while anything hooks one, a
+must-use plugin included:
 
 - `markdown_for_agents_serve_enabled`
+- `markdown_for_agents_serve_post_types`
 - `markdown_for_agents_serve_taxonomies`
 - `markdown_for_agents_canonical_url`
-- `markdown_for_agents_content_signal`
-- `markdown_for_agents_cache_headers`
 - `markdown_for_agents_export_path`
 - `markdown_for_agents_post_relative_path`
 - `get_canonical_url` (SEO plugins that change the canonical URL)
 
-The check runs at `wp_loaded` on front-end requests that load fully, so it
-updates on the next such request after you add or remove a filter. A filter
-added later than `wp_loaded`, for example inside a `template_redirect`
-callback, is not seen. Filters added by must-use plugins load on every
-request, so they apply to early responses too and don't block them.
+It does apply these two, when sending the response:
+
+- `markdown_for_agents_content_signal`
+- `markdown_for_agents_cache_headers`
+
+Must-use plugins load before early serving, so their callbacks on these two
+apply to early responses too. Regular plugins and the theme have not loaded
+yet, so early serving stands aside while either of them hooks one.
+
+The check for regular plugins and the theme runs at `wp_loaded` on front-end
+requests that load fully. A filter added later than `wp_loaded`, for example
+inside a `template_redirect` callback, is not seen. Must-use plugins are
+checked on every early request.
 
 **Plugins that act on every request.** Maintenance-mode and coming-soon
 plugins, membership plugins and security plugins that block or rate-limit in
 PHP have not loaded. Remove the loader while the site is in maintenance mode.
+Response headers a regular plugin or the theme adds, such as CORS headers, are
+missing from early responses.
 Firewalls that run before WordPress, such as a CDN or `auto_prepend_file`
 WAF, are unaffected.
 
@@ -111,8 +140,14 @@ path, following the default export layout: `{post_type}/{slug}.md`,
 file's own front matter has the same path as the request, so a date archive
 whose last segment matches a post's slug is never answered with that post. A
 URL it cannot match carries on to WordPress and is handled as usual. That
-includes the home page, files moved by the path filters, and, if
-`sanitize_file_name()` changes them, slugs with non-ASCII characters.
+includes the home page, the page set as the posts page (WordPress shows the
+blog index there, which has no Markdown), files moved by the path filters,
+and, if `sanitize_file_name()` changes them, slugs with non-ASCII characters.
+
+**Query strings.** A query variable can change what WordPress shows at a path
+(`?s=`, `?p=`, `?preview=`), and early serving has no main query to tell. Any
+request whose query string holds something other than `output_format`,
+tracking parameters such as `utm_source` included, goes through WordPress.
 
 **Multisite.** Not supported; the loader does nothing there.
 

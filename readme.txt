@@ -3,7 +3,7 @@ Contributors: chancerylaneproject
 Tags: markdown, ai, llm, content negotiation, agents
 Requires at least: 6.3
 Tested up to: 7.1.2
-Stable tag: 1.8.0-rc.3
+Stable tag: 1.8.0
 Requires PHP: 8.1
 License: GPL-3.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
@@ -79,15 +79,18 @@ a full WordPress page.
 
 = Can Markdown requests be made cheaper for the server? =
 
-Yes, optionally. Copy `mu-plugins/markdown-for-agents-early.php` from the plugin
+Most sites don't need to do anything. There is an experimental option, early
+serving, for sites where Markdown requests are a real share of the load. It is
+off unless you copy `mu-plugins/markdown-for-agents-early.php` from the plugin
 into `wp-content/mu-plugins/`. Markdown requests are then answered before other
-plugins and the theme load, with the same headers and statistics. On one
-Pressable site that cut each Markdown request from 250 ms of CPU to 13 ms. It
-switches itself off while a regular plugin or the theme hooks one of the
-plugin's serving filters, and it skips plugins that act on every request, such
-as maintenance mode. Delete the file to switch it off. The
+plugins and the theme load, with the same triggers and statistics. On one
+Pressable site that cut each Markdown request from 250 ms of CPU to 13 ms;
+other sites have not been measured. Early requests skip regular plugins and
+the theme, so anything they do on every request, such as maintenance mode,
+access rules or extra response headers, does not apply to them. It may change
+or be removed in a later release. Read the
 [early serving guide](https://github.com/chancery-lane-project/wp-mfa-plugin/blob/main/docs/early-serving.md)
-covers what it skips and how to check it.
+before switching it on, and delete the file to switch it off.
 
 = Does bulk generation need anything special on my host? =
 
@@ -317,11 +320,9 @@ wp markdown-agents generate-taxonomies --dry-run
 
 == Changelog ==
 
-= Unreleased =
-* Feature: optional early serving. Copy `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` and Markdown requests are answered before other plugins, the theme and the main query load, using the same triggers, response headers and statistics as before. On one Pressable site that took a Markdown request from 250 ms of CPU and 28 MB to 13 ms and 6 MB. It finds the export from the URL path and serves it only if the file's own permalink matches. It stands aside while a regular plugin or the theme hooks one of the serving filters, and leaves any URL it can't match to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. Off unless you copy the file; see docs/early-serving.md.
-* Developer: Markdown responses and their statistics are sent by a new `MarkdownResponder` class shared by both serving routes. No change to hooks or output.
-
 = 1.8.0 =
+* Experimental: optional early serving, off unless you switch it on. Copy `mu-plugins/markdown-for-agents-early.php` into `wp-content/mu-plugins/` and Markdown requests are answered before other plugins, the theme and the main query load, using the same triggers, response headers and statistics as before. On one Pressable site that took a Markdown request from 250 ms of CPU and 28 MB to 13 ms and 6 MB. It finds the export from the URL path and serves it only if the file's own permalink matches. It stands aside while anything hooks a serving filter it can't apply, while a regular plugin or the theme hooks one of the two response filters it does apply or moves the uploads directory, and after a plugin or theme change until a full page load has checked again. It leaves any URL it can't match, including the posts page, and any URL with a query string other than `output_format`, to WordPress. Responses carry `X-Markdown-Source: markdown-for-agents-early`. It skips regular plugins and the theme, has been measured on one site only, and may change or be removed; read docs/early-serving.md first.
+* Developer: Markdown responses and their statistics are sent by a new `MarkdownResponder` class shared by both serving routes. No change to hooks or output.
 * Feature: Markdown served through WordPress (`?output_format=md`, `Accept: text/markdown` or a known AI User-Agent) now names the page as canonical with `Link: <…>; rel="canonical"`: the post's own canonical URL from `wp_get_canonical_url()`, or the term's archive URL for taxonomy archives. Search engines and AI search indexes then cite the page rather than the Markdown. Direct `/wp-content/uploads/…` file URLs are served by the web server and don't get the header. New `markdown_for_agents_canonical_url` filter to change or omit it.
 * Feature: access statistics are now cleaned up automatically. Daily totals older than the period set under Settings → Agent Detection → Statistics are deleted once a day by WP-Cron. The default is 365 days, so no existing site loses data on update (statistics started in March 2026). Choose 30, 90 or 180 days, or keep everything. `wp markdown-agents prune-stats` still works for one-off clean-ups.
 * Feature: RiverBot and ibou-search are now recognised as AI search indexers. Both name themselves but were not on the list, so one site's statistics missed about 1,650 of their page requests in a week (plus 3,300 Markdown requests from ibou-search, which were counted but not categorised).

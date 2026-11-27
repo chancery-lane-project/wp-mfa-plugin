@@ -7,7 +7,7 @@
  * docs/early-serving.md.
  *
  * @package Tclp\WpMarkdownForAgents
- * @since   1.9.0
+ * @since   1.8.0
  */
 
 declare(strict_types=1);

@@ -170,6 +170,16 @@ if (!function_exists('update_option')) {
     }
 }
 
+if (!function_exists('maybe_unserialize')) {
+    function maybe_unserialize(mixed $data): mixed {
+        if (is_string($data) && preg_match('/^([adObis]:|N;)/', $data)) {
+            $value = @unserialize($data, ['allowed_classes' => false]);
+            return false === $value && 'b:0;' !== $data ? $data : $value;
+        }
+        return $data;
+    }
+}
+
 if (!function_exists('add_option')) {
     function add_option(string $option, mixed $value, string $deprecated = '', bool|string $autoload = true): bool {
         if (!isset($GLOBALS['_mock_options'][$option])) {
